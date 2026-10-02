@@ -1,0 +1,36 @@
+# Gradle files
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin 编译会话临时文件
+.kotlin/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.DS_Store
+
+# Log/OS Files
+*.log
+
+# Built application files
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ==================== 开发过程产物（不发布） ====================
+
+# 调试截图：249 张、300+ MB，全是我在模拟器上验收时截的，
+# 对使用者没有价值，提交上去会把仓库撑爆。
+docs/shots/
+
+# uiautomator dump：自动化测试时导出的界面结构 XML，纯调试用
+docs/ui*.xml
+
+# 临时测试脚本的产物（拼音表校验等，脚本本身在 build/ 下，已忽略）
+build/pytest/

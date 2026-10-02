@@ -1,0 +1,30 @@
+# ===== 复制到 Gitee 仓库根目录：.workflow/release.yml =====
+# Gitee Go / 流水线配置（Gitee 的 CI 叫做 Gitee Go，语法与 GitHub Actions 相近但不完全一致）。
+# 若你的 Gitee 仓库没有开启 Gitee Go，可以直接用本地脚本一键发布：
+#   tools/publish.ps1 -Tag v1.0.0
+name: release
+
+trigger:
+  tag:
+    - "v*"
+
+stages:
+  - stage: build
+    displayName: 构建并发布 APK
+    jobs:
+      - job: build_apk
+        displayName: 构建 APK
+        steps:
+          - step: setup-jdk
+            displayName: 准备 JDK 17
+            script:
+              - java -version
+          - step: build
+            displayName: Gradle 构建
+            script:
+              - chmod +x gradlew
+              - ./gradlew :app:assembleRelease --no-daemon
+          - step: upload
+            displayName: 上传制品
+            artifacts:
+              - app/build/outputs/apk/release/*.apk

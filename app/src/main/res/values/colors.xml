@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ink">#FF0A0B10</color>
+    <color name="ink_soft">#FF10132A</color>
+    <color name="violet">#FF1A1240</color>
+    <color name="accent">#FF5AA9FF</color>
+    <color name="accent_bright">#FF8EC5FF</color>
+    <color name="accent_pink">#FFFF6B9F</color>
+    <color name="black">#FF000000</color>
+</resources>

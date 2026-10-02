@@ -1,0 +1,868 @@
+package com.chinut.bawantv.ui.screens
+
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.chinut.bawantv.BawanApp
+import com.chinut.bawantv.BuildConfig
+import com.chinut.bawantv.core.DebugWebServer
+import com.chinut.bawantv.core.ParentalControl
+import com.chinut.bawantv.core.Qr
+import com.chinut.bawantv.core.Updater
+import com.chinut.bawantv.core.UpdateState
+import com.chinut.bawantv.ddys.Ddys
+import com.chinut.bawantv.ui.ParentalPinDialog
+import com.chinut.bawantv.ui.ReadonlyKeyValue
+import com.chinut.bawantv.ui.theme.Dim
+import com.chinut.bawantv.ui.theme.entryFocusable
+import com.chinut.bawantv.ui.theme.Ink
+import com.chinut.bawantv.ui.theme.rememberTvFocusState
+import com.chinut.bawantv.ui.theme.sdp
+import com.chinut.bawantv.ui.theme.ssp
+import com.chinut.bawantv.ui.theme.tvFocusable
+import com.chinut.bawantv.ui.theme.Txt
+import com.chinut.bawantv.ui.TvKeyboardDialog
+import com.chinut.bawantv.ui.TvSwitch
+import com.chinut.bawantv.vod.VodRepo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/**
+ * 板块 D：设置。
+ *
+ * 全部设置都可以在电视上完成，但为了不折磨遥控器，长文本（订阅地址）优先引导用户
+ * 用手机扫码改（手机网页调试模式）。域名、开关这类短设置直接在电视上改。
+ */
+@Composable
+fun SettingsScreen(
+    entryKey: Any,
+) {
+    val context = LocalContext.current
+    val prefs = BawanApp.prefs
+    val scope = rememberCoroutineScope()
+
+    // 让设置项变更后立刻触发重组
+    val revision by prefs.revision.collectAsState()
+    val serverRunning by DebugWebServer.running.collectAsState()
+    val serverPort by DebugWebServer.port.collectAsState()
+    val updateState by Updater.state.collectAsState()
+
+    var editing by remember { mutableStateOf<EditTarget?>(null) }
+    var showQr by remember { mutableStateOf(false) }
+    var siteCount by remember { mutableStateOf(0) }
+    var liveStatus by remember { mutableStateOf("未加载") }
+    var resolvedDomain by remember { mutableStateOf(Ddys.activeBase) }
+
+    // ---------- 未成年人保护的状态 ----------
+    var parentalOn by remember { mutableStateOf(ParentalControl.enabled) }
+    /** 家长密码流程处于哪一步；null 表示没在输密码。 */
+    var pinStage by remember { mutableStateOf<PinStage?>(null) }
+    /** 首次设置时暂存第一次输入，用于二次确认。 */
+    var pinFirst by remember { mutableStateOf("") }
+    /** 输完 PIN 后想把保护设成什么状态。 */
+    var pendingEnable by remember { mutableStateOf(false) }
+    /** 名单被改过时用它触发重组（名单内容存在 prefs 里，不是 Compose 状态）。 */
+    var wordEpoch by remember { mutableIntStateOf(0) }
+
+    fun blockedCount() = prefs.parentalBlockedWords.split(',').count { it.isNotBlank() }
+    fun allowedCount() = prefs.parentalAllowedWords.split(',').count { it.isNotBlank() }
+
+    // 进入设置页时启动调试服务（方便随时扫码）
+    LaunchedEffect(Unit) {
+        if (prefs.debugEnabled && !DebugWebServer.running.value) {
+            DebugWebServer.start(context, prefs.debugPort)
+        }
+        withContext(Dispatchers.IO) {
+            val sites = runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
+                .getOrDefault(emptyList())
+            siteCount = sites.size
+            liveStatus = VodRepo.lastStatus
+            resolvedDomain = Ddys.activeBase
+        }
+    }
+
+    val listState = rememberLazyListState()
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(end = 12.sdp, bottom = 40.sdp),
+        verticalArrangement = Arrangement.spacedBy(18.sdp),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("设置", color = Color.White, fontSize = Txt.Title, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(14.sdp))
+                Text(
+                    "遥控器上下选择，确定键进入/切换",
+                    color = Ink.TextTertiary,
+                    fontSize = Txt.Caption,
+                )
+            }
+        }
+
+        // ==================== 手机网页调试 ====================
+        item {
+            SettingsCard(
+                title = "手机网页调试",
+                subtitle = "电视上打字太麻烦：用手机扫码，在手机上改所有设置，保存后电视立即生效",
+                focusKey = entryKey,
+                accent = Ink.Green,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (serverRunning) {
+                                "服务运行中：${Qr.debugUrl(context, serverPort)}"
+                            } else {
+                                "服务未运行"
+                            },
+                            color = if (serverRunning) Ink.Green else Ink.TextTertiary,
+                            fontSize = Txt.Label,
+                        )
+                        Spacer(Modifier.height(4.sdp))
+                        Text(
+                            "手机与电视需连同一个 WiFi。默认端口 ${prefs.debugPort}。",
+                            color = Ink.TextFaint,
+                            fontSize = Txt.Tiny,
+                        )
+                    }
+                    Spacer(Modifier.width(12.sdp))
+                    SmallButton(if (showQr) "收起二维码" else "显示二维码") { showQr = !showQr }
+                    Spacer(Modifier.width(10.sdp))
+                    SmallButton(if (serverRunning) "停止" else "启动") {
+                        if (serverRunning) {
+                            DebugWebServer.stop()
+                        } else {
+                            DebugWebServer.start(context, prefs.debugPort)
+                        }
+                    }
+                }
+
+                if (showQr && serverRunning) {
+                    Spacer(Modifier.height(16.sdp))
+                    QrPanel(url = Qr.debugUrl(context, serverPort)) { showQr = false }
+                }
+                Spacer(Modifier.height(10.sdp))
+                TvSwitch(
+                    label = "允许手机调试",
+                    hint = "关闭后不再自动启动局域网服务",
+                    checked = prefs.debugEnabled,
+                ) { prefs.debugEnabled = it }
+
+                Spacer(Modifier.height(4.sdp))
+                KeyValueRow(
+                    label = "调试端口",
+                    value = prefs.debugPort.toString(),
+                    onEdit = { editing = EditTarget.Port },
+                )
+                KeyValueRow(
+                    label = "手机口令",
+                    value = prefs.debugToken.ifBlank { "（未设置）" },
+                    onEdit = { editing = EditTarget.Token },
+                )
+            }
+        }
+
+        // ==================== 影视库来源说明 + 辅助源开关 ====================
+        item {
+            SettingsCard(
+                title = "影视内容来源",
+                subtitle = "低端影视是内容基础（片库缓存在本地，进影视页立刻有内容）；" +
+                    "下面的 TVBox 站点只作为**补充线路**，当低端影视播不了时才会用上。",
+                accent = Ink.Green,
+            ) {
+                TvSwitch(
+                    label = "允许 TVBox 作为补充源",
+                    hint = "关掉后影视只使用低端影视，更干净但可选线路变少",
+                    checked = prefs.tvboxSupplement,
+                ) { prefs.tvboxSupplement = it }
+                Spacer(Modifier.height(10.sdp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        com.chinut.bawantv.unified.LibraryStore.let { ls ->
+                            val n = runCatching { ls.load().size }.getOrDefault(0)
+                            if (n > 0) "本地片库：$n 部（已缓存，离线可看）"
+                            else "本地片库：空，去影视页按「刷新片库」拉取"
+                        },
+                        color = Ink.TextTertiary,
+                        fontSize = Txt.Tiny,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    SmallButton("清空片库") {
+                        com.chinut.bawantv.unified.LibraryStore.clear()
+                        toast(context, "本地片库已清空")
+                    }
+                }
+            }
+        }
+
+        // ==================== 板块 B：影视订阅 ====================
+        item {
+            SettingsCard(
+                title = "影视订阅（板块 B）",
+                subtitle = "TVBox 接口地址，一行一个。内置一份默认接口，也可以填自己的。" +
+                    "这些站点**只是备用线路**，不参与主内容列表。",
+                accent = Ink.Accent,
+            ) {
+                ReadonlyKeyValue(
+                    value = prefs.subscriptionUrls,
+                    placeholder = "asset://default_sub.json（内置默认）",
+                    onEditRequest = { editing = EditTarget.SubUrls },
+                )
+                Spacer(Modifier.height(10.sdp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "可用站点：$siteCount 个 · $liveStatus",
+                        color = if (siteCount > 0) Ink.Green else Ink.Amber,
+                        fontSize = Txt.Tiny,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    SmallButton("恢复内置") {
+                        prefs.subscriptionUrls = com.chinut.bawantv.core.AppPrefs.DEFAULT_SUB_URLS
+                        VodRepo.invalidate()
+                        scope.launch {
+                            siteCount = withContext(Dispatchers.IO) {
+                                runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
+                                    .getOrDefault(emptyList()).size
+                            }
+                            liveStatus = VodRepo.lastStatus
+                        }
+                    }
+                    Spacer(Modifier.width(10.sdp))
+                    SmallButton("重新加载") {
+                        VodRepo.invalidate()
+                        scope.launch {
+                            siteCount = withContext(Dispatchers.IO) {
+                                runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
+                                    .getOrDefault(emptyList()).size
+                            }
+                            liveStatus = VodRepo.lastStatus
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.sdp))
+                TvSwitch(
+                    label = "只显示影视类站点",
+                    hint = "过滤掉工具/网盘/直播类站点",
+                    checked = prefs.vodOnlySites,
+                ) { prefs.vodOnlySites = it }
+            }
+        }
+
+        // ==================== 板块 C：低端影视 ====================
+        item {
+            SettingsCard(
+                title = "低端影视域名（板块 C）",
+                subtitle = "网站换域名时改这里。官方永久域名 ddys.io，另有 ddys.pics / ddys.live / ddys.help 三个镜像。",
+                accent = Ink.Amber,
+            ) {
+                KeyValueRow(
+                    label = "当前域名",
+                    value = prefs.domain,
+                    onEdit = { editing = EditTarget.Domain },
+                )
+                Spacer(Modifier.height(6.sdp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "最近探测可用：${resolvedDomain.removePrefix("https://")}",
+                        color = Ink.TextFaint,
+                        fontSize = Txt.Tiny,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SmallButton("探测可用域名") {
+                        scope.launch {
+                            val d = withContext(Dispatchers.IO) { Ddys.probe(force = true) }
+                            resolvedDomain = "https://$d"
+                            toast(context, "可用域名：$d")
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.sdp))
+                TvSwitch(
+                    label = "自动探测域名",
+                    hint = "启动时自动在四个官方域名里挑一个能通的",
+                    checked = prefs.autoPickDomain,
+                ) { prefs.autoPickDomain = it }
+                Spacer(Modifier.height(4.sdp))
+                TvSwitch(
+                    label = "网页兜底",
+                    hint = "接口异常时改用网页方式抓取（备用方案）",
+                    checked = prefs.webFallbackEnabled,
+                ) { prefs.webFallbackEnabled = it }
+            }
+        }
+
+        // ==================== 板块 A：直播 ====================
+        item {
+            SettingsCard(
+                title = "电视直播（板块 A）",
+                subtitle = "内置央视频道表；也可以填自己的 m3u / txt 直播源地址（留空用内置）",
+                accent = Ink.Pink,
+            ) {
+                ReadonlyKeyValue(
+                    value = prefs.liveSourceUrl,
+                    placeholder = "（留空使用内置频道表）",
+                    onEditRequest = { editing = EditTarget.LiveSource },
+                    maxLines = 2,
+                )
+                Spacer(Modifier.height(6.sdp))
+                TvSwitch(
+                    label = "开机自动播放上次频道",
+                    hint = "像老电视一样，打开就在台上",
+                    checked = prefs.autoPlayLastChannel,
+                ) { prefs.autoPlayLastChannel = it }
+                TvSwitch(
+                    label = "换台时显示台标浮层",
+                    hint = "关闭后换台更干净",
+                    checked = prefs.showChannelHud,
+                ) { prefs.showChannelHud = it }
+                TvSwitch(
+                    label = "硬件解码",
+                    hint = "画面花屏/绿屏时关掉试试",
+                    checked = prefs.hardwareDecode,
+                ) { prefs.hardwareDecode = it }
+            }
+        }
+
+        // ==================== 未成年人保护 ====================
+        item {
+            SettingsCard(
+                title = "未成年人保护",
+                subtitle = "按分类与关键词过滤不合适的内容；开关由 4 位家长密码保护",
+                accent = Ink.Amber,
+            ) {
+                TvSwitch(
+                    label = if (parentalOn) "已开启" else "已关闭",
+                    hint = if (parentalOn) {
+                        "少儿/动漫/科教/纪录等分类可看，恐怖/犯罪/情色等被拦下"
+                    } else {
+                        "开启后，明显不适合未成年人的内容不会出现在列表里"
+                    },
+                    checked = parentalOn,
+                ) { want ->
+                    if (!ParentalControl.hasPin) {
+                        // 第一次开启：先让家长设一个 PIN
+                        if (want) {
+                            pendingEnable = true
+                            pinStage = PinStage.SetFirst
+                        } else {
+                            parentalOn = false
+                        }
+                    } else if (ParentalControl.unlocked) {
+                        ParentalControl.setEnabled(want)
+                        parentalOn = want
+                    } else {
+                        // 已经有 PIN：改开关前必须验一次
+                        pendingEnable = want
+                        pinStage = PinStage.Verify
+                    }
+                }
+
+                if (ParentalControl.hasPin) {
+                    Spacer(Modifier.height(4.sdp))
+                    KeyValueRow(
+                        label = "家长密码",
+                        value = if (ParentalControl.unlocked) "本次已解锁" else "已设置（点此重设）",
+                        onEdit = { pinStage = PinStage.SetFirst },
+                    )
+                }
+
+                Spacer(Modifier.height(6.sdp))
+                Text(
+                    "怎么判断能不能看：内容源**都不提供年龄分级**，" +
+                        "所以这里是用「分类 + 关键词」做启发式过滤——" +
+                        "少儿/动漫/科教/纪录等放行，恐怖/犯罪/情色/暴力等拦下，" +
+                        "两条都没命中时默认拦（不确定就不放）。" +
+                        "它拦得住明显的，拦不住刻意包装的内容；" +
+                        "要更严格可以在下面的名单里补具体片名。",
+                    color = Ink.TextFaint,
+                    fontSize = Txt.Tiny,
+                    lineHeight = 18.ssp,
+                )
+
+                Spacer(Modifier.height(8.sdp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "自定义名单：拦 ${blockedCount()} 词 · 放行 ${allowedCount()} 词",
+                        color = Ink.TextSecondary,
+                        fontSize = Txt.Label,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SmallButton("清空名单") {
+                        ParentalControl.clearWordLists()
+                        wordEpoch++
+                    }
+                }
+            }
+        }
+
+        // ==================== 更新 ====================
+        item {
+            SettingsCard(
+                title = "版本与更新",
+                subtitle = "发布在 Gitee 与 GitHub，优先走 Gitee 下载",
+                accent = Ink.Green,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "当前版本 v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        color = Ink.TextSecondary,
+                        fontSize = Txt.Label,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SmallButton("检查更新") {
+                        scope.launch {
+                            val info = withContext(Dispatchers.IO) { Updater.check(context) }
+                            if (info == null && Updater.state.value is UpdateState.UpToDate) {
+                                toast(context, "已经是最新版本")
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.sdp))
+                when (val st = updateState) {
+                    is UpdateState.Checking -> StatusLine(st.message, Ink.TextTertiary)
+                    is UpdateState.UpToDate -> StatusLine("已经是最新版本", Ink.Green)
+                    is UpdateState.Failed -> StatusLine(st.message, Ink.Amber)
+                    is UpdateState.Available -> {
+                        StatusLine(
+                            "发现新版本 v${st.info.versionName}（versionCode ${st.info.versionCode}）",
+                            Ink.AccentBright,
+                        )
+                        if (st.info.notes.isNotBlank()) {
+                            Spacer(Modifier.height(6.sdp))
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.sdp))
+                                    .background(Ink.Deep)
+                                    .padding(12.sdp)
+                            ) {
+                                Text(
+                                    st.info.notes.take(600),
+                                    color = Ink.TextTertiary,
+                                    fontSize = Txt.Tiny,
+                                    lineHeight = 18.ssp,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.sdp))
+                        Row {
+                            SmallButton("下载并安装") {
+                                scope.launch {
+                                    val f = withContext(Dispatchers.IO) { Updater.download(context, st.info) }
+                                    if (f != null) Updater.install(context, f)
+                                }
+                            }
+                        }
+                    }
+
+                    is UpdateState.Downloading -> {
+                        StatusLine("正在从 ${st.from} 下载 ${(st.progress * 100).toInt()}%", Ink.AccentBright)
+                        Spacer(Modifier.height(6.sdp))
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(6.sdp)
+                                .clip(RoundedCornerShape(3.sdp))
+                                .background(Ink.CardStrong)
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(st.progress.coerceIn(0f, 1f))
+                                    .height(6.sdp)
+                                    .background(Ink.AccentBright)
+                            )
+                        }
+                    }
+
+                    is UpdateState.Ready -> {
+                        StatusLine("下载完成 ${st.info.sizeText}，点下面安装", Ink.Green)
+                        Spacer(Modifier.height(8.sdp))
+                        SmallButton("立即安装") { Updater.install(context, st.file) }
+                    }
+
+                    UpdateState.Idle -> Unit
+                }
+                Spacer(Modifier.height(6.sdp))
+                TvSwitch(
+                    label = "启动时自动检查更新",
+                    hint = "打开 App 后台静默检查",
+                    checked = prefs.autoCheckUpdate,
+                ) { prefs.autoCheckUpdate = it }
+            }
+        }
+
+        // ==================== 关于 ====================
+        item {
+            SettingsCard(
+                title = "关于焰火TV",
+                subtitle = "为电视大屏与遥控器重新设计的聚合播放器",
+                accent = Ink.AccentBright,
+            ) {
+                val about = listOf(
+                    "直播" to "内置央视频道表，支持自定义 m3u 直播源；播放中上下键换台、左右键调音量",
+                    "影视" to "基于 TVBox 订阅接口（只保留 HTTP-JSON 型站点，不需要额外爬虫插件）",
+                    "瀑布流" to "低端影视官方 JSON 接口，四个官方域名自动容错",
+                    "输入" to "电视端自带虚拟键盘；长文本建议扫码用手机改",
+                )
+                about.forEach { (k, v) ->
+                    Row(Modifier.padding(vertical = 5.sdp)) {
+                        Text(k, color = Ink.AccentBright, fontSize = Txt.Caption, modifier = Modifier.width(70.sdp))
+                        Text(v, color = Ink.TextTertiary, fontSize = Txt.Caption, lineHeight = 20.ssp)
+                    }
+                }
+                Spacer(Modifier.height(8.sdp))
+                Text(
+                    "免责声明：本应用只做播放器与界面聚合，不存储、不传播任何影视资源。\n" +
+                        "直播源、订阅接口与在线影视地址均来自第三方公开接口，仅限个人学习研究使用，" +
+                        "请勿用于任何商业用途。",
+                    color = Ink.TextFaint,
+                    fontSize = Txt.Tiny,
+                    lineHeight = 18.ssp,
+                )
+            }
+        }
+
+        item {
+            // 兜底留白
+            Box(Modifier.width(1.sdp).height(1.sdp))
+        }
+    }
+
+    // ---------- 家长密码弹窗 ----------
+    when (pinStage) {
+        PinStage.SetFirst -> ParentalPinDialog(
+            title = if (ParentalControl.hasPin) "设置新的家长密码" else "设置家长密码",
+            onCancel = { pinStage = null },
+            verify = { input ->
+                // 第一次输入只暂存，不算"通过"，所以永远返回 false 并切到确认阶段
+                pinFirst = input
+                pinStage = PinStage.SetConfirm
+                false
+            },
+            onDone = { },
+        )
+
+        PinStage.SetConfirm -> ParentalPinDialog(
+            title = "请再输入一次确认",
+            onCancel = { pinStage = null },
+            verify = { input ->
+                if (input == pinFirst) {
+                    ParentalControl.setPin(input)
+                    ParentalControl.setEnabled(true)
+                    parentalOn = true
+                    pinStage = null
+                    true
+                } else {
+                    // 两次不一致：回到第一步重来
+                    pinFirst = ""
+                    pinStage = PinStage.SetFirst
+                    false
+                }
+            },
+            onDone = { },
+        )
+
+        PinStage.Verify -> ParentalPinDialog(
+            title = if (pendingEnable) "开启未成年人保护" else "关闭未成年人保护",
+            onCancel = { pinStage = null },
+            verify = { input ->
+                if (ParentalControl.unlock(input)) {
+                    ParentalControl.setEnabled(pendingEnable)
+                    parentalOn = pendingEnable
+                    pinStage = null
+                    true
+                } else {
+                    false
+                }
+            },
+            onDone = { },
+        )
+
+        null -> Unit
+    }
+
+    // ---------- 输入弹窗（TV 键盘） ----------
+    editing?.let { target ->
+        TvKeyboardDialog(
+            title = target.title,
+            initial = target.current(prefs),
+            onDismiss = { editing = null },
+            onConfirm = { value ->
+                target.apply(prefs, value)
+                editing = null
+                if (target == EditTarget.SubUrls || target == EditTarget.LiveSource) {
+                    VodRepo.invalidate()
+                    scope.launch {
+                        siteCount = withContext(Dispatchers.IO) {
+                            runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
+                                .getOrDefault(emptyList()).size
+                        }
+                        liveStatus = VodRepo.lastStatus
+                    }
+                }
+            },
+        )
+    }
+
+    // revision 只是为了让上面的读取随设置变化重组
+    @Suppress("UNUSED_EXPRESSION")
+    revision
+}
+
+/** 设置项编辑目标。 */
+private enum class EditTarget(val title: String) {
+    SubUrls("影视订阅地址（一行一个）"),
+    Domain("低端影视域名"),
+    LiveSource("直播源地址"),
+    Port("调试端口"),
+    Token("手机调试口令");
+
+    fun current(prefs: com.chinut.bawantv.core.AppPrefs): String = when (this) {
+        SubUrls -> prefs.subscriptionUrls
+        Domain -> prefs.domain
+        LiveSource -> prefs.liveSourceUrl
+        Port -> prefs.debugPort.toString()
+        Token -> prefs.debugToken
+    }
+
+    fun apply(prefs: com.chinut.bawantv.core.AppPrefs, value: String) {
+        when (this) {
+            SubUrls -> prefs.subscriptionUrls = value
+            Domain -> prefs.domain = value
+            LiveSource -> prefs.liveSourceUrl = value
+            Port -> value.toIntOrNull()?.let { prefs.debugPort = it.coerceIn(1024, 65535) }
+            Token -> prefs.debugToken = value
+        }
+    }
+}
+
+// ==================== 通用小组件 ====================
+
+@Composable
+private fun SettingsCard(
+    title: String,
+    subtitle: String,
+    accent: Color,
+    focusKey: Any? = null,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Dim.BigRadius))
+            .background(Ink.Card)
+            .then(
+                // 第一张卡片作为板块入口：注册一个可聚焦项，供导航栏按右键进入
+                if (focusKey != null) {
+                    Modifier.entryFocusable(focusKey)
+                } else {
+                    Modifier
+                }
+            )
+            .padding(20.sdp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .width(5.sdp)
+                    .height(22.sdp)
+                    .background(accent, RoundedCornerShape(3.sdp))
+            )
+            Spacer(Modifier.width(12.sdp))
+            Column {
+                Text(title, color = Color.White, fontSize = Txt.Section, fontWeight = FontWeight.Bold)
+                if (subtitle.isNotBlank()) {
+                    Spacer(Modifier.height(2.sdp))
+                    Text(subtitle, color = Ink.TextTertiary, fontSize = Txt.Tiny, lineHeight = 18.ssp)
+                }
+            }
+        }
+        Spacer(Modifier.height(14.sdp))
+        content()
+    }
+}
+
+@Composable
+private fun KeyValueRow(label: String, value: String, onEdit: () -> Unit) {
+    val f = rememberTvFocusState()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .tvFocusable(
+                focusState = f,
+                shape = RoundedCornerShape(12.sdp),
+                focusedScale = 1.01f,
+                glow = false,
+                borderWidth = 2.dp,
+                baseBackground = Ink.Deep,
+                focusedBackground = Ink.CardStrong,
+                onClick = onEdit,
+            )
+            .padding(horizontal = 14.sdp, vertical = 12.sdp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = Ink.TextFaint, fontSize = Txt.Caption, modifier = Modifier.width(90.sdp))
+        Text(
+            value,
+            color = if (f.focused) Color.White else Ink.TextSecondary,
+            fontSize = Txt.Label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text("修改", color = Ink.AccentBright, fontSize = Txt.Tiny)
+    }
+}
+
+@Composable
+private fun SmallButton(label: String, onClick: () -> Unit) {
+    val f = rememberTvFocusState()
+    Box(
+        Modifier
+            .height(38.sdp)
+            .tvFocusable(
+                focusState = f,
+                shape = RoundedCornerShape(Dim.ChipRadius),
+                focusedScale = 1.06f,
+                borderWidth = 2.dp,
+                baseBackground = Ink.CardStrong,
+                focusedBackground = Ink.AccentSoft,
+                onClick = onClick,
+            )
+            .padding(horizontal = 16.sdp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (f.focused) Color.White else Ink.TextSecondary,
+            fontSize = Txt.Caption,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun StatusLine(text: String, color: Color) {
+    Text(text, color = color, fontSize = Txt.Caption, lineHeight = 20.ssp)
+}
+
+/** 二维码面板（手机扫码入口）。 */
+@Composable
+private fun QrPanel(url: String, onClose: () -> Unit) {
+    val bitmap = remember(url) { Qr.bitmap(url, 560) }
+
+    // 关键：这是个全屏 Dialog，必须自己处理返回键，否则按返回会一路穿透到
+    // 根 BackHandler（被当成"回首页"），用户看起来就像"卡在二维码里出不来"。
+    BackHandler(enabled = true) { onClose() }
+
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .background(Ink.Sheet, RoundedCornerShape(Dim.BigRadius))
+                .padding(28.sdp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("手机扫码修改设置", color = Color.White, fontSize = Txt.Section, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.sdp))
+            Text(
+                "手机连同一个 WiFi，扫码打开网页即可修改订阅、域名等全部设置",
+                color = Ink.TextTertiary,
+                fontSize = Txt.Caption,
+            )
+            Spacer(Modifier.height(18.sdp))
+            if (bitmap != null) {
+                Box(
+                    Modifier
+                        .size(300.sdp)
+                        .background(Color.White, RoundedCornerShape(16.sdp))
+                        .padding(12.sdp)
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "调试二维码",
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            } else {
+                Text("二维码生成失败", color = Ink.Amber, fontSize = Txt.Label)
+            }
+            Spacer(Modifier.height(14.sdp))
+            Text(url, color = Ink.AccentBright, fontSize = Txt.Label, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(16.sdp))
+            // 提示用遥控器返回键关闭（不放按钮，保持干净）
+            Text(
+                "按遥控器「返回」关闭",
+                color = Ink.TextFaint,
+                fontSize = Txt.Caption,
+            )
+        }
+    }
+}
+
+private fun toast(context: android.content.Context, msg: String) {
+    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+}
+
+/** 家长密码流程的三个阶段。 */
+private enum class PinStage {
+    /** 首次设置：输一遍，再确认一遍。 */
+    SetFirst,
+
+    /** 首次设置的第二次确认。 */
+    SetConfirm,
+
+    /** 已有密码，改开关前校验。 */
+    Verify,
+}

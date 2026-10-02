@@ -1,0 +1,23 @@
+# 统一换行符，避免 Windows 提交 / 服务器构建时出现莫名其妙的整文件 diff
+
+# 默认：入库统一用 LF，检出时按平台
+* text=auto eol=lf
+
+# Windows 专用脚本必须保持 CRLF，否则在 Windows 上可能无法执行
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制文件：不要做任何换行转换（转换会破坏文件）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.jar binary
+*.jks binary
+*.keystore binary
+*.apk binary
+*.aab binary
+*.m3u8 binary
+*.ts binary
