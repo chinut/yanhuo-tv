@@ -5,6 +5,7 @@ import android.net.Uri
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -903,9 +904,19 @@ fun LivePlayerScreen(
                         qualityCursor = (qualityCursor + 1).coerceAtMost(max); true
                     }
 
-                    com.chinut.bawantv.ui.theme.Direction.Left,
-                    com.chinut.bawantv.ui.theme.Direction.Right,
-                    -> true
+                    // ←→ 也用来在列表里移动。
+                    //
+                    // 原来这两键直接返回 true（什么都不做），本意是"别拿去换台"，
+                    // 但用户看到的是一按左右就没反应 —— 对着几十个源只能一个个按上下，
+                    // 很别扭。现在让它们等价于上下。
+                    com.chinut.bawantv.ui.theme.Direction.Left -> {
+                        qualityCursor = (qualityCursor - 1).coerceAtLeast(0); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Right -> {
+                        val max = (candidatesOf(current).size - 1).coerceAtLeast(0)
+                        qualityCursor = (qualityCursor + 1).coerceAtMost(max); true
+                    }
                 }
             } else {
                 when (dir) {
@@ -1334,6 +1345,16 @@ private fun QualityPanel(
     cursor: Int,
     onPick: (Int) -> Unit,
 ) {
+    // 每个频道的源可能有几十个（央视 33 个），面板必须能滚动，
+    // 否则超出的项会跑到屏幕外 —— 用户「看得到列表但选不中」就是这么来的。
+    val listState = rememberLazyListState()
+    // 光标移动时自动把它滚进可见范围（遥控器没法拖动滚动条）
+    LaunchedEffect(cursor, sources.size) {
+        if (cursor >= 0 && cursor < sources.size) {
+            runCatching { listState.animateScrollToItem(cursor) }
+        }
+    }
+
     Column(
         Modifier
             .width(360.sdp)
@@ -1362,7 +1383,13 @@ private fun QualityPanel(
         )
         Spacer(Modifier.height(14.dp))
 
-        sources.forEachIndexed { i, url ->
+        androidx.compose.foundation.lazy.LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 300.sdp),
+        ) {
+            itemsIndexed(sources) { i, url ->
             val isActive = i == activeIndex
             val isCursor = i == cursor
             Row(
@@ -1412,6 +1439,7 @@ private fun QualityPanel(
                         fontWeight = FontWeight.Bold,
                     )
                 }
+            }
             }
         }
 

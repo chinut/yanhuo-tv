@@ -1,29 +1,26 @@
 """
-自动抓取央视各频道的直播直连地址。
+自动抓取央视各频道的直播直连地址（第二版）。
 
-## 背景
+## 为什么有第二版
 
-央视的直播流可以直连，不需要 WebView、不需要签名：
+第一版的问题是**没耐心**：每个频道只打开一次、等 45 秒拿不到就走人。
+用户手动在浏览器里是**反复刷新直到播放器真的切到那个频道**，
+所以他能抓到 CCTV-9 / CCTV-14，我的脚本抓不到（拿到的是 cctv13 的流）。
 
-    https://ldncctvwbcdtxy.liveplay.myqcloud.com/ldncctvwbcd/cdrmldcctv13_1.m3u8
-    → 腾讯云直播（央视自己的 CDN），无防盗链，master playlist 5 档清晰度
+实测证据：用户给的
+    CCTV-9   https://ldocctvwbcdcnc.v.wscdns.com/ldocctvwbcd/cdrmldcctv9_1_720P/playlist.m3u8?wsApp=HLS
+    CCTV-14  https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv14_1/index.m3u8?BR=td
+都是可用的（实测 HTTP 200 且有分片）。
 
-但**每个频道的地址不同**（主机名和路径都不一样），
-而且地址是页面里的 JS 动态取回来的 —— 所以静态爬 HTML 拿不到。
-
-## 这个脚本做什么
-
-用真实浏览器（Playwright + 你已装的 Edge）逐个打开央视各频道页面，
-**监听网络请求**，把 m3u8 的地址截下来。
-
-这跟手工 F12 是同一件事，只是自动化了 —— 一次跑完 17 个频道，
-以后央视换地址重跑一遍就行。
+第二版的做法：
+  · 每个频道**最多试 N 轮**，每轮重新加载页面（等价于用户手动刷新）
+  · 每轮里**持续轮询**，一旦截到"频道号对得上"的流就成功
+  · 记录所有形态（`index.m3u8?BR=` / `_720P/playlist.m3u8` / ...）
 
 ## 用法
 
-    python tools\fetch_cctv_urls.py
-
-结果写到 cctv_urls.json，同时打印在屏幕上。
+    python tools\\fetch_cctv_urls.py                  # 抓全部 18 个
+    python tools\\fetch_cctv_urls.py cctv9 cctv14     # 只抓指定的
 """
 import json
 import os
@@ -34,175 +31,141 @@ import time
 try:
     from playwright.sync_api import sync_playwright
 except ImportError:
-    print('缺少 playwright。请先运行：')
-    print('    python -m pip install playwright')
+    print('缺少 playwright。请先运行： python -m pip install playwright')
     sys.exit(1)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, 'cctv_urls.json')
 
-# 要抓的频道。键是央视网的频道 slug，值是给用户看的名字。
 CHANNELS = [
-    ('cctv1', 'CCTV-1 综合'),
-    ('cctv2', 'CCTV-2 财经'),
-    ('cctv3', 'CCTV-3 综艺'),
-    ('cctv4', 'CCTV-4 中文国际'),
-    ('cctv5', 'CCTV-5 体育'),
-    ('cctv5plus', 'CCTV-5+ 体育赛事'),
-    ('cctv6', 'CCTV-6 电影'),
-    ('cctv7', 'CCTV-7 国防军事'),
-    ('cctv8', 'CCTV-8 电视剧'),
-    ('cctv9', 'CCTV-9 纪录'),
-    ('cctv10', 'CCTV-10 科教'),
-    ('cctv11', 'CCTV-11 戏曲'),
-    ('cctv12', 'CCTV-12 社会与法'),
-    ('cctv13', 'CCTV-13 新闻'),
-    ('cctv14', 'CCTV-14 少儿'),
-    ('cctv15', 'CCTV-15 音乐'),
-    ('cctv16', 'CCTV-16 奥林匹克'),
-    ('cctv17', 'CCTV-17 农业农村'),
+    ('cctv1', 'CCTV-1 综合'), ('cctv2', 'CCTV-2 财经'),
+    ('cctv3', 'CCTV-3 综艺'), ('cctv4', 'CCTV-4 中文国际'),
+    ('cctv5', 'CCTV-5 体育'), ('cctv5plus', 'CCTV-5+ 体育赛事'),
+    ('cctv6', 'CCTV-6 电影'), ('cctv7', 'CCTV-7 国防军事'),
+    ('cctv8', 'CCTV-8 电视剧'), ('cctv9', 'CCTV-9 纪录'),
+    ('cctv10', 'CCTV-10 科教'), ('cctv11', 'CCTV-11 戏曲'),
+    ('cctv12', 'CCTV-12 社会与法'), ('cctv13', 'CCTV-13 新闻'),
+    ('cctv14', 'CCTV-14 少儿'), ('cctv15', 'CCTV-15 音乐'),
+    ('cctv16', 'CCTV-16 奥林匹克'), ('cctv17', 'CCTV-17 农业农村'),
 ]
 
-# 只要这些域名的 m3u8 —— 央视自己的 CDN，不是海外转发
+# 央视自己的直播 CDN。**排除**海外转发（那些国内用不了）。
 GOOD_HOST = re.compile(
-    r'(myqcloud\.com|kcdnvip\.com|bdydns\.com|wscdns\.com|cntv\.cn|'
-    r'cctv\.com|ksycdn|qcloud)',
-    re.I,
-)
-# 明确排除（广告 / 统计 / 第三方）
-BAD_HOST = re.compile(r'(doubleclick|google|baidu|umeng|sentry|admaster)', re.I)
+    r'(myqcloud\.com|kcdnvip\.com|bdydns\.com|volcfcdn\.com|wscdns\.com|'
+    r'cntv\.cn|qcloud)', re.I)
+BAD_HOST = re.compile(r'(doubleclick|google|baidu|umeng|sentry|admaster|'
+                      r'data\.cctv\.com)', re.I)
+
+ROUNDS = 3          # 每个频道最多试几轮
+ROUND_WAIT_S = 40   # 每轮最多等多久
 
 
-def _slug_to_ch(slug: str) -> str:
-    """'cctv5plus' → '5+'；'cctv13' → '13'"""
-    n = slug.replace('cctv', '')
-    return n.replace('plus', '+')
+def slug_to_ch(slug: str) -> str:
+    return slug.replace('cctv', '').replace('plus', '+')
 
 
-def _channel_in_url(u: str):
-    """从地址里推断频道号。推不出来返回 None。"""
-    # 形如 cdrmldcctv13 / cdrmldcctv5plus / cctv5plus/1080p
+def channel_in_url(u: str):
+    """从地址里推频道号。推不出来返回 None。"""
     m = re.search(r'cdrmldcctv(\d+)(plus)?', u, re.I)
     if m:
         return m.group(1) + ('+' if m.group(2) else '')
-    m = re.search(r'/cctv(\d+)(plus)?/', u, re.I)
+    m = re.search(r'[/_]cctv(\d+)(plus)?[/_]', u, re.I)
+    if m:
+        return m.group(1) + ('+' if m.group(2) else '')
+    m = re.search(r'cctv(\d+)(plus)?', u, re.I)
     if m:
         return m.group(1) + ('+' if m.group(2) else '')
     return None
 
 
-def _has_own_channel(urls, slug: str) -> bool:
-    """截到的地址里，有没有一个确实是当前频道的流。"""
-    want = _slug_to_ch(slug)
-    for u in urls:
-        got = _channel_in_url(u)
-        if got == want:
-            return True
-    return False
-
-
-def is_media_url(u: str) -> bool:
+def is_media(u: str) -> bool:
     if '.m3u8' not in u.lower():
         return False
     if BAD_HOST.search(u):
         return False
-    return True
+    return bool(GOOD_HOST.search(u))
 
 
-def fetch_one(page, slug: str, name: str) -> dict:
-    """打开一个频道页，截获它的 m3u8 请求。"""
-    found = []
-    errors = []
-
-    def on_request(req):
-        u = req.url
-        if is_media_url(u):
-            found.append(u)
-
-    page.on('request', on_request)
-
+def fetch_one(ctx, slug: str, name: str) -> dict:
+    """反复尝试，直到截到"频道号对得上"的流。"""
+    want = slug_to_ch(slug)
     url = 'https://tv.cctv.com/live/%s/' % slug
+    all_urls = []
     result = {'slug': slug, 'name': name, 'page': url,
-              'urls': [], 'good': None, 'error': None}
-    try:
-        print('  [%s] 打开 %s' % (name, url))
-        page.goto(url, timeout=45000, wait_until='domcontentloaded')
+              'urls': [], 'good': None, 'error': None, 'rounds': 0}
 
-        # 等播放器起播。
-        #
-        # ⚠️ 踩过的坑：一开始等 30 秒，结果 CCTV-9/14 抓到了 **cctv13** 的地址
-        # —— 央视的播放器是懒加载的，切频道后要过一会儿才真正换流。
-        # 所以这里必须等到"截到的地址里频道号和当前频道对得上"才算成功。
-        deadline = time.time() + 45
-        while time.time() < deadline:
-            page.wait_for_timeout(1000)
-            if found and _has_own_channel(found, slug):
-                # 已截到本频道自己的流，再多等 3 秒收集其它档位
-                page.wait_for_timeout(3000)
-                break
+    for rnd in range(1, ROUNDS + 1):
+        result['rounds'] = rnd
+        page = ctx.new_page()
+        seen = []
 
-        # 去重
-        uniq = sorted(set(found))
-        result['urls'] = uniq
+        def on_req(req, seen=seen):
+            u = req.url
+            if is_media(u):
+                seen.append(u)
 
-        # 挑"最好的"：必须是央视 CDN 的，而且**频道号要对得上**
-        want = _slug_to_ch(slug)
-        best = None
-        for u in uniq:
-            if not GOOD_HOST.search(u):
-                continue
-            got = _channel_in_url(u)
-            if got is not None and got != want:
-                continue                     # 别的频道，跳过
-            if re.search(r'/index\.m3u8', u):   # master playlist 最好
-                best = u
-                break
-            if best is None:
-                best = u
-        # 一个本频道的都没有 → 明确报出来，不要静默给错地址
-        if best is None:
-            others = sorted({_channel_in_url(u) for u in uniq
-                             if _channel_in_url(u)})
-            result['error'] = ('没截到本频道的流（截到的是 %s）'
-                               % (','.join(others) if others else '无'))
-        result['good'] = best
-    except Exception as e:
-        result['error'] = '%s: %s' % (type(e).__name__, str(e)[:120])
-    finally:
-        page.remove_listener('request', on_request)
+        page.on('request', on_req)
+        try:
+            # 每轮换一个查询串，避免命中旧频道的缓存
+            page.goto('%s?r=%d' % (url, int(time.time() * 1000) % 100000),
+                      timeout=45000, wait_until='domcontentloaded')
 
+            deadline = time.time() + ROUND_WAIT_S
+            while time.time() < deadline:
+                page.wait_for_timeout(1000)
+                if any(channel_in_url(u) == want for u in seen):
+                    page.wait_for_timeout(2500)   # 多收一会儿其它档位
+                    break
+        except Exception as e:
+            result['error'] = '%s: %s' % (type(e).__name__, str(e)[:90])
+        finally:
+            try:
+                page.remove_listener('request', on_req)
+            except Exception:
+                pass
+            page.close()
+
+        all_urls.extend(seen)
+        mine = [u for u in set(all_urls) if channel_in_url(u) == want]
+        if mine:
+            mine.sort(key=lambda u: (0 if '/index.m3u8' in u else 1, len(u)))
+            result['good'] = mine[0]
+            result['urls'] = sorted(set(all_urls))
+            print('    ✅ 第 %d 轮抓到 %s' % (rnd, mine[0][:96]))
+            return result
+        print('    …第 %d 轮没抓到本频道的流，重试' % rnd)
+
+    result['urls'] = sorted(set(all_urls))
+    got = sorted({channel_in_url(u) for u in all_urls if channel_in_url(u)})
+    result['error'] = '试了 %d 轮都没抓到本频道（截到的是 %s）' % (
+        ROUNDS, ','.join(got) or '无')
     return result
 
 
 def main():
+    argv = [a.lower() for a in sys.argv[1:]]
+    todo = [c for c in CHANNELS if not argv or c[0] in argv]
+
     print('=' * 74)
-    print('  央视直播地址抓取')
+    print('  央视直播地址抓取（第二版：耐心重试）')
     print('=' * 74)
-    print()
-    print('  用真实浏览器打开每个频道页，截获它的 m3u8 请求。')
-    print('  浏览器窗口会打开又关掉，属正常现象 —— 不要手动干预。')
-    print('  共 %d 个频道，预计 3~6 分钟。' % len(CHANNELS))
+    print('  频道 %d 个，每个最多试 %d 轮、每轮等 %d 秒'
+          % (len(todo), ROUNDS, ROUND_WAIT_S))
     print()
 
     results = []
     with sync_playwright() as p:
-        # 用系统已装的 Edge，避免再下载一个 Chromium（几百 MB）
         browser = None
-        for kwargs in (
-            {'channel': 'msedge'},
-            {'channel': 'chrome'},
-            {},                      # 退回到 playwright 自带的 chromium
-        ):
+        for kw in ({'channel': 'msedge'}, {'channel': 'chrome'}, {}):
             try:
-                browser = p.chromium.launch(headless=True, **kwargs)
-                print('  浏览器: %s' % (kwargs.get('channel') or 'playwright chromium'))
+                browser = p.chromium.launch(headless=True, **kw)
+                print('  浏览器: %s\n' % (kw.get('channel') or 'chromium'))
                 break
-            except Exception as e:
-                print('  启动失败 %s: %s' % (kwargs, str(e)[:80]))
+            except Exception:
+                continue
         if browser is None:
-            print('  找不到可用浏览器。请先装 Edge/Chrome，或运行：')
-            print('      python -m playwright install chromium')
+            print('  没有可用浏览器，请先装 Edge/Chrome')
             sys.exit(1)
 
         ctx = browser.new_context(
@@ -212,38 +175,39 @@ def main():
             viewport={'width': 1280, 'height': 720},
             locale='zh-CN',
         )
-        for slug, name in CHANNELS:
-            page = ctx.new_page()
-            try:
-                results.append(fetch_one(page, slug, name))
-            finally:
-                page.close()
-
+        for slug, name in todo:
+            print('  [%s] %s' % (name, 'https://tv.cctv.com/live/%s/' % slug))
+            results.append(fetch_one(ctx, slug, name))
         ctx.close()
         browser.close()
 
-    # ---------- 汇总 ----------
     print()
     print('=' * 74)
     print('  结果')
     print('=' * 74)
-    ok = [r for r in results if r['good']]
+    ok = 0
     for r in results:
         if r['good']:
+            ok += 1
             print('  ✅ %-20s %s' % (r['name'], r['good']))
         else:
-            print('  ❌ %-20s %s' % (r['name'], r['error'] or '未找到'))
-            for u in r['urls'][:3]:
-                print('        （截到但不是理想地址）%s' % u[:100])
-
+            print('  ❌ %-20s %s' % (r['name'], r['error']))
     print()
-    print('  成功 %d / %d' % (len(ok), len(results)))
+    print('  成功 %d / %d' % (ok, len(results)))
 
-    with open(OUT, 'w', encoding='utf-8') as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-    print()
-    print('  已保存到： %s' % OUT)
-    print('  把这个文件发我，我把它内置进 App。')
+    # 合并进已有结果（方便分次抓）
+    merged = {}
+    if os.path.exists(OUT):
+        try:
+            for r in json.load(open(OUT, encoding='utf-8')):
+                merged[r['slug']] = r
+        except Exception:
+            pass
+    for r in results:
+        merged[r['slug']] = r
+    json.dump(list(merged.values()), open(OUT, 'w', encoding='utf-8'),
+              ensure_ascii=False, indent=2)
+    print('  已保存: %s' % OUT)
 
 
 if __name__ == '__main__':
