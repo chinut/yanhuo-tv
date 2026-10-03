@@ -204,6 +204,63 @@ class TvFocusManager {
     /** 给外部（例如预聚焦到某一项）用的 key 列表。 */
     val keys: List<Any> get() = items.keys.toList()
 
+    /**
+     * 找一个"真正能按确定"的项 —— 即 onActivate 非空的项。
+     *
+     * 用途：entryFocusable 注册的**入口占位项**自己不能操作，
+     * 用户把焦点落在它上面按确定时，应该把动作转交给板块里第一个真控件，
+     * 而不是什么都不发生（那正是"设置里所有开关按不动"的表现）。
+     *
+     * 选择策略：按**几何位置**取最靠上的那个（y 最小），
+     * 也就是用户在屏幕上看到的第一个控件 —— 符合直觉。
+     *
+     * @param exclude 排除这个 key（通常就是入口项自己）
+     */
+    fun firstActivatableAfter(exclude: Any?): Any? {
+        val anchor = items[exclude]?.let { runCatching { it.boundsProvider() }.getOrNull() }
+
+        var best: Any? = null
+        var bestScore = Float.MAX_VALUE
+        items.forEach { (k, it) ->
+            if (k == exclude) return@forEach
+            if (!it.enabled || it.onActivate == null) return@forEach
+            val r = runCatching { it.boundsProvider() }.getOrNull() ?: return@forEach
+            if (r.isEmpty) return@forEach
+
+            // ---------- 打分 ----------
+            //
+            // 语义：用户在入口卡片上按确定，焦点应落到**卡片里第一个控件**，
+            // 或者紧邻卡片下方最近的那个。
+            //
+            // 踩过两次坑，都记下来：
+            //   1. 只比 r.top 最小 → 选到了页面最底部的按钮（比较基准错了）
+            //   2. 用 dy = r.top - anchor.bottom 且 dy<0 时给 100000-dy →
+            //      设置页那张卡很高（top=128，bottom=800），把手机调试那几个
+            //      控件**全包在里面**，于是 dy 全是负数，而越负惩罚越小，
+            //      结果还是选到最靠下的那个。
+            //
+            // 现在按"离卡片顶部多近"来排（r.top - anchor.top），
+            // 卡片内部的控件自然排最前；在卡片上方的加大惩罚，几乎不会被选到。
+            val score = if (anchor != null && !anchor.isEmpty) {
+                val insideOrBelow = r.top >= anchor.top - 8f
+                if (insideOrBelow) r.top - anchor.top else 100_000f + (anchor.top - r.top)
+            } else {
+                // 锚点位置未知（还没布局完）→ 退回"最靠上"
+                r.top
+            }
+            if (score < bestScore) {
+                bestScore = score
+                best = k
+            }
+        }
+        android.util.Log.i(
+            "BawanFocus",
+            "入口项按确定 → 转发到 $best（锚点=${anchor?.let { "top=${it.top.toInt()} bottom=${it.bottom.toInt()}" } ?: "未知"}，" +
+                "候选数=${items.size}）",
+        )
+        return best
+    }
+
     // ==================== 屏幕级按键接管 ====================
     // 播放页这类「没有可聚焦项、纯按键操作」的界面需要自己接管方向键/确定键，
     // 否则按键会落到这里没人处理（表现就是「播放中按上下键没反应」）。
@@ -759,6 +816,29 @@ fun Modifier.entryFocusable(focusKey: Any): Modifier {
     if (manager != null) {
         DisposableEffect(manager, focusKey) {
             val item = TvFocusManager.Item(focusKey, focusState) { bounds }
+
+            // ---------- 为什么必须有这一段 ----------
+            //
+            // 这个项**本身不是控件**，原来的写法只 register 就完事了。
+            // 但 register() 里有"焦点为空或失效就 moveTo 新项"，于是进入
+            // 这个板块时它会抢到焦点 —— 而它既没有 onActivate，
+            // boundsProvider 又永远返回 Rect.Zero。后果：
+            //
+            //   · 按确定：activate() 拿到 null 直接返回 false
+            //     （实测日志：确定键未激活任何项：focused=entry:settings）
+            //   · 按方向键：几何导航跳过空矩形，找不到下面的控件
+            //     → 焦点卡死在这个空项上，「所有开关都按不动」
+            //
+            // 所以两件事都要做：
+            //   1. bounds 用真实布局位置（下面 onGloballyPositioned 已经在做，
+            //      但要在 DisposableEffect 之前就位）
+            //   2. onActivate 转发给容器里第一个真正可操作的项
+            // onActivate 的类型是 (() -> Unit)?，所以这里不返回值；
+            // 找到了就先把焦点挪过去，用户再按一次确定即可操作它。
+            item.onActivate = {
+                manager.firstActivatableAfter(focusKey)?.let { manager.moveTo(it) }
+            }
+
             manager.register(item)
             onDispose { manager.unregister(focusKey) }
         }
