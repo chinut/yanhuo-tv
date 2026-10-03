@@ -296,21 +296,96 @@ object Updater {
             openInstallPermissionSettings(context)
             return
         }
-        val result = runCatching {
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        val apkMime = "application/vnd.android.package-archive"
+
+        // ---------- 逐级尝试，第一个能起来的就用它 ----------
+        //
+        // 为什么要多级：**各家的电视系统限制不一样**。
+        //
+        // 实测小米电视（MIUI TV）报：
+        //     ActivityNotFoundException No Activity found to handle Intent
+        //     {act=android.intent.action.VIEW dat=content://... typ=application/vnd.android.package-archive}
+        // 也就是说它**不响应"用 ACTION_VIEW 打开 APK"**（安全限制）。
+        //
+        // 而"只报一句失败"对用户毫无帮助（老版本甚至静默无反应）。
+        // 所以这里每一级都先 resolveActivity 探测，能起来的才 startActivity，
+        // 全都不行就把**文件路径**告诉用户，让他用文件管理器装。
+        val attempts = mutableListOf<Pair<String, Intent>>()
+
+        // 1) 标准做法：content:// + FileProvider（Android 7+ 的正路，多数电视可用）
+        runCatching {
+            val uri = FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", file,
+            )
+            attempts += "FileProvider" to Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, apkMime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(intent)
         }
-        result.onFailure { e ->
-            android.util.Log.e(TAG_INSTALL, "调起安装器失败", e)
-            _state.value = UpdateState.Failed(
-                "调起安装界面失败：${e.javaClass.simpleName} ${e.message.orEmpty()}".trim(),
+
+        // 2) 显式点名系统安装器。部分定制系统对 ACTION_VIEW 的隐式匹配做了限制，
+        //    但显式指定组件仍然放行。
+        //
+        //    ⚠️ 只有拿到 content:// 才加这一级。
+        //    之前写成 `?: return@apply`，FileProvider 失败时会产出一个
+        //    **没有 data 的空 ACTION_VIEW Intent** —— 那种 Intent 可能被系统
+        //    解析到完全无关的东西上，反而添乱。
+        val contentUri = runCatching {
+            FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", file,
             )
+        }.getOrNull()
+        if (contentUri != null) {
+            for (pkg in listOf("com.android.packageinstaller", "com.google.android.packageinstaller")) {
+                attempts += "显式:$pkg" to Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(contentUri, apkMime)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    setPackage(pkg)
+                }
+            }
         }
+
+        // 3) 把 APK 拷到外部私有目录，用 file:// 交给安装器。
+        //    这条是给"FileProvider 那条路被系统拦掉"的老机器兜底的。
+        runCatching {
+            @Suppress("DEPRECATION")
+            val ext = context.getExternalFilesDir(null) ?: context.filesDir
+            val pub = File(ext, file.name)
+            if (!pub.exists() || pub.length() != file.length()) file.copyTo(pub, overwrite = true)
+            attempts += "file://" to Intent(Intent.ACTION_VIEW).apply {
+                @Suppress("DEPRECATION")
+                setDataAndType(android.net.Uri.fromFile(pub), apkMime)
+            }
+        }
+
+        for ((label, intent) in attempts) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val resolved = runCatching { context.packageManager.resolveActivity(intent, 0) }
+                .getOrNull()
+            if (resolved == null) {
+                android.util.Log.i(TAG_INSTALL, "$label 无可用组件，试下一级")
+                continue
+            }
+            val ok = runCatching { context.startActivity(intent) }.isSuccess
+            if (ok) {
+                android.util.Log.i(TAG_INSTALL, "已用 $label 调起安装器")
+                return
+            }
+            android.util.Log.w(TAG_INSTALL, "$label 启动失败，试下一级")
+        }
+
+        // ---------- 全都不行：给出可操作的出路 ----------
+        //
+        // 到这一步说明这台电视**彻底不允许第三方调起安装器**。
+        // 与其显示一句"失败"，不如把安装包位置和手动安装方法告诉用户。
+        android.util.Log.e(TAG_INSTALL, "所有安装方式都不可用，APK 在 ${file.absolutePath}")
+        _state.value = UpdateState.Failed(
+            "这台电视不允许应用自己调起安装界面。\n\n" +
+                "安装包已下载到：\n${file.absolutePath}\n\n" +
+                "可以：① 用「电视的文件管理器」找到它打开安装；" +
+                "② 或在电脑上用 adb install 安装。",
+        )
     }
 
     fun reset() {

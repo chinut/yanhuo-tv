@@ -87,20 +87,24 @@ Write-Host '  版本号校验通过'
 # 两者**互相独立**：versionName 可以从 1.0.34 跳到 1.1.1，
 # 但 versionCode 必须接着数（35 → 36）。
 #
-# 上次发布的 versionCode 从**上一个 git tag 的 gradle 文件**里读，
-# 不依赖任何手工记录 —— 手工记的东西迟早会忘。
+# 上次发布的 versionCode 从**当前提交的父提交**里读。
+#
+# 为什么不从上一个 git tag 读：本脚本要求"先提交再发布"，
+# 而 tag 是发布时才打的 —— 如果先打了 tag 再跑脚本，
+# 读到的就是本次自己（36 → 36），会把自己挡住。父提交才是真正的"上一版"。
 $prevCode = 0
 $prevName = ''
-$lastTag = (git tag --list 'v*' --sort=-v:refname 2>$null | Select-Object -First 1)
-if ($lastTag) {
-    $prevGradle = (git show "${lastTag}:app/build.gradle.kts" 2>$null) -join "`n"
-    if ($prevGradle -match 'versionCode\s*=\s*(\d+)') { $prevCode = [int]$Matches[1] }
-    if ($prevGradle -match 'versionName\s*=\s*"([^"]+)"') { $prevName = $Matches[1] }
+$prevGradle = (git show 'HEAD~1:app/build.gradle.kts' 2>$null) -join "`n"
+if ($prevGradle -match 'versionCode\s*=\s*(\d+)') { $prevCode = [int]$Matches[1] }
+if ($prevGradle -match 'versionName\s*=\s*"([^"]+)"') { $prevName = $Matches[1] }
+if ($prevCode -gt 0) {
+    Write-Host "  上次发布：$prevName (code $prevCode)  →  本次：$VersionName (code $VersionCode)"
+} else {
+    Write-Host "  读不到上一版（可能是首次提交），跳过递增校验"
 }
-Write-Host "  上次发布：$prevName (code $prevCode)  →  本次：$VersionName (code $VersionCode)"
 
 if ($prevCode -gt 0 -and $VersionCode -le $prevCode) {
-    Write-Host "  !! versionCode $VersionCode 没有大于上次的 $prevCode" -ForegroundColor Red
+    Write-Host "  !! versionCode $VersionCode 没有大于上一版的 $prevCode" -ForegroundColor Red
     Write-Host '     versionCode 只能递增 —— 应用靠它判断升级，调小会让更新检测失效' -ForegroundColor Yellow
     exit 1
 }
