@@ -499,6 +499,24 @@ fun Modifier.tvFocusable(
     borderWidth: Dp = 3.dp,
     baseBackground: Color = Color.Transparent,
     focusedBackground: Color = Ink.CardStrong,
+    /**
+     * 这是不是"操作类"控件（按钮 / 开关）。
+     *
+     * ## 为什么需要这个开关
+     *
+     * 玻璃面板类控件（卡片、行）用半透明底色是合适的：聚焦时底色微微提亮 +
+     * 描边，层次很自然。
+     *
+     * 但**按钮和开关不能这么做**。它们的底色本来就很淡：
+     *     未聚焦 Ink.CardStrong = 0x24FFFFFF（14% 白）
+     *     聚焦   Ink.AccentSoft = 0x335AA9FF（20% 蓝）
+     * 两者亮度几乎一样 —— 用户看到的是"没任何变化的控件上多了一圈细线"，
+     * 反馈原话是"看起很诡异"。焦点不明确，遥控器就没法用。
+     *
+     * 所以操作类控件改成**实心底色 + 更粗的边框 + 更强的光晕**：
+     * 未聚焦是一块暗哑的实心块，聚焦整块明显变亮，亮度差一眼可辨。
+     */
+    action: Boolean = false,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     onFocus: ((Boolean) -> Unit)? = null,
@@ -649,17 +667,22 @@ fun Modifier.tvFocusable(
         // 光晕加强：从 18dp 提到 30dp。
         // 实测电视上 18dp 在深色背景里太弱，用户看不清当前选中的是哪一项
         // （电视有 overscan、色彩也不如显示器准，对比度会被进一步吃掉）。
+        //
+        // 操作类控件再往外扩一圈：它们在列表里可能紧挨着别的控件，
+        // 更亮的光晕能让"当前落在哪个按钮上"一眼可见。
         m = m.shadow(
-            elevation = 30.dp * glowAlpha,
+            elevation = (if (action) 38.dp else 30.dp) * glowAlpha,
             shape = shape,
             ambientColor = Ink.AccentBright,
             spotColor = Ink.AccentBright,
         )
     }
 
-    if (borderWidth > 0.dp) {
+    // 操作类控件的边框更粗：2dp 在电视观看距离上太细，容易被 overscan 吃掉
+    val effectiveBorder = if (action) maxOf(borderWidth, 3.dp) else borderWidth
+    if (effectiveBorder > 0.dp) {
         m = m.border(
-            width = if (focusState.focused) borderWidth else 0.dp,
+            width = if (focusState.focused) effectiveBorder else 0.dp,
             brush = Brush.linearGradient(
                 listOf(Ink.AccentBright, Ink.Accent, Ink.Pink.copy(alpha = 0.75f))
             ),

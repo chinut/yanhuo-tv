@@ -39,6 +39,18 @@ object Ink {
     val Amber = Color(0xFFFFC97A)
     val Red = Color(0xFFFF7B7B)
 
+    // ---------- 操作类控件（按钮 / 开关）的**实心**底色 ----------
+    //
+    // 半透明底色用于玻璃面板很合适，但**按钮和开关不行**：
+    // 未聚焦 0x24FFFFFF（14% 白）和聚焦 0x335AA9FF（20% 蓝）亮度几乎一样，
+    // 用户看到的是"没变化的控件上多了一圈细线"，反馈原话"看起很诡异"。
+    //
+    // 这两个刻意拉开亮度差：
+    //   Action      接近背景色（暗哑，不抢注意力）
+    //   ActionFocus 明显提亮（聚焦时整块"点亮"）
+    val Action = Color(0xFF262C42)
+    val ActionFocus = Color(0xFF3D4A6E)
+
     val TextPrimary = Color(0xFFFFFFFF)
     val TextSecondary = Color(0xE0FFFFFF)
     val TextTertiary = Color(0x9AFFFFFF)

@@ -88,6 +88,8 @@ fun SettingsScreen(
     val serverRunning by DebugWebServer.running.collectAsState()
     val serverPort by DebugWebServer.port.collectAsState()
     val updateState by Updater.state.collectAsState()
+    /** 上一次「检查更新」的结果是否"已是最新"（用于 Idle 状态给出准确提示）。 */
+    var checkedAndCurrent by remember { mutableStateOf(false) }
 
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     var showQr by remember { mutableStateOf(false) }
@@ -408,7 +410,36 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.sdp))
                 when (val st = updateState) {
                     is UpdateState.Checking -> StatusLine(st.message, Ink.TextTertiary)
-                    is UpdateState.UpToDate -> StatusLine("已经是最新版本", Ink.Green)
+
+                    // ---------- 已是最新 ----------
+                    //
+                    // 以前这里只有一行字，**没有任何按钮** —— 用户在当前版本下
+                    // 翻遍设置都找不到"下载与安装"，反馈就是"现版本的下载与安装
+                    // 点选不到"。因为那个按钮原来只在"检测到新版"时才存在。
+                    //
+                    // 现在即使已是最新，也给一个「重新下载安装的版本」的出路：
+                    // 覆盖安装是电视上的常规操作，装坏了、想重装都用得上。
+                    is UpdateState.UpToDate -> {
+                        StatusLine("已经是最新版本", Ink.Green)
+                        Spacer(Modifier.height(8.sdp))
+                        SmallButton("重新下载并覆盖安装") {
+                            scope.launch {
+                                // 强制重新查一次，拿到当前最新 Release 的下载地址
+                                val info = runCatching {
+                                    withContext(Dispatchers.IO) { Updater.check(context, force = true) }
+                                }.getOrNull()
+                                if (info == null) {
+                                    toast(context, "拿不到下载地址，请稍后再试")
+                                } else {
+                                    val f = withContext(Dispatchers.IO) {
+                                        Updater.download(context, info)
+                                    }
+                                    if (f != null) Updater.install(context, f)
+                                }
+                            }
+                        }
+                    }
+
                     is UpdateState.Failed -> StatusLine(st.message, Ink.Amber)
                     is UpdateState.Available -> {
                         StatusLine(
@@ -468,7 +499,39 @@ fun SettingsScreen(
                         SmallButton("立即安装") { Updater.install(context, st.file) }
                     }
 
-                    UpdateState.Idle -> Unit
+                    // ---------- 空闲：说明当前没有可下的新版 ----------
+                    //
+                    // 这里原来什么都不显示，于是"下载并安装"这个按钮**只在真有新版时
+                    // 才会出现** —— 用户在当前版本下翻遍设置也找不到它，
+                    // 反馈就是"现版本的下载与安装点选不到"。
+                    //
+                    // 现在 Idle 状态也给一个常驻按钮：检查完之后如果确实有新版，
+                    // 就接着下载并调起安装，省得用户再点一次。
+                    UpdateState.Idle -> {
+                        if (checkedAndCurrent) {
+                            StatusLine("已是最新版本，无需下载", Ink.Green)
+                        } else {
+                            StatusLine("点下面的按钮检查并下载新版本", Ink.TextTertiary)
+                        }
+                        Spacer(Modifier.height(8.sdp))
+                        SmallButton("检查更新并下载") {
+                            scope.launch {
+                                val info = runCatching {
+                                    withContext(Dispatchers.IO) { Updater.check(context) }
+                                }.getOrNull()
+                                if (info == null) {
+                                    checkedAndCurrent = true
+                                    toast(context, "已经是最新版本")
+                                } else {
+                                    checkedAndCurrent = false
+                                    val f = withContext(Dispatchers.IO) {
+                                        Updater.download(context, info)
+                                    }
+                                    if (f != null) Updater.install(context, f)
+                                }
+                            }
+                        }
+                    }
                 }
                 Spacer(Modifier.height(6.sdp))
                 TvSwitch(
@@ -754,11 +817,15 @@ private fun SmallButton(label: String, onClick: () -> Unit) {
             .height(38.sdp)
             .tvFocusable(
                 focusState = f,
+                // 操作类控件：实心底色 + 粗边框 + 强光晕。
+                // 原来用半透明的 CardStrong/AccentSoft，两者亮度几乎一样，
+                // 聚焦时看不出变化（用户："看起很诡异"）。
+                action = true,
                 shape = RoundedCornerShape(Dim.ChipRadius),
                 focusedScale = 1.06f,
-                borderWidth = 2.dp,
-                baseBackground = Ink.CardStrong,
-                focusedBackground = Ink.AccentSoft,
+                borderWidth = 3.dp,
+                baseBackground = Ink.Action,
+                focusedBackground = Ink.ActionFocus,
                 onClick = onClick,
             )
             .padding(horizontal = 16.sdp),
@@ -768,7 +835,7 @@ private fun SmallButton(label: String, onClick: () -> Unit) {
             label,
             color = if (f.focused) Color.White else Ink.TextSecondary,
             fontSize = Txt.Caption,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (f.focused) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1,
         )
     }

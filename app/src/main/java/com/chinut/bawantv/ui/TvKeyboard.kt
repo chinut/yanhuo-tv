@@ -256,12 +256,19 @@ fun TvSwitch(
             .fillMaxWidth()
             .tvFocusable(
                 focusState = f,
+                // 开关属于操作类控件：原来的 glow=false + 半透明底
+                // 导致聚焦时几乎看不出变化（用户反馈"开关部分焦点很不明显"）。
+                // 现在改成实心底色 + 粗边框 + 光晕，聚焦时整行明显点亮。
+                action = true,
                 shape = RoundedCornerShape(12.sdp),
-                focusedScale = 1.01f,
-                glow = false,
-                borderWidth = 2.dp,
+                focusedScale = 1f,
+                borderWidth = 3.dp,
+                // 未聚焦完全干净（无底色无边框），聚焦时才整行点亮。
+                // 比"每行都挂一圈边"干净得多 —— 后者满屏都是框，反而看不出焦点在哪。
+                // 另外不做放大：1.01 虽然很小，但会让聚焦行比别的行宽一点，
+                // 右边看起来"缩进去一截"。
                 baseBackground = Color.Transparent,
-                focusedBackground = Ink.Card,
+                focusedBackground = Ink.ActionFocus,
                 onClick = { onToggle(!checked) },
             )
             .padding(horizontal = 14.sdp, vertical = 12.sdp),

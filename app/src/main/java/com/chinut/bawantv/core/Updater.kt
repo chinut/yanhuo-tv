@@ -104,7 +104,7 @@ object Updater {
     }.getOrDefault(BuildConfig.VERSION_CODE)
 
     /** 检查更新。返回可用的更新信息，没有则 null。 */
-    suspend fun check(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun check(context: Context, force: Boolean = false): UpdateInfo? = withContext(Dispatchers.IO) {
         _state.value = UpdateState.Checking()
         val current = currentVersionCode(context)
 
@@ -149,7 +149,26 @@ object Updater {
         val newer = usable.filter { it.versionCode > current }
         if (newer.isEmpty()) {
             _state.value = UpdateState.UpToDate
-            return@withContext null
+            // force：即使没有更新的版本，也把"当前最新 Release"交出去。
+            // 设置页的「重新下载并覆盖安装」需要它 —— 否则已是最新时拿不到
+            // 任何下载地址，那个按钮就成了摆设。
+            if (!force) return@withContext null
+            val newest = usable.maxByOrNull { it.versionCode } ?: return@withContext null
+            val forcedSources = usable.filter { it.apkUrl.isNotBlank() }
+                .sortedBy { it.priority }
+                .map { ApkSource(it.sourceName, it.apkUrl, it.priority) }
+            if (forcedSources.isEmpty()) {
+                _state.value = UpdateState.Failed("Release 里没有 APK 附件，无法下载")
+                return@withContext null
+            }
+            return@withContext UpdateInfo(
+                versionCode = newest.versionCode,
+                versionName = newest.versionName,
+                notes = newest.notes,
+                apkSources = forcedSources,
+                apkSize = newest.apkSize,
+                releasePage = newest.releasePage,
+            )
         }
 
         val latest = newer.maxByOrNull { it.versionCode }!!
