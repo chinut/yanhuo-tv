@@ -105,17 +105,48 @@ object Updater {
     suspend fun check(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
         _state.value = UpdateState.Checking()
         val current = currentVersionCode(context)
-        val raws = coroutineScope {
-            sources.map { src -> async(Dispatchers.IO) { query(src) } }.awaitAll()
-        }.filterNotNull()
 
-        val newer = raws.filter { it.versionCode > current }
-        if (newer.isEmpty()) {
-            _state.value = if (raws.isEmpty()) {
-                UpdateState.Failed("检查更新失败：两个更新源都不可达")
-            } else {
-                UpdateState.UpToDate
+        // 探测每个源：query 返回 null 表示网络/HTTP 失败；
+        // 返回 Raw 但 error 非空表示"连上了但读不出有效版本"。
+        val probed = coroutineScope {
+            sources.map { src -> async(Dispatchers.IO) { src to query(src) } }.awaitAll()
+        }
+
+        val reachable = probed.mapNotNull { (_, r) -> r }
+        val usable = reachable.filter { it.error.isEmpty() && it.versionCode > 0 }
+
+        // ---------- 一个有效源都没有：把原因说清楚 ----------
+        //
+        // 这里必须区分三种情况，否则用户只会看到一句笼统的"不可达"，
+        // 完全无从下手（这正是之前"两个更新源都不可达"最让人困惑的地方）：
+        //   · 网络不通 / 站点访问不了
+        //   · 连上了，但 Release 正文没写 versionCode（发布方的问题）
+        //   · 连上了、也有版本号，但版本号不比自己新
+        if (usable.isEmpty()) {
+            val reason = when {
+                reachable.isEmpty() ->
+                    "两个更新源都连不上（检查网络，或稍后重试）"
+
+                reachable.all { it.error.isNotEmpty() } ->
+                    "更新源可达，但 ${reachable.first().error}" +
+                        "（这是发布方的配置问题，不是你的网络）"
+
+                else -> "检查更新失败"
             }
+            android.util.Log.w(
+                "BawanUpdater",
+                "检查更新失败：$reason；各源=" +
+                    probed.joinToString { (s, r) ->
+                        "${s.name}=" + (r?.error?.ifEmpty { "ok(code=${r.versionCode})" } ?: "unreachable")
+                    },
+            )
+            _state.value = UpdateState.Failed(reason)
+            return@withContext null
+        }
+
+        val newer = usable.filter { it.versionCode > current }
+        if (newer.isEmpty()) {
+            _state.value = UpdateState.UpToDate
             return@withContext null
         }
 
@@ -225,6 +256,8 @@ object Updater {
         val apkUrl: String,
         val apkSize: Long,
         val releasePage: String,
+        /** 非空表示这个源有问题（拿不到版本号 / 网络失败），用于给用户可读的提示。 */
+        val error: String = "",
     )
 
     private fun query(src: Source): Raw? = runCatching {
@@ -241,11 +274,27 @@ object Updater {
             val notes = json.optString("body")
             val page = json.optString("html_url")
 
-            val code = Regex("""versionCode[:\s=]+(\d+)""", RegexOption.IGNORE_CASE)
-                .find(notes)?.groupValues?.get(1)?.toIntOrNull()
-                ?: tag.filter { it.isDigit() }.toIntOrNull()
-                ?: 0
-            if (code <= 0) return null
+            // ---------- 版本号解析 ----------
+            //
+            // 只认**正文里显式写的 versionCode**。
+            //
+            // 之前有一条"读不到就从 tag 抠数字"的兜底，那是**错的**：
+            // tag 是 v1.0.22，抠出来是 "1022"，而真实 versionCode 是 23 ——
+            // 差两个数量级。一旦正文漏写，就会算出一个离谱的版本号，
+            // 导致"永远提示可升级"或"永远提示已最新"，而且完全看不出原因。
+            //
+            // 现在：读不到就**明确放弃这个源**，并把原因记下来。
+            val parsed = parseVersionCode(notes)
+            if (parsed == null) {
+                val detail = "Release 正文里没有 versionCode"
+                android.util.Log.w("BawanUpdater", "${src.name}：$detail（tag=$tag）")
+                return Raw(
+                    sourceName = src.name, priority = src.priority,
+                    versionCode = 0, versionName = "", notes = "",
+                    apkUrl = "", apkSize = 0L, releasePage = page,
+                    error = detail,
+                )
+            }
 
             var apkUrl = ""
             var apkSize = 0L
@@ -263,13 +312,40 @@ object Updater {
             Raw(
                 sourceName = src.name,
                 priority = src.priority,
-                versionCode = code,
+                versionCode = parsed,
                 versionName = tag.removePrefix("v").ifBlank { "新版本" },
                 notes = notes,
                 apkUrl = apkUrl,
                 apkSize = apkSize,
                 releasePage = page,
+                error = "",
             )
         }
     }.getOrNull()
+
+    /**
+     * 从 Release 正文里取出 versionCode。
+     *
+     * 容忍几种常见写法（发布时手抖写出哪种都不至于失效）：
+     *
+     *     versionCode: 23          ← 推荐写法
+     *     versionCode = 23
+     *     versionCode 23
+     *     **versionCode**: 23      ← markdown 加粗
+     *     `versionCode`: 23        ← markdown 行内代码
+     *     - versionCode: 23        ← 列表项
+     *
+     * **不做"从 tag 抠数字"的兜底** —— 那个兜底算出来的值必然是错的
+     * （v1.0.22 → 1022），比"没有版本号"更糟：它会静默地给出错误结论。
+     *
+     * @return 解析出的 versionCode；正文里确实没有则返回 null
+     */
+    private fun parseVersionCode(notes: String): Int? {
+        if (notes.isBlank()) return null
+        val re = Regex(
+            """version\s*code\s*[*`]*\s*[:=]?\s*(\d{1,9})""",
+            RegexOption.IGNORE_CASE,
+        )
+        return re.find(notes)?.groupValues?.get(1)?.toIntOrNull()
+    }
 }
