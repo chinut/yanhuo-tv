@@ -1,40 +1,60 @@
 #EXTM3U
 #EXTINF:-1 group-title="央视",CCTV-13 新闻
+https://ldncctvwbcdbd.a.bdydns.com/ldncctvwbcd/cdrmldcctv13_1/index.m3u8?BR=td
+#EXTINF:-1 group-title="央视",CCTV-13 新闻
 https://tv.cctv.com/live/cctv13/
 #EXTINF:-1 group-title="央视",CCTV-13 新闻
 https://www.yangshipin.cn/tv/home?pid=600001811
+#EXTINF:-1 group-title="央视",CCTV-1 综合
+https://ldncctvwbcdbd.a.bdydns.com/ldncctvwbcd/cdrmldcctv1_1/index.m3u8?BR=td
 #EXTINF:-1 group-title="央视",CCTV-1 综合
 https://www.yangshipin.cn/tv/home?pid=600001859
 #EXTINF:-1 group-title="央视",CCTV-1 综合
 https://tv.cctv.com/live/cctv1/
 #EXTINF:-1 group-title="央视",CCTV-2 财经
+https://ldocctvwbcdks.v.kcdnvip.com/ldocctvwbcd/cdrmldcctv2_1/index.m3u8?b=200-2100
+#EXTINF:-1 group-title="央视",CCTV-2 财经
 https://tv.cctv.com/live/cctv2/
 #EXTINF:-1 group-title="央视",CCTV-2 财经
 https://www.yangshipin.cn/tv/home?pid=600001800
+#EXTINF:-1 group-title="央视",CCTV-3 综艺
+https://ldocctvwbcdks.v.kcdnvip.com/ldocctvwbcd/cdrmldcctv3_1/index.m3u8?b=200-1200
 #EXTINF:-1 group-title="央视",CCTV-3 综艺
 https://tv.cctv.com/live/cctv3/
 #EXTINF:-1 group-title="央视",CCTV-3 综艺
 https://www.yangshipin.cn/tv/home?pid=600001801
 #EXTINF:-1 group-title="央视",CCTV-4 中文国际
+https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv4_1/index.m3u8?BR=td
+#EXTINF:-1 group-title="央视",CCTV-4 中文国际
 https://tv.cctv.com/live/cctv4
 #EXTINF:-1 group-title="央视",CCTV-4 中文国际
 https://www.yangshipin.cn/tv/home?pid=600001814
+#EXTINF:-1 group-title="央视",CCTV-5 体育
+https://ldcctvwbcdbd.a.bdydns.com/ldcctvwbcd/cdrmldcctv5_1/index.m3u8?BR=td
 #EXTINF:-1 group-title="央视",CCTV-5 体育
 https://tv.cctv.com/live/cctv5/
 #EXTINF:-1 group-title="央视",CCTV-5 体育
 https://www.yangshipin.cn/tv/home?pid=600001818
 #EXTINF:-1 group-title="央视",CCTV-5+ 体育赛事
+https://hlslive1-byte-w4.volcfcdn.com/live/hls_cdrm/enc1/av1/cctv5plus/1080p/index.m3u8
+#EXTINF:-1 group-title="央视",CCTV-5+ 体育赛事
 https://tv.cctv.com/live/cctv5plus/
 #EXTINF:-1 group-title="央视",CCTV-5+ 体育赛事
 https://www.yangshipin.cn/tv/home?pid=600001817
+#EXTINF:-1 group-title="央视",CCTV-6 电影
+https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv6_1/index.m3u8?BR=hd
 #EXTINF:-1 group-title="央视",CCTV-6 电影
 https://tv.cctv.com/live/cctv6/
 #EXTINF:-1 group-title="央视",CCTV-6 电影
 https://www.yangshipin.cn/tv/home?pid=600108442
 #EXTINF:-1 group-title="央视",CCTV-7 国防军事
+https://ldocctvwbcdbyte.volcfcdn.com/ldocctvwbcd/cdrmldcctv7_1/index.m3u8?BR=td
+#EXTINF:-1 group-title="央视",CCTV-7 国防军事
 https://tv.cctv.com/live/cctv7/
 #EXTINF:-1 group-title="央视",CCTV-7 国防军事
 https://www.yangshipin.cn/tv/home?pid=600004092
+#EXTINF:-1 group-title="央视",CCTV-8 电视剧
+https://ldocctvwbcdks.v.kcdnvip.com/ldocctvwbcd/cdrmldcctv8_1/index.m3u8?b=200-1200
 #EXTINF:-1 group-title="央视",CCTV-8 电视剧
 https://tv.cctv.com/live/cctv8/
 #EXTINF:-1 group-title="央视",CCTV-8 电视剧
@@ -44,25 +64,37 @@ https://tv.cctv.com/live/cctvjilu/
 #EXTINF:-1 group-title="央视",CCTV-9 纪录
 https://www.yangshipin.cn/tv/home?pid=600004078
 #EXTINF:-1 group-title="央视",CCTV-10 科教
+https://ldocctvwbcdbyte.volcfcdn.com/ldocctvwbcd/cdrmldcctv10_1/index.m3u8?BR=td
+#EXTINF:-1 group-title="央视",CCTV-10 科教
 https://tv.cctv.com/live/cctv10/
 #EXTINF:-1 group-title="央视",CCTV-10 科教
 https://www.yangshipin.cn/tv/home?pid=600001805
+#EXTINF:-1 group-title="央视",CCTV-11 戏曲
+https://ldocctvwbcdtxy.liveplay.myqcloud.com/ldocctvwbcd/cdrmldcctv11_1/index.m3u8?b=200-2100
 #EXTINF:-1 group-title="央视",CCTV-11 戏曲
 https://tv.cctv.com/live/cctv11/
 #EXTINF:-1 group-title="央视",CCTV-11 戏曲
 https://www.yangshipin.cn/tv/home?pid=600001806
 #EXTINF:-1 group-title="央视",CCTV-12 社会与法
+https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv12_1/index.m3u8?BR=td
+#EXTINF:-1 group-title="央视",CCTV-12 社会与法
 https://tv.cctv.com/live/cctv12/
 #EXTINF:-1 group-title="央视",CCTV-12 社会与法
 https://www.yangshipin.cn/tv/home?pid=600001807
+#EXTINF:-1 group-title="央视",CCTV-15 音乐
+https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv15_1/index.m3u8?BR=td
 #EXTINF:-1 group-title="央视",CCTV-15 音乐
 https://tv.cctv.com/live/cctv15/
 #EXTINF:-1 group-title="央视",CCTV-15 音乐
 https://www.yangshipin.cn/tv/home?pid=600001815
 #EXTINF:-1 group-title="央视",CCTV-16 奥林匹克
+https://hlslive1-txy-w4.live.cntv.cn/live/hls_cdrm/enc1/av1/cctv16/1080p/index.m3u8
+#EXTINF:-1 group-title="央视",CCTV-16 奥林匹克
 https://tv.cctv.com/live/cctv16/
 #EXTINF:-1 group-title="央视",CCTV-16 奥林匹克
 https://www.yangshipin.cn/tv/home?pid=600098637
+#EXTINF:-1 group-title="央视",CCTV-17 农业农村
+https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv17_1/index.m3u8?BR=td
 #EXTINF:-1 group-title="央视",CCTV-17 农业农村
 https://tv.cctv.com/live/cctv17/
 #EXTINF:-1 group-title="央视",CCTV-17 农业农村

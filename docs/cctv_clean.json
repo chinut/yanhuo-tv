@@ -1,0 +1,82 @@
+{
+  "CCTV-1 综合": {
+    "slug": "cctv1",
+    "url": "https://ldncctvwbcdbd.a.bdydns.com/ldncctvwbcd/cdrmldcctv1_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-2 财经": {
+    "slug": "cctv2",
+    "url": "https://ldocctvwbcdks.v.kcdnvip.com/ldocctvwbcd/cdrmldcctv2_1/index.m3u8?b=200-2100",
+    "kind": "master(4档)"
+  },
+  "CCTV-3 综艺": {
+    "slug": "cctv3",
+    "url": "https://ldocctvwbcdks.v.kcdnvip.com/ldocctvwbcd/cdrmldcctv3_1/index.m3u8?b=200-1200",
+    "kind": "master(2档)"
+  },
+  "CCTV-4 中文国际": {
+    "slug": "cctv4",
+    "url": "https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv4_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-5 体育": {
+    "slug": "cctv5",
+    "url": "https://ldcctvwbcdbd.a.bdydns.com/ldcctvwbcd/cdrmldcctv5_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-5+ 体育赛事": {
+    "slug": "cctv5plus",
+    "url": "https://hlslive1-byte-w4.volcfcdn.com/live/hls_cdrm/enc1/av1/cctv5plus/1080p/index.m3u8",
+    "kind": "media(3段)"
+  },
+  "CCTV-6 电影": {
+    "slug": "cctv6",
+    "url": "https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv6_1/index.m3u8?BR=hd",
+    "kind": "media(3段)"
+  },
+  "CCTV-7 国防军事": {
+    "slug": "cctv7",
+    "url": "https://ldocctvwbcdbyte.volcfcdn.com/ldocctvwbcd/cdrmldcctv7_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-8 电视剧": {
+    "slug": "cctv8",
+    "url": "https://ldocctvwbcdks.v.kcdnvip.com/ldocctvwbcd/cdrmldcctv8_1/index.m3u8?b=200-1200",
+    "kind": "master(2档)"
+  },
+  "CCTV-10 科教": {
+    "slug": "cctv10",
+    "url": "https://ldocctvwbcdbyte.volcfcdn.com/ldocctvwbcd/cdrmldcctv10_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-11 戏曲": {
+    "slug": "cctv11",
+    "url": "https://ldocctvwbcdtxy.liveplay.myqcloud.com/ldocctvwbcd/cdrmldcctv11_1/index.m3u8?b=200-2100",
+    "kind": "master(4档)"
+  },
+  "CCTV-12 社会与法": {
+    "slug": "cctv12",
+    "url": "https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv12_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-13 新闻": {
+    "slug": "cctv13",
+    "url": "https://ldncctvwbcdbd.a.bdydns.com/ldncctvwbcd/cdrmldcctv13_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-15 音乐": {
+    "slug": "cctv15",
+    "url": "https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv15_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  },
+  "CCTV-16 奥林匹克": {
+    "slug": "cctv16",
+    "url": "https://hlslive1-txy-w4.live.cntv.cn/live/hls_cdrm/enc1/av1/cctv16/1080p/index.m3u8",
+    "kind": "media(3段)"
+  },
+  "CCTV-17 农业农村": {
+    "slug": "cctv17",
+    "url": "https://ldocctvwbcdbd.a.bdydns.com/ldocctvwbcd/cdrmldcctv17_1/index.m3u8?BR=td",
+    "kind": "media(3段)"
+  }
+}

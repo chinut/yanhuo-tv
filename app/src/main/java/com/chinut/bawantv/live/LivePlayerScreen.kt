@@ -142,8 +142,30 @@ fun LivePlayerScreen(
     var sourceIndex by remember {
         val list = LiveCatalog.candidatesOf(initialChannel)
         val remembered = prefs.rememberedSource(channelKeyOf(initialChannel))
-        val at = if (remembered != null) list.indexOf(remembered) else -1
-        mutableIntStateOf(if (at >= 0) at else 0)
+
+        // ---------- 优先直连，源记忆只在它自己也是直连时才认 ----------
+        //
+        // 踩过的坑（用户反馈"进了直连地址却还走网页"）：
+        // 频道表里直连地址已经排在第一位了，但"源记忆"记的是**老版本的网页源**
+        // （以前只有网页源能用），于是它把下标指到了网页那个候选上，
+        // 直连地址明明排在前面却被跳过。
+        //
+        // 现在的规则：
+        //   · 有直连候选 → 用它（老电视唯一跑得动的路线）
+        //   · 记忆的源**本身是直连**且还在列表里 → 尊重它（用户手选的）
+        //   · 记忆的是网页源 → 忽略，不要拿它覆盖直连
+        val directAt = list.indexOfFirst { LiveCatalog.isDirectStream(it) }
+        val rememberedAt =
+            if (remembered != null && LiveCatalog.isDirectStream(remembered))
+                list.indexOf(remembered)
+            else -1
+
+        val start = when {
+            rememberedAt >= 0 -> rememberedAt       // 用户选过的直连
+            directAt >= 0 -> directAt               // 有直连就用直连
+            else -> 0                               // 只有网页源，退回去
+        }
+        mutableIntStateOf(start)
     }
     var showing by remember { mutableStateOf(true) }
     var buffering by remember { mutableStateOf(true) }
@@ -243,6 +265,7 @@ fun LivePlayerScreen(
     val useWeb = remember(webUrl, cachedStreamUrl) {
         cachedStreamUrl == null && LiveCatalog.isWebPage(webUrl)
     }
+
 
     /** 网页路线的 WebView 实例。 */
     var webView by remember { mutableStateOf<TvWebPlayerView?>(null) }
