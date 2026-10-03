@@ -169,6 +169,9 @@ fun BawanRoot(
     var vodGridIndex by remember { mutableIntStateOf(0) }
     var vodGridOffset by remember { mutableIntStateOf(0) }
 
+    /** 返回影视列表时要恢复焦点的影片 id（空表示不恢复）。 */
+    var vodFocusMovieId by remember { mutableStateOf("") }
+
     /** 影视板块每次重新挂载时用来恢复滚动位置的令牌。 */
     var vodRestoreToken by remember { mutableIntStateOf(0) }
 
@@ -414,6 +417,8 @@ fun BawanRoot(
                                         vodGridIndex = i
                                         vodGridOffset = o
                                     },
+                                    externalFocusMovieId = vodFocusMovieId,
+                                    onExternalFocusMovie = { vodFocusMovieId = it },
                                     debugAutoPlay = debugAutoPlay,
                                     onDebugAutoPlayConsumed = { debugAutoPlay = false },
                                 onBack = {

@@ -127,6 +127,14 @@ fun UnifiedVideoScreen(
     externalGridIndex: Int = 0,
     externalGridOffset: Int = 0,
     onExternalGridScroll: (Int, Int) -> Unit = { _, _ -> },
+    /**
+     * 返回本页时要恢复焦点的影片 id。
+     *
+     * 为什么需要：播放/详情会把本页整棵树卸掉，重挂时焦点会落到"第一个
+     * 可聚焦项"上 —— 用户看到的就是"选中框跳到了一部不知道哪里的电影"。
+     */
+    externalFocusMovieId: String = "",
+    onExternalFocusMovie: (String) -> Unit = {},
     /** 调试：详情页数据就绪后自动起播第一集（用于自动化验证播放页）。 */
     debugAutoPlay: Boolean = false,
     /** 调试：自动起播只做一次，做完通知上层复位。 */
@@ -171,6 +179,14 @@ fun UnifiedVideoScreen(
      * 第一项固定是「搜索」—— 头部的搜索按钮被去掉了，
      * 不留个入口的话搜索功能就没法用了。
      */
+    /**
+     * 海报卡片焦点 key 的前缀。
+     *
+     * 用「前缀 + 影片 id」作为稳定 key，才能把焦点存下来再恢复；
+     * 原来非首张卡片用的是 `remember { Any() }`，每次重挂都是新对象。
+     */
+    val cardKeyPrefix = "vod:card:"
+
     val typePanelItems = remember(typeOptions) {
         listOf("搜索") + listOf("全部") + typeOptions
     }
@@ -397,6 +413,52 @@ fun UnifiedVideoScreen(
     // 焦点系统会回调把列表滚一点，让新的项进入可视区。
     // 注册成 Modifier 形式，让焦点系统能知道这个容器的范围 ——
     // 否则「在分类栏按右键」会把网格滚下去（真机反馈的 bug）。
+    // ---------- 记录当前焦点属于哪部影片 ----------
+    //
+    // 播放/详情会把本页整棵树卸掉，重挂时焦点会落到"第一个可聚焦项"上 ——
+    // 用户看到的就是"选中框跳到了一部不知道哪里的电影"。
+    // 所以离开前把焦点存到主框架，回来时再恢复。
+    androidx.compose.runtime.LaunchedEffect(manager) {
+        if (manager == null) return@LaunchedEffect
+        snapshotFlow { manager.focusedKey }
+            .collect { key ->
+                val s = key?.toString().orEmpty()
+                if (s.startsWith(cardKeyPrefix)) {
+                    onExternalFocusMovie(s.removePrefix(cardKeyPrefix))
+                }
+            }
+    }
+
+    // ---------- 重新挂载后恢复焦点 ----------
+    //
+    // 瀑布流是懒加载的，目标项可能还没被组合出来，所以要重试几次。
+    // 恢复成功就不再打扰用户；一直失败就退回第一项，至少保证有焦点。
+    // ⚠️ 依赖里**不能**放 externalFocusMovieId。
+    //
+    // 踩过的坑：记录焦点时我们会往主框架写这个值，而它又是这个 effect 的依赖 ——
+    // 于是每记录一次焦点就把恢复过程打断一次，恢复永远做不完
+    // （日志表现：反复打印"准备恢复焦点"，但从不打印"已恢复"）。
+    //
+    // 现在只在**这一轮挂载**开始时取一次目标：
+    // 用 remember(movies.size) 固定住初值，effect 只跟着 movies.size 走。
+    val restoreTarget = remember(movies.size) {
+        externalFocusMovieId.takeIf { it.isNotBlank() }?.let { cardKeyPrefix + it }
+    }
+    androidx.compose.runtime.LaunchedEffect(movies.size) {
+        if (movies.isEmpty()) return@LaunchedEffect
+        val target = restoreTarget ?: return@LaunchedEffect
+        repeat(25) {
+            kotlinx.coroutines.delay(120)
+            if (manager?.focusedKey?.toString() == target) return@LaunchedEffect
+            if (manager?.keys?.contains(target) == true) {
+                manager.moveTo(target)
+                return@LaunchedEffect
+            }
+        }
+        android.util.Log.w("BawanVod", "恢复焦点失败（$target），退回第一项")
+        manager?.moveTo(entryKey)
+    }
+
     val gridScrollModifier = Modifier.registerViewportScroll { delta ->
         gridState.scrollBy(delta.toFloat())
     }
@@ -570,7 +632,10 @@ fun UnifiedVideoScreen(
             items(movies, key = { it.id }) { m ->
                 UnifiedCard(
                     movie = m,
-                    focusKey = if (m == movies.firstOrNull()) entryKey else null,
+                    // 用**影片 id** 作为焦点 key（原来除第一张外都是 null，
+                    // 于是 tvFocusable 内部用 remember{Any()} 生成 —— 那种 key
+                    // 每次重挂都是新对象，焦点没法恢复）。
+                    focusKey = "vod:card:${m.id}",
                     // 不用 onLeft 覆盖：首页的导航栏已经没了，
                     // "nav:vod" 这个 key 没人注册，写了反而会把左键吃掉（踩过）
                     onLeft = null,
