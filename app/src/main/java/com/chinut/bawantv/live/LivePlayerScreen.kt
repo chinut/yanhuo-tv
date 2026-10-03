@@ -322,15 +322,23 @@ fun LivePlayerScreen(
             //
             // 现在改成：网页露出来了，但如果**始终没有片子出画面**，
             // 就保持加载提示，并在再等一段时间后升级成"换个源试试"。
+            // ⚠️ 这里**绝不能保持转圈**。
+            //
+            // 我上一版写成"网页露出后如果还没出画面就继续转圈"，
+            // 结果是那个 CircularProgressIndicator 会**永久挂在视频上面**
+            // 一直做动画 —— 在电视上持续动画要和视频抢合成，
+            // 表现就是"画面卡住了"。而且注入脚本一旦失灵，
+            // 转圈永远不会消失（它盖住的正是已经在播的画面）。
+            //
+            // 现在：网页一露面就收掉转圈。没出画面的话，
+            // 用**不参与渲染**的静态文字提示（见下面的 slowHint 浮层）。
+            buffering = false
             if (!sawRealFrame) {
-                buffering = true
                 kotlinx.coroutines.delay(WEB_SLOW_HINT_MS)
                 if (!sawRealFrame) {
                     webSlow = true
-                    android.util.Log.w(TAG_LIVE, "网页起播超时，提示用户换源")
+                    android.util.Log.w(TAG_LIVE, "网页起播超时，显示静态换源提示")
                 }
-            } else {
-                buffering = false
             }
         }
     }
@@ -1014,6 +1022,43 @@ fun LivePlayerScreen(
             )
         }
 
+        // ---------- 起播慢的静态提示 ----------
+        //
+        // 刻意做得极简：**没有动画、没有进度条**。
+        //
+        // 为什么：这是叠在视频上的浮层，任何持续动画都要和视频抢合成，
+        // 在电视上代价很高（上一版用转圈就导致"画面卡住"）。
+        // 静态文字只画一帧，画完就不占资源。
+        //
+        // 15 秒后自动消失：它只是"告诉用户能做什么"，不该常驻挡画面。
+        if (webSlow && failed == null) {
+            var hintVisible by remember { mutableStateOf(true) }
+            LaunchedEffect(webSlow) {
+                kotlinx.coroutines.delay(15_000)
+                hintVisible = false
+            }
+            if (hintVisible) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 72.sdp),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Text(
+                        "${current.name} 起播较慢 · 按「左右键」换个源试试",
+                        color = Color.White,
+                        fontSize = Txt.Label,
+                        modifier = Modifier
+                            .background(
+                                Color(0xCC000000),
+                                RoundedCornerShape(10.sdp),
+                            )
+                            .padding(horizontal = 18.sdp, vertical = 10.sdp),
+                    )
+                }
+            }
+        }
+
         // ---------- 加载中 ----------
         //
         // ⚠️ 这里原来有 `&& !useWeb`，于是**网页路线完全没有加载提示**。
@@ -1026,7 +1071,7 @@ fun LivePlayerScreen(
         // 现在网页路线也给状态提示，并且区分两种情况：
         //   · 还在加载（webSlow 为 false）→ 转圈 + "正在接入…"
         //   · 拖太久了（webSlow 为 true）→ 给出**可操作的**提示：换源
-        if (buffering && failed == null) {
+        if (buffering && failed == null && !sawRealFrame) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = Ink.Accent, strokeWidth = 3.sdp)
