@@ -34,3 +34,6 @@ docs/ui*.xml
 
 # 临时测试脚本的产物（拼音表校验等，脚本本身在 build/ 下，已忽略）
 build/pytest/
+
+# 抓包结果（含账号级别的流量，不进仓库）
+captures/
