@@ -262,6 +262,11 @@ fun TvSwitch(
     label: String,
     hint: String,
     checked: Boolean,
+    /** 本行的焦点 key（供上下邻居指向它）。 */
+    focusKey: Any? = null,
+    /** 显式指定的上下邻居，避免几何导航跳过这一行（见 tvFocusable 的说明）。 */
+    upKey: Any? = null,
+    downKey: Any? = null,
     onToggle: (Boolean) -> Unit,
 ) {
     val f = rememberTvFocusState()
@@ -270,6 +275,9 @@ fun TvSwitch(
             .fillMaxWidth()
             .tvFocusable(
                 focusState = f,
+                focusKey = focusKey,
+                upKey = upKey,
+                downKey = downKey,
                 // 开关属于操作类控件：原来的 glow=false + 半透明底
                 // 导致聚焦时几乎看不出变化（用户反馈"开关部分焦点很不明显"）。
                 // 现在改成实心底色 + 粗边框 + 光晕，聚焦时整行明显点亮。

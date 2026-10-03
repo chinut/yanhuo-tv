@@ -582,6 +582,20 @@ fun Modifier.tvFocusable(
     onUp: (() -> Boolean)? = null,
     onDown: (() -> Boolean)? = null,
     scrollKey: Any? = null,
+
+    /**
+     * 显式指定的**上下邻居**。
+     *
+     * 为什么需要：几何导航按「主轴距离 + 交叉轴错位 × 2.5」打分，
+     * 对整行等宽的控件很好用；但对**贴右边缘的窄按钮**，
+     * 纵向移动时与上下整行的交叉轴错位约半屏宽，×2.5 后分数很大，
+     * 于是焦点会跳过它 —— 实测按 18 次下键都落不到「导入直播源文件」行上。
+     *
+     * 指定这两个 key 后，按下/上键会**直接跳到那个项**，不做几何推断。
+     * 这是电视 UI 的常规做法：关键位置别依赖几何猜测。
+     */
+    upKey: Any? = null,
+    downKey: Any? = null,
 ): Modifier {
     val manager = LocalTvFocusManager.current
     val focusScope = LocalTvFocusScope.current
@@ -673,8 +687,21 @@ fun Modifier.tvFocusable(
             item.onActivate = onClick
             item.onLeft = onLeft
             item.onRight = onRight
-            item.onUp = onUp
-            item.onDown = onDown
+            // 显式邻居优先；没指定才用调用方给的 onUp/onDown
+            item.onUp = if (upKey != null) {
+                {
+                    val has = manager.keys.contains(upKey)
+                    android.util.Log.i("BawanNav", "上键: 目标=$upKey 存在=$has")
+                    if (has) { manager.moveTo(upKey); true } else { onUp?.invoke() ?: false }
+                }
+            } else onUp
+            item.onDown = if (downKey != null) {
+                {
+                    val has = manager.keys.contains(downKey)
+                    android.util.Log.i("BawanNav", "下键: 目标=$downKey 存在=$has")
+                    if (has) { manager.moveTo(downKey); true } else { onDown?.invoke() ?: false }
+                }
+            } else onDown
             item.enabled = enabled
             item.bringIntoView = {
                 // 显式指定的滚动目标优先（跨区域跳转用）

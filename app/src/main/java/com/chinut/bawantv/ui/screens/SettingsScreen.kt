@@ -1,5 +1,6 @@
 package com.chinut.bawantv.ui.screens
 
+import androidx.compose.foundation.border
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -89,6 +90,9 @@ fun SettingsScreen(
     val serverRunning by DebugWebServer.running.collectAsState()
     val serverPort by DebugWebServer.port.collectAsState()
     val updateState by Updater.state.collectAsState()
+
+    // 焦点管理器：进页面时用它把焦点放到「导入直播源文件」行
+    val focusManager = com.chinut.bawantv.ui.theme.LocalTvFocusManager.current
     /** 上一次「检查更新」的结果是否"已是最新"（用于 Idle 状态给出准确提示）。 */
     var checkedAndCurrent by remember { mutableStateOf(false) }
 
@@ -150,6 +154,7 @@ fun SettingsScreen(
         }
     }
 
+
     val listState = rememberLazyListState()
 
     // 把设置列表注册成"焦点导航的兜底滚动目标"。
@@ -196,6 +201,60 @@ fun SettingsScreen(
 
             // ==================== 手机网页调试 ====================
             item {
+                // ---------- 导入直播源文件 ----------
+                //
+                // 放在**最上面**：这是用户最可能想做的事（换掉内置源），
+                // 而且原来它在第 2~3 屏时，方向键会跳过它 ——
+                // 因为那一行的可点击区域右边是窄按钮、上下都是整行，
+                // 几何导航的"交叉轴错位 × 2.5"打分让它永远不是最优目标
+                // （实测按 15 次下键都落不到）。放最上面就绕开了这个问题。
+                SettingsCard(
+                    title = "导入直播源文件",
+                    subtitle = "选一个 m3u / txt 频道表（运营商给的 IPTV 源，或朋友发来的）",
+                    accent = Ink.Green,
+                ) {
+                    TvRow(
+                        label = if (importedCount > 0) {
+                            "已导入 $importedCount 个频道"
+                        } else {
+                            "还没有导入自定义源"
+                        },
+                        hint = if (importedCount > 0) {
+                            "导入的源优先于下面的「直播源地址」，也优先于内置频道表"
+                        } else {
+                            "导入后优先于内置频道表；想换回来点「清除」"
+                        },
+                        hintColor = if (importedCount > 0) Ink.Green else Ink.TextFaint,
+                        actionText = if (importedCount > 0) "重新导入" else "选择文件",
+                    ) {
+                        pickM3u.launch(
+                            arrayOf(
+                                "application/vnd.apple.mpegurl",
+                                "audio/x-mpegurl",
+                                "application/x-mpegURL",
+                                "text/plain",
+                                "*/*",
+                            )
+                        )
+                    }
+                    if (importedCount > 0) {
+                        TvRow(
+                            label = "清除导入的源",
+                            hint = "回到内置频道表",
+                            actionText = "清除",
+                        ) {
+                            com.chinut.bawantv.live.LiveCatalog.clearImported(context)
+                            importedCount = 0
+                            importMsg = "已清除导入的源"
+                            toast(context, "已清除")
+                        }
+                    }
+                    if (importMsg.isNotBlank()) {
+                        Spacer(Modifier.height(6.sdp))
+                        Text(importMsg, color = Ink.Amber, fontSize = Txt.Tiny)
+                    }
+                }
+
                 SettingsCard(
                     title = "手机网页调试",
                     subtitle = "电视上打字太麻烦：用手机扫码，在手机上改所有设置，保存后电视立即生效",
@@ -346,68 +405,32 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(8.sdp))
 
-                    // ---------- 导入 m3u 文件 ----------
-                    //
-                    // 比手输网址现实得多：运营商给的 IPTV 源就是文件。
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "导入直播源文件",
-                                color = Ink.TextSecondary,
-                                fontSize = Txt.Label,
-                            )
-                            Text(
-                                if (importedCount > 0) {
-                                    "已导入 $importedCount 个频道（比上面的网址优先）"
-                                } else {
-                                    "选一个 m3u / txt 文件（运营商的 IPTV 源）"
-                                },
-                                color = if (importedCount > 0) Ink.Green else Ink.TextFaint,
-                                fontSize = Txt.Tiny,
-                            )
-                        }
-                        Spacer(Modifier.width(14.sdp))
-                        SmallButton(if (importedCount > 0) "重新导入" else "选择文件") {
-                            pickM3u.launch(
-                                arrayOf(
-                                    "application/vnd.apple.mpegurl",
-                                    "audio/x-mpegurl",
-                                    "application/x-mpegURL",
-                                    "text/plain",
-                                    "*/*",
-                                )
-                            )
-                        }
-                        if (importedCount > 0) {
-                            Spacer(Modifier.width(10.sdp))
-                            SmallButton("清除") {
-                                com.chinut.bawantv.live.LiveCatalog.clearImported(context)
-                                importedCount = 0
-                                importMsg = "已清除导入的源"
-                                toast(context, "已清除")
-                            }
-                        }
-                    }
-                    if (importMsg.isNotBlank()) {
-                        Spacer(Modifier.height(6.sdp))
-                        Text(importMsg, color = Ink.Amber, fontSize = Txt.Tiny)
-                    }
 
                     Spacer(Modifier.height(6.sdp))
                     TvSwitch(
                         label = "开机自动播放上次频道",
                         hint = "像老电视一样，打开就在台上",
                         checked = prefs.autoPlayLastChannel,
+                        upKey = if (importedCount > 0) "set:clearImport"
+                        else "set:importM3u",
+                        downKey = "set:channelHud",
+                        focusKey = "set:autoLast",
                     ) { prefs.autoPlayLastChannel = it }
                     TvSwitch(
                         label = "换台时显示台标浮层",
                         hint = "关闭后换台更干净",
                         checked = prefs.showChannelHud,
+                        upKey = "set:autoLast",
+                        downKey = "set:hwDecode",
+                        focusKey = "set:channelHud",
                     ) { prefs.showChannelHud = it }
                     TvSwitch(
                         label = "硬件解码",
                         hint = "画面花屏/绿屏时关掉试试",
                         checked = prefs.hardwareDecode,
+                        upKey = "set:channelHud",
+                        downKey = "set:liveQuality",
+                        focusKey = "set:hwDecode",
                     ) { prefs.hardwareDecode = it }
 
                     // ---------- 播放清晰度 ----------
@@ -433,8 +456,10 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.width(14.sdp))
                         SmallButton(
-                            listOf("自动", "省流 360p", "标清 480p", "高清 720p")
+                            label = listOf("自动", "省流 360p", "标清 480p", "高清 720p")
                                 .getOrElse(prefs.liveQuality) { "自动" },
+                            focusKey = "set:liveQuality",
+                            upKey = "set:hwDecode",
                         ) {
                             prefs.liveQuality = (prefs.liveQuality + 1) % 4
                             toast(
@@ -974,13 +999,22 @@ private fun KeyValueRow(label: String, value: String, onEdit: () -> Unit) {
 }
 
 @Composable
-private fun SmallButton(label: String, onClick: () -> Unit) {
+private fun SmallButton(
+    label: String,
+    focusKey: Any? = null,
+    upKey: Any? = null,
+    downKey: Any? = null,
+    onClick: () -> Unit,
+) {
     val f = rememberTvFocusState()
     Box(
         Modifier
             .height(38.sdp)
             .tvFocusable(
                 focusState = f,
+                focusKey = focusKey,
+                upKey = upKey,
+                downKey = downKey,
                 // 操作类控件：实心底色 + 粗边框 + 强光晕。
                 // 原来用半透明的 CardStrong/AccentSoft，两者亮度几乎一样，
                 // 聚焦时看不出变化（用户："看起很诡异"）。
@@ -1089,4 +1123,88 @@ private enum class PinStage {
 
     /** 已有密码，改开关前校验。 */
     Verify,
+}
+
+/**
+ * 设置页的「整行可聚焦 + 右侧动作按钮」行。
+ *
+ * # 为什么整行都要可聚焦
+ *
+ * 原来这种行只让右边的小按钮可聚焦，结果**方向键会跳过它** ——
+ * 因为几何导航按「主轴距离 + 交叉轴错位 × 2.5」打分，
+ * 而窄按钮贴右边缘时，与上下整行控件的交叉轴错位约半屏宽，
+ * 乘以 2.5 后分数很大，反而选中更远但"横向对齐更好"的项。
+ *
+ * 整行可聚焦之后，上下的邻居都是同类几何形状，导航自然正常。
+ * 这也是电视 UI 的常规做法 —— 遥控器没法精确指向一个小按钮。
+ *
+ * 视觉上和 [TvSwitch] 保持一致（同样的边框/底色/内边距），
+ * 这样一列行看起来是统一的。
+ */
+@Composable
+private fun TvRow(
+    label: String,
+    hint: String,
+    actionText: String,
+    hintColor: Color = Ink.TextFaint,
+    /** 本行的焦点 key（供上下邻居指向它）。 */
+    focusKey: Any? = null,
+    /** 显式上下邻居，避免几何导航跳过这一行（见 tvFocusable 的说明）。 */
+    upKey: Any? = null,
+    downKey: Any? = null,
+    onClick: () -> Unit,
+) {
+    val f = rememberTvFocusState()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .tvFocusable(
+                focusState = f,
+                action = true,
+                focusKey = focusKey,
+                upKey = upKey,
+                downKey = downKey,
+                shape = RoundedCornerShape(12.sdp),
+                focusedScale = 1f,
+                borderWidth = 3.dp,
+                baseBackground = Color.Transparent,
+                focusedBackground = Ink.ActionFocus,
+                onClick = onClick,
+            )
+            .padding(horizontal = 14.sdp, vertical = 12.sdp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                color = if (f.focused) Color.White else Ink.TextSecondary,
+                fontSize = Txt.Label,
+            )
+            if (hint.isNotBlank()) {
+                Text(hint, color = hintColor, fontSize = Txt.Tiny, lineHeight = 17.ssp)
+            }
+        }
+        Spacer(Modifier.width(14.sdp))
+        // 纯视觉元素，不单独接收焦点（焦点在整行上）
+        Box(
+            Modifier
+                .background(
+                    if (f.focused) Ink.ActionFocus else Ink.Action,
+                    RoundedCornerShape(Dim.ChipRadius),
+                )
+                .border(
+                    width = 3.dp,
+                    color = if (f.focused) Ink.AccentBright else Color.Transparent,
+                    shape = RoundedCornerShape(Dim.ChipRadius),
+                )
+                .padding(horizontal = 16.sdp, vertical = 8.sdp),
+        ) {
+            Text(
+                actionText,
+                color = if (f.focused) Color.White else Ink.TextSecondary,
+                fontSize = Txt.Label,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
 }
