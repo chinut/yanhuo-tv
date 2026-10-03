@@ -41,3 +41,7 @@ captures/
 # Python 缓存
 __pycache__/
 *.pyc
+
+# IPTV 扫描器的运行产物（每次跑都不同）
+tools/iptv/iptv_result.json
+tools/iptv/iptv_*.m3u
