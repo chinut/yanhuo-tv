@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
@@ -132,6 +133,19 @@ fun SettingsScreen(
     // 如果把它们留在 LazyColumn 的 item 里，fillMaxSize 拿到的是那个 item
     // 的边界，浮层会被滚动容器裁成窄条 —— 所以必须和 LazyColumn 平级。
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        // ---------- 设置项变更后必须刷新界面 ----------
+        //
+        // ⚠️ 踩过一个很隐蔽的坑：原来在函数末尾写了一句裸的 `revision`，
+        // 指望它触发重组。但 **Compose 只把"被真正消费的状态读取"算作依赖** ——
+        // 读出来就丢掉的表达式不构成依赖，revision 变化时这一层不重组。
+        //
+        // 表现就是用户报的「设置里所有开关按了没反应」：
+        // 日志显示 onToggle 被调用、pref 也写进了文件，
+        // 但 TvSwitch 收到的 checked 永远是旧值，屏幕一动不动。
+        //
+        // 现在用 key(revision) 包住整块内容：revision 一变化，
+        // 这棵子树重建，所有开关/按钮都拿到新值。
+        key(revision) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().registerViewportScroll { d -> listState.scrollBy(d.toFloat()) },
@@ -703,6 +717,7 @@ fun SettingsScreen(
                 Box(Modifier.width(1.sdp).height(1.sdp))
             }
         }
+        }
         // ---------- 家长密码弹窗 ----------
         when (pinStage) {
             PinStage.SetFirst -> ParentalPinDialog(
@@ -769,9 +784,6 @@ fun SettingsScreen(
             )
         }
 
-        // revision 只是为了让上面的读取随设置变化重组
-        @Suppress("UNUSED_EXPRESSION")
-        revision
     }
 }
 
