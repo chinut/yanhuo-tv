@@ -754,8 +754,11 @@ fun VodPlayerScreen(
         // ---------- 短剧：利用竖屏两侧的黑边 ----------
         //
         // 短剧是 720x1280 竖屏，在横屏电视上居中后左右各空一块。
-        // 老人在电视上看短剧最需要两件事：**知道第几集**、**方便切下一集**。
-        // 所以左空区放「上一集」、右空区放「下一集 + 集数」。
+        // 老人在电视上看短剧最需要两件事：**知道第几集**、**怎么切下一集**。
+        //
+        // 所以两侧放的是**遥控器按键提示**（▲ 上键 / ▼ 下键），不是按钮 ——
+        // 遥控器没法"选中"两侧的东西，放按钮只会误导。
+        // 详见 SideKeyHint 的说明。
         //
         // 只在 isShortDrama 时显示 —— 影视是宽屏内容，没有黑边可用。
         if (isShortDrama && failed == null) {
@@ -771,12 +774,12 @@ fun VodPlayerScreen(
                     .padding(horizontal = Dim.SafeH * 0.2f),
                 contentAlignment = Alignment.Center,
             ) {
-                SideEpisodeButton(
+                SideKeyHint(
+                    keyGlyph = "▲",
+                    keyName = "上键",
                     label = "上一集",
                     hint = if (hasPrev) "第 ${index} 集" else "已是第一集",
                     enabled = hasPrev,
-                    forward = false,
-                    onClick = { if (hasPrev) step(-1) },
                 )
             }
 
@@ -800,7 +803,9 @@ fun VodPlayerScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(10.sdp))
-                    SideEpisodeButton(
+                    SideKeyHint(
+                        keyGlyph = "▼",
+                        keyName = "下键",
                         label = "下一集",
                         hint = if (hasNext) {
                             "第 ${(nextPlayable() ?: index) + 1} 集"
@@ -808,8 +813,6 @@ fun VodPlayerScreen(
                             "已是最后一集"
                         },
                         enabled = hasNext,
-                        forward = true,
-                        onClick = { nextPlayable()?.let { step(it - index) } },
                     )
                 }
             }
@@ -1083,43 +1086,56 @@ private const val SCRUB_CHAIN_MS = 900L
 private const val SCRUB_COMMIT_DELAY_MS = 600L
 
 /**
- * 短剧两侧的大按钮（上一集 / 下一集）。
+ * 短剧两侧的**遥控器按键提示**（不是按钮）。
  *
- * 为什么要做成"大按钮"而不是小图标：电视的观看距离是 2~3 米，
- * 老人更是看不清小字。这里用整块区域承接触摸/点击，也会被遥控器
- * 的左右键顺带覆盖到（step() 的行为一致）。
+ * # 为什么是"提示"而不是"按钮"
  *
- * [enabled] 为 false 时画成灰色并且不可点 —— 比"点了没反应"清楚得多。
+ * 第一版把它做成了 `Modifier.clickable` 的按钮 —— 结果遥控器根本够不着
+ * （只能触摸/鼠标点），而且它调用的 `step()` 和 ↑↓ 完全一样，
+ * **没提供任何新能力**；更糟的是它长得像"要用方向键去选中它"，会误导用户。
+ *
+ * 遥控器的真实映射是：
+ * ```
+ *     ← →   拖动进度
+ *     ↑ ↓   切上一集 / 下一集     ← 切集在这里
+ *     确定   暂停 / 恢复
+ *     三横键  选集列表
+ * ```
+ *
+ * 所以两侧应该做的是**把这个映射告诉用户** —— 对着 2~3 米外、
+ * 眼神不好的老人，"按遥控器上键"比一个点不到的按钮有用得多。
+ *
+ * [enabled] 为 false 时整体压暗，并给出原因（"已是第一集"），
+ * 而不是让用户按了没反应。
  */
 @Composable
-private fun SideEpisodeButton(
+private fun SideKeyHint(
+    keyGlyph: String,
+    keyName: String,
     label: String,
     hint: String,
     enabled: Boolean,
-    forward: Boolean,
-    onClick: () -> Unit,
 ) {
     val tint = if (enabled) Color.White else Ink.TextFaint
-    val bg = if (enabled) {
-        Color.White.copy(alpha = 0.10f)
-    } else {
-        Color.White.copy(alpha = 0.04f)
-    }
+    val bg = if (enabled) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.03f)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .clip(RoundedCornerShape(18.sdp))
             .background(bg)
-            .then(if (enabled) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 18.sdp, vertical = 22.sdp),
+            .padding(horizontal = 20.sdp, vertical = 22.sdp),
     ) {
+        // 遥控器上的那个键（画大一点，一眼能认）
+        Text(keyGlyph, color = tint, fontSize = 34.ssp)
+        Spacer(Modifier.height(6.sdp))
         Text(
-            if (forward) "▶" else "◀",
-            color = tint,
-            fontSize = 30.ssp,
+            "按$keyName",
+            color = if (enabled) Ink.AccentBright else Ink.TextFaint,
+            fontSize = Txt.Tiny,
+            fontWeight = FontWeight.Bold,
         )
-        Spacer(Modifier.height(8.sdp))
+        Spacer(Modifier.height(10.sdp))
         Text(
             label,
             color = tint,
@@ -1129,7 +1145,7 @@ private fun SideEpisodeButton(
         Spacer(Modifier.height(4.sdp))
         Text(
             hint,
-            color = if (enabled) Ink.TextTertiary else Ink.TextFaint,
+            color = Ink.TextTertiary,
             fontSize = Txt.Tiny,
         )
     }
