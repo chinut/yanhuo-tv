@@ -108,6 +108,14 @@ fun VodPlayerScreen(
     request: com.chinut.bawantv.unified.PlayRequest,
     onClose: () -> Unit,
     onSwitchEpisode: (com.chinut.bawantv.unified.PlayRequest) -> Unit,
+    /**
+     * 短剧模式：一集播完**自动播下一集**。
+     *
+     * 为什么用开关而不是自动判断：影视（一部电影）播完就该结束，
+     * 自动播下一部会让用户莫名其妙。短剧一集只有 1~2 分钟，
+     * 不自动连播就得一直按遥控器 —— 那才是没法用。
+     */
+    isShortDrama: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = BawanApp.prefs
@@ -284,10 +292,52 @@ fun VodPlayerScreen(
         }.onFailure { failed = it.message }
     }
 
+    // ---------- 自动连播（短剧） ----------
+    //
+    // 两个必须防住的点：
+    //
+    // 1. **重复触发**：`onPlaybackStateChanged` 在同一个 STATE_ENDED 上
+    //    可能回调多次，不加标志会连切好几集。
+    // 2. **空地址**：红果只有免费集能取到播放地址，其余是空串（正常付费墙）。
+    //    遇到空地址要给明确提示，而不是切过去黑屏。
+    //
+    // 注意：Kotlin 的局部函数必须在**使用之前**声明，
+    // 所以这段放在 DisposableEffect 之前。
+    var autoNextFired by remember(request) { mutableStateOf(false) }
+
+    /** 找下一集里第一个有地址的；没有就返回 null。 */
+    fun nextPlayable(): Int? {
+        for (i in (index + 1)..request.episodes.lastIndex) {
+            if (request.episodes[i].url.isNotBlank()) return i
+        }
+        return null
+    }
+
+    fun onEpisodeEnded() {
+        if (autoNextFired) return
+        autoNextFired = true
+        val next = nextPlayable()
+        when {
+            next != null -> {
+                android.util.Log.i(TAG_VOD, "自动连播：第 ${index + 1} 集 → 第 ${next + 1} 集")
+                onSwitchEpisode(request.copy(index = next))
+            }
+            index < request.episodes.lastIndex -> {
+                android.util.Log.i(TAG_VOD, "自动连播停止：后续剧集没有播放地址（付费集）")
+                failed = "后面的剧集需要在「红果短剧」App 里观看"
+            }
+            else -> android.util.Log.i(TAG_VOD, "自动连播结束：已是最后一集")
+        }
+    }
+
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 isPlaying = player.isPlaying
+                // 一集播完 → 短剧自动下一集
+                if (state == androidx.media3.common.Player.STATE_ENDED && isShortDrama) {
+                    onEpisodeEnded()
+                }
             }
 
             override fun onIsPlayingChanged(playing: Boolean) {
@@ -947,6 +997,7 @@ private fun fmt(ms: Long): String {
 /**
  * 第一档步长：轻点一下跳 10 秒 —— 方便精确微调到想看的台词/镜头。
  */
+private const val TAG_VOD = "BawanVodPlayer"
 private const val SCRUB_MIN_MS = 10_000L
 
 /**

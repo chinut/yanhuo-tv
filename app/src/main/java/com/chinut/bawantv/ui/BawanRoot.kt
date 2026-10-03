@@ -473,6 +473,8 @@ fun BawanRoot(
                                             title = movie.title,
                                             vodId = movie.id,
                                             poster = movie.poster,
+                                            // 短剧：一集播完自动下一集
+                                            autoNext = true,
                                         )
                                     },
                                 )
@@ -621,6 +623,7 @@ fun BawanRoot(
                     request = req,
                     onClose = { resumeVod = null },
                     onSwitchEpisode = { resumeVod = it },
+                    isShortDrama = req.autoNext,
                 )
             }
             // ---------- 影视板块点剧集后的全屏播放 ----------
@@ -629,6 +632,7 @@ fun BawanRoot(
                     request = req,
                     onClose = { playVod = null },
                     onSwitchEpisode = { playVod = it },
+                    isShortDrama = req.autoNext,
                 )
             }
         }

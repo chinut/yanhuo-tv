@@ -18,6 +18,15 @@ data class PlayRequest(
     /** 用于观看记录（断点续播 / 首页继续观看）。 */
     val vodId: String = "",
     val poster: String = "",
+    /**
+     * 短剧模式：一集播完**自动播下一集**。
+     *
+     * 为什么不让播放器按"集数 > 1"自己判断：一部电视剧也可能有几十集，
+     * 但播完一集未必想自动连播（有的用户就是看一集）。
+     * 短剧是明确的产品语义 —— 一集 1~2 分钟，就该连着看。
+     * 所以由发起方（板块）显式标记。
+     */
+    val autoNext: Boolean = false,
 ) {
     val current: Episode? get() = episodes.getOrNull(index) ?: episodes.firstOrNull()
 }
