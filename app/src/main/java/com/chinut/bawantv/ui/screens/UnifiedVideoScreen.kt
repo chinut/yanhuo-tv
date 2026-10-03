@@ -482,7 +482,7 @@ fun UnifiedVideoScreen(
         // 结构说明：低端影视是**基础库**，所以这里第一眼看到的是
         // "库里有什么"（数量），而不是各源的聚合状态。
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("影视", color = Color.White, fontSize = Txt.Title, fontWeight = FontWeight.Bold)
+            Text("影视", color = Color.White, fontSize = Txt.Section, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(14.sdp))
             Text(
                 if (syncing > 0) "低端影视库 ${movies.size} 部 · 补货中 ${syncDone}/20"
@@ -506,7 +506,7 @@ fun UnifiedVideoScreen(
             )
         }
 
-        Spacer(Modifier.height(12.sdp))
+        Spacer(Modifier.height(8.sdp))
 
         // ---------- 当前分类（**不可聚焦**，只是一行状态） ----------
         //
@@ -520,7 +520,7 @@ fun UnifiedVideoScreen(
             fontSize = Txt.Label,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(Modifier.height(12.sdp))
+        Spacer(Modifier.height(8.sdp))
 
 
         if (movies.isEmpty()) {
@@ -623,11 +623,25 @@ fun UnifiedVideoScreen(
 
         // ---------- 无限滚动海报墙 ----------
         LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Adaptive(minSize = 138.sdp),
+            // ---------- 列数：一屏放更多海报 ----------
+            //
+            // 原来用 Adaptive(minSize = 138dp)，实测 1920x1080 的电视上只排下 5 列，
+            // 一屏十来个 —— 电视屏幕这么大，确实浪费。
+            //
+            // 改成**固定 6 列**：
+            //   可用宽度 960 - 2*33.6(安全边距) ≈ 893dp
+            //   6 列 × (136 + 2*6 间距) ≈ 893dp   ← 正好铺满
+            // 配合下面把卡片内边距和字号收紧，一屏从 2 行变成 3 行，
+            // 也就是从十来个变成 **18 个**。
+            //
+            // 用 Fixed 而不是 Adaptive 是有意的：Adaptive 会按"能塞下几个最小值"
+            // 算列数，宽度一变列数就跳（720p/1080p/4K 各不相同）。
+            // 固定列数让各种分辨率下的**排版比例一致**，观感稳定得多。
+            columns = StaggeredGridCells.Fixed(6),
             state = gridState,
-            contentPadding = PaddingValues(bottom = 32.sdp, end = 8.sdp),
-            horizontalArrangement = Arrangement.spacedBy(14.sdp),
-            verticalItemSpacing = 16.sdp,
+            contentPadding = PaddingValues(bottom = 18.sdp, end = 2.sdp),
+            horizontalArrangement = Arrangement.spacedBy(12.sdp),
+            verticalItemSpacing = 10.sdp,
             modifier = Modifier.fillMaxSize().then(gridScrollModifier),
         ) {
             items(movies, key = { it.id }) { m ->
@@ -705,7 +719,9 @@ private fun UnifiedCard(
                 focusState = focus,
                 focusKey = focusKey,
                 shape = RoundedCornerShape(Dim.CardRadius),
-                focusedScale = 1.05f,
+                // 缩放从 1.05 收到 1.03：焦点框放大后不会顶出列宽被裁掉半截。
+                // 焦点依然是"亮边框 + 提亮 + 底加深"三重提示，辨识度不受影响。
+                focusedScale = 1.03f,
                 borderWidth = 3.dp,
                 baseBackground = Ink.Card,
                 focusedBackground = Ink.CardStrong,
@@ -713,7 +729,7 @@ private fun UnifiedCard(
                 onLeft = onLeft,
                 onUp = onUp,
             )
-            .padding(8.sdp),
+            .padding(6.sdp),
     ) {
         Box(
             Modifier
@@ -769,11 +785,13 @@ private fun UnifiedCard(
                 }
             }
         }
-        Spacer(Modifier.height(7.sdp))
+        Spacer(Modifier.height(5.sdp))
         Text(
             movie.title,
             color = if (focus.focused) Color.White else Ink.TextSecondary,
-            fontSize = Txt.Label,
+            // 列变窄了，标题从 Label(15sp) 收到 Caption(13sp)，
+            // 中文标题一行能放下 8~9 个字，够用且不至于挤成一团
+            fontSize = Txt.Caption,
             fontWeight = if (focus.focused) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

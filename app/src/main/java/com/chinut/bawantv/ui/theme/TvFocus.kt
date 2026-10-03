@@ -363,6 +363,52 @@ class TvFocusScope(
         return false
     }
 
+    /**
+     * 找到包含 [rect] 中心点的那个滚动视口，拿它的可视范围。
+     *
+     * 用途：焦点卡片自己判断"我有没有被裁掉"。
+     * 判断方式用"中心点在谁里面"，和 [scrollViewport] 保持一致 ——
+     * 用整块相交的话，卡片一半压在容器外时归属会算错。
+     */
+    fun viewportRectFor(rect: Rect): Rect? {
+        if (rect.isEmpty) return null
+        val cx = rect.center.x
+        val cy = rect.center.y
+        viewportScrolls.values.forEach { vp ->
+            val r = runCatching { vp.bounds() }.getOrNull() ?: return@forEach
+            if (r.isEmpty) return@forEach
+            if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return r
+        }
+        return null
+    }
+
+    /**
+     * 按精确像素量滚动"包含 [focusRect]"的那个容器。
+     *
+     * 与 [scrollViewport] 的区别：那个是按一个固定的步长滚（方向键触发），
+     * 这个是"差多少补多少" —— 由焦点项自己算出被裁掉的部分，正好把它滚出来。
+     * 用于保证「选中的内容 100% 在屏幕内」。
+     *
+     * @param focusRect 焦点项在窗口里的矩形（用来判断它属于哪个容器）
+     * @param delta 要滚动的像素量（正数向下）
+     */
+    fun scrollViewportBy(focusRect: Rect, delta: Float) {
+        if (delta == 0f || viewportScrolls.isEmpty()) return
+        val vp = viewportRectFor(focusRect)?.let { r ->
+            viewportScrolls.values.firstOrNull { v ->
+                runCatching { v.bounds() }.getOrNull() == r
+            }
+        }
+        if (vp != null) {
+            runCatching { vp.scroll(delta.toInt()) }
+            return
+        }
+        // 拿不到归属时退回第一个容器，总比不滚好
+        viewportScrolls.values.firstOrNull()?.let { v ->
+            runCatching { v.scroll(delta.toInt()) }
+        }
+    }
+
     companion object {
         /** 一次方向键滚动的像素量 —— 约半行卡片，滚动手感比较连续。 */
         private const val SCROLL_STEP = 260
@@ -488,23 +534,61 @@ fun Modifier.tvFocusable(
     //
     // bringIntoViewRequester 交给 Compose 自己算：它知道滚动容器的可视范围，
     // 会把这一项完整带进视野。
+    //
+    // ⚠️ 但**光靠它不够**，实测踩到了：
+    //
+    //   bringIntoView 只在目标**完全不可见**时才滚动。卡片"下半截在屏幕外"
+    //   属于部分可见，它判定"已经在视野里了" → 什么都不做。
+    //   于是连续按向下键时，焦点卡片的上半截会被容器顶边切掉。
+    //
+    // 所以下面自己算一遍：拿卡片在窗口里的实际位置，和它所在滚动容器的可视
+    // 范围比一比，差多少就精确滚多少。bringIntoView 保留作为兜底
+    // （比如跨容器跳转那种它更擅长的情况）。
+    //
+    // 留白为什么是这些值：
+    //   · 上 12 / 下 10 —— 电视普遍有 overscan（边缘会被切几像素），
+    //     而且卡片聚焦时会放大 3%，上下都得留出余量。
+    //   · 左右 24 —— 网格本身已有安全边距，这里只需要盖住放大和光晕。
+    val bringPadTop = 12f
+    val bringPadBottom = 10f
+    val bringPadSide = 24f
+
     val bringRequester = androidx.compose.foundation.relocation.BringIntoViewRequester()
     val scopeForBring = rememberCoroutineScope()
-    androidx.compose.runtime.LaunchedEffect(focusState.focused) {
-        if (focusState.focused) {
-            // 轻微延迟：等布局稳定（尤其刚切分类、列表项才重组完）
-            kotlinx.coroutines.delay(60)
-            runCatching {
-                bringRequester.bringIntoView(
-                    Rect(
-                        // 四周留边距，避免贴边时被圆角/光晕裁掉
-                        left = -24f,
-                        top = -24f,
-                        right = bounds.width + 24f,
-                        bottom = bounds.height + 24f,
-                    )
+    androidx.compose.runtime.LaunchedEffect(focusState.focused, focusScope) {
+        if (!focusState.focused) return@LaunchedEffect
+        // 轻微延迟：等布局稳定（尤其刚切分类、列表项才重组完）
+        kotlinx.coroutines.delay(60)
+        runCatching {
+            bringRequester.bringIntoView(
+                Rect(
+                    left = -bringPadSide,
+                    top = -bringPadTop,
+                    right = bounds.width + bringPadSide,
+                    bottom = bounds.height + bringPadBottom,
                 )
+            )
+        }
+
+        // ---------- 精确补齐：把被裁掉的部分滚出来 ----------
+        if (focusScope == null) return@LaunchedEffect
+        repeat(3) {
+            val b = bounds
+            if (b.isEmpty) return@repeat
+            val vp = focusScope.viewportRectFor(b) ?: return@LaunchedEffect
+
+            // 相对容器上下沿算差值：正数=内容在视口上方，需要往上滚（负 delta）
+            val overTop = vp.top - b.top + bringPadTop
+            val overBottom = b.bottom - vp.bottom + bringPadBottom
+            val delta = when {
+                overTop > 0f -> -overTop
+                overBottom > 0f -> overBottom
+                else -> 0f
             }
+            if (delta == 0f) return@LaunchedEffect
+            focusScope.scrollViewportBy(b, delta)
+            // 等一帧，让滚动生效后再判断一次（可能有图片解码导致的尺寸变化）
+            kotlinx.coroutines.delay(80)
         }
     }
 
@@ -527,10 +611,10 @@ fun Modifier.tvFocusable(
                         runCatching {
                             bringRequester.bringIntoView(
                                 androidx.compose.ui.geometry.Rect(
-                                    left = -24f,
-                                    top = -24f,
-                                    right = bounds.width + 24f,
-                                    bottom = bounds.height + 24f,
+                                    left = -bringPadSide,
+                                    top = -bringPadTop,
+                                    right = bounds.width + bringPadSide,
+                                    bottom = bounds.height + bringPadBottom,
                                 )
                             )
                         }
