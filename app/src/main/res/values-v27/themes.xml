@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 开屏瞬间的系统级主题：纯黑，避免白屏闪烁；真正的开屏动画在 Compose 里 -->
+    <!--
+      刘海屏适配：windowLayoutInDisplayCutoutMode 是 API 27 才有的属性，
+      必须单独放在 values-v27 里，否则 minSdk 23 的构建会因为 NewApi 报错。
+
+      低版本系统（Android 6/7/8）本来也没有刘海屏这个概念，
+      用 values/ 里那份不带这个属性的主题即可。
+    -->
     <style name="Theme.BawanTV" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/ink</item>
         <item name="android:colorBackground">@color/ink</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <!-- 注意：刘海屏相关的 windowLayoutInDisplayCutoutMode 要求 API 27，
-             放在这里会让 minSdk 23 的构建报 NewApi。
-             它被单独放到 values-v27/themes.xml —— 低版本系统本来也用不到刘海屏。 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 </resources>

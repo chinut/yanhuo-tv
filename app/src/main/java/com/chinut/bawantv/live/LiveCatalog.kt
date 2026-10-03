@@ -52,70 +52,47 @@ object LiveCatalog {
                 val text = runCatching {
                     context.assets.open(BUILTIN_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() }
                 }.getOrDefault("")
-                val groups = attachKnownStreams(parse(text).ifEmpty { fallbackCctv() })
+                val groups = parse(text).ifEmpty { fallbackCctv() }
                 cachedBuiltin = groups
                 groups
             }
         }
     }
 
-    /**
-     * 给「网页类频道」补上直连流地址。
+    /*
+     * ==================== 这里曾经尝试"直连流优先"，已撤销 ====================
      *
-     * 关键：**网页地址必须保持在第一位**。
-     * 央视与多数省台的流是加密专有格式，只有电视台自己的网页播放器能解，
-     * 所以这类频道默认走「浏览器引擎打开网页」的路线（见 [TvWebPlayerView]）；
-     * 直连流只作为备用源挂在后面，网页路线放不出来时才轮到它。
+     * 起因是真机反馈：老电视看直播"卡到无法观看，大部分时间停在央视频的
+     * 加载占位图上"。当时的判断是"让 WebView 跑央视频整站太重"，于是改成
+     * 直接把流地址交给 ExoPlayer 硬解。
+     *
+     * **这个判断是错的，而且我犯了一个具体的错误：**
+     *
+     * 我给这些地址做的验证只有一条 —— "返回的文本以 #EXTM3U 开头"。
+     * 但那个 CDN 上放的其实是**纯音频流**：
+     *
+     *     https://piccpndali.v.myalicdn.com/audio/cctv1_2.m3u8
+     *                                          ^^^^^ 路径里就写着 audio
+     *     #EXTINF:10.006,
+     *     cctv1_audio/1790960938_14541823.ts      ← 分片名也带 audio
+     *
+     * 结果用户看到的是**只有声音、没有画面**。
+     * 教训：验证媒体流必须确认**有没有视频轨**（看分片路径 / CODECS），
+     * 光看"是不是合法播放列表"远远不够。
+     *
+     * 之后我又逐个实测了其他公开的央视直连源（电信/百视通/ivi/山东移动等），
+     * **全部返回 502（早已下线）**。也就是说：
+     *
+     *   · 没有可用的央视直连视频流；
+     *   · 央视的流是专有加密格式，只能由台站自己的网页播放器解。
+     *
+     * 所以现在**不再硬塞任何直连地址**，网页路线是唯一可行方案。
+     * 它的性能问题不用改路线来解决，而是靠：
+     *   · TvWebPlayerView 的强力起播 + 元素清理脚本
+     *   · 直播页的预加载（出画面才显示 WebView，用户只看到转圈）
+     *   · 连续失败时自动换下一个源
      */
-    private fun attachKnownStreams(groups: List<LiveGroup>): List<LiveGroup> {
-        val known = knownCctvStreams()
-        return groups.map { g ->
-            g.copy(
-                channels = g.channels.map { ch ->
-                    if (isDirectStream(ch.url)) {
-                        ch
-                    } else {
-                        val extra = known[normalizeName(ch.name)]
-                        if (extra.isNullOrEmpty()) {
-                            ch
-                        } else {
-                            ch.copy(
-                                // 网页地址保持第一，直连流追加为备用
-                                alternates = (ch.alternates + extra).distinct(),
-                            )
-                        }
-                    }
-                }
-            )
-        }
-    }
 
-    /** 关键词 → 直连 HLS 地址表。 */
-    private fun knownCctvStreams(): Map<String, List<String>> {
-        val base = "http://ivi.bupt.edu.cn/hls"
-        val entries = listOf(
-            "CCTV-1 综合" to "cctv1hd",
-            "CCTV-2 财经" to "cctv2hd",
-            "CCTV-3 综艺" to "cctv3hd",
-            "CCTV-4 中文国际" to "cctv4hd",
-            "CCTV-5 体育" to "cctv5hd",
-            "CCTV-5+ 体育赛事" to "cctv5phd",
-            "CCTV-6 电影" to "cctv6hd",
-            "CCTV-7 国防军事" to "cctv7hd",
-            "CCTV-8 电视剧" to "cctv8hd",
-            "CCTV-9 纪录" to "cctv9hd",
-            "CCTV-10 科教" to "cctv10hd",
-            "CCTV-11 戏曲" to "cctv11hd",
-            "CCTV-12 社会与法" to "cctv12hd",
-            "CCTV-13 新闻" to "cctv13hd",
-            "CCTV-14 少儿" to "cctv14hd",
-            "CCTV-15 音乐" to "cctv15hd",
-            "CCTV-17 农业农村" to "cctv17hd",
-        )
-        return entries.associate { (name, file) ->
-            normalizeName(name) to listOf("$base/$file.m3u8")
-        }
-    }
     /**
      * 最终频道表：内置频道 + 用户自定义源（如果有）。
      * 自定义源单独成一类，放在最前面，避免和内置的混在一起。
@@ -304,8 +281,8 @@ object LiveCatalog {
      */
     fun candidatesOf(channel: LiveChannel): List<String> {
         val out = ArrayList<String>(channel.alternates.size + 1)
-        if (!isDeadSource(channel.url)) out.add(channel.url)
-        channel.alternates.forEach { if (it !in out && !isDeadSource(it)) out.add(it) }
+        if (!isDeadSource(channel.url) && !isAudioOnlyStream(channel.url)) out.add(channel.url)
+            channel.alternates.forEach { if (it !in out && !isDeadSource(it) && !isAudioOnlyStream(it)) out.add(it) }
         return out.ifEmpty { listOf(channel.url) }
     }
 
@@ -313,6 +290,22 @@ object LiveCatalog {
     private val DEAD_HOSTS = listOf("ivi.bupt.edu.cn")
 
     fun isDeadSource(url: String): Boolean = DEAD_HOSTS.any { url.contains(it) }
+
+    /**
+     * 已知的**纯音频**流，不能当视频源用。
+     *
+     * 血的教训：我加过一批"央视直连流"，验证方式只有"返回文本以 #EXTM3U 开头"，
+     * 结果它们其实是音频流（路径 `/audio/`、分片 `cctv1_audio/xxx.ts`），
+     * 用户看到的是**只有声音没有画面**。
+     *
+     * 所以凡是路径里带 `audio` 的一律排除 —— 宁可退回网页路线，
+     * 也不要给用户一个"能播但没画面"的源。
+     */
+    private val AUDIO_ONLY_HINTS = listOf("/audio/", "_audio/", "audio-only")
+
+    /** 这个地址是不是已知的纯音频流。 */
+    fun isAudioOnlyStream(url: String): Boolean =
+        AUDIO_ONLY_HINTS.any { url.lowercase().contains(it) }
 
     /**
      * 网页播放时按站点挑 UA。
@@ -353,6 +346,8 @@ object LiveCatalog {
             host.endsWith("gstv.com.cn") -> "https://www.gstv.com.cn/"
             host.contains("kankanlive") -> "https://www.kankanews.com/"
             host.contains("hyrtv") -> "https://www.hyrtv.cn/"
+            // 央视自有直连流 CDN（CCTV 各频道的硬解源）。必带 Referer，否则被拒。
+            host.contains("myalicdn") || host.contains("alicdn") -> "https://tv.cctv.com/"
             host.contains("cctv") -> "https://tv.cctv.com/"
             host.contains("cctvpic") -> "https://tv.cctv.com/"
             host.contains("yangshipin") -> "https://www.yangshipin.cn/"
@@ -371,18 +366,37 @@ object LiveCatalog {
     }
 
     /**
-     * 内置兜底频道表（assets 缺失时用）。
-     * 这几个是长期稳定的央视公开 HLS 源。
+     * 内置兜底频道表（assets 读取失败时才用）。
+     *
+     * 这里用的是**电视台自己的网页直播页**，和主频道表同一套地址。
+     *
+     * 以前这里拿的是一批第三方 HLS 直连地址，但那个域名已经下线 ——
+     * 也就是说"兜底表"本身是坏的，真出问题时反而播不了。
+     * 现在统一用官方网页地址：走 [TvWebPlayerView] 浏览器引擎播放，
+     * 和正常频道的路径完全一致，不会再出现"兜底源全是死的"这种事。
      */
     private fun fallbackCctv(): List<LiveGroup> = listOf(
         LiveGroup(
             "央视",
-            knownCctvStreams().map { (key, urls) ->
-                LiveChannel(
-                    name = key.replaceFirstChar { it.uppercase() },
-                    url = urls.first(),
-                    group = "央视",
-                )
+            listOf(
+                "CCTV-1 综合" to "https://tv.cctv.com/live/cctv1/",
+                "CCTV-2 财经" to "https://tv.cctv.com/live/cctv2/",
+                "CCTV-3 综艺" to "https://tv.cctv.com/live/cctv3/",
+                "CCTV-4 中文国际" to "https://tv.cctv.com/live/cctv4/",
+                "CCTV-5 体育" to "https://tv.cctv.com/live/cctv5/",
+                "CCTV-6 电影" to "https://tv.cctv.com/live/cctv6/",
+                "CCTV-7 国防军事" to "https://tv.cctv.com/live/cctv7/",
+                "CCTV-8 电视剧" to "https://tv.cctv.com/live/cctv8/",
+                "CCTV-9 纪录" to "https://tv.cctv.com/live/cctv9/",
+                "CCTV-10 科教" to "https://tv.cctv.com/live/cctv10/",
+                "CCTV-11 戏曲" to "https://tv.cctv.com/live/cctv11/",
+                "CCTV-12 社会与法" to "https://tv.cctv.com/live/cctv12/",
+                "CCTV-13 新闻" to "https://tv.cctv.com/live/cctv13/",
+                "CCTV-14 少儿" to "https://tv.cctv.com/live/cctv14/",
+                "CCTV-15 音乐" to "https://tv.cctv.com/live/cctv15/",
+                "CCTV-17 农业农村" to "https://tv.cctv.com/live/cctv17/",
+            ).map { (name, url) ->
+                LiveChannel(name = name, url = url, group = "央视")
             }
         )
     )

@@ -58,6 +58,24 @@ class MainActivity : ComponentActivity(), com.chinut.bawantv.core.RemoteBus.Host
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // ---------- 全局禁止息屏 ----------
+        //
+        // 用户反馈："打开这个软件的时候能不能不要进入屏保啊，看一会就进入屏保了"。
+        //
+        // 之前只在两个播放页加了 FLAG_KEEP_SCREEN_ON —— 那是错的：
+        //   · **浏览页面**（首页、频道墙、影视列表、设置）照样会息屏，
+        //     而这些页面本来就要慢慢挑，正是最容易息屏的时候；
+        //   · 而且熄屏后音频还在放，体验非常怪。
+        //
+        // 这是一个**遥控器操作的全屏电视应用**，息屏没有任何意义：
+        // 用户在看电视时就该常亮。所以直接在窗口级加标志，全程有效，
+        // 直到用户主动退出应用。
+        //
+        // 用 window 标志而不是 View.keepScreenOn：
+        // 部分国产电视（实测小米）只认窗口级标志，不认子 View 的。
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         // 注册为网络遥控的执行端：手机 App 发来的按键最终由这里注入
         com.chinut.bawantv.core.RemoteBus.registerHost(this)
         // 调试入口诊断：把 intent 里的 extras 全打出来。
@@ -100,7 +118,13 @@ class MainActivity : ComponentActivity(), com.chinut.bawantv.core.RemoteBus.Host
                         // 不会出现「开屏没了、首页还没画出来」中间闪一下黑底。
                         // 首页**立即挂载**（首次启动时它就在开屏底下渲染），
                         // 这样等开屏淡出时底下早就是画好的首页了。
-                        BawanRoot(focusManager = focusManager)
+                        BawanRoot(
+                            focusManager = focusManager,
+                            // 首页再按返回 → 退出 App。
+                            // 用 finish() 而不是 finishAffinity()：电视上这个应用
+                            // 就是从桌面启动的，finish 之后自然回到桌面。
+                            onExitRequested = { finish() },
+                        )
 
                         // 首次启动才播开屏；从后台回来、旋屏都不重播。
                         var showSplash by remember { mutableStateOf(!BawanApp.splashShown) }
@@ -154,8 +178,55 @@ class MainActivity : ComponentActivity(), com.chinut.bawantv.core.RemoteBus.Host
             if (isEnterKeyCode(event.keyCode)) {
                 if (focusManager.dispatchConfirm()) return true
             }
+
+            // ---------- 飞鼠 / 游戏手柄上的"确认"类按键 ----------
+            //
+            // 实测：电视遥控器没问题，但**飞鼠（空中鼠标）**上那几个键按了没反应。
+            // 原因是飞鼠发的不是 DPAD_CENTER，而是下面这些键码之一 ——
+            // 各个厂商实现还不统一，所以常见的都收进来。
+            if (event.keyCode in AIR_MOUSE_CONFIRM_KEYS) {
+                if (focusManager.dispatchConfirm()) return true
+            }
+
+            // ---------- 飞鼠上的"返回 / 菜单" ----------
+            // 这两个键在部分飞鼠上映射到 ENTER / ESCAPE / MENU / BACK，
+            // 如果不显式处理，会直接落到 super 被系统吞掉（表现为按键无效）。
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                    // 交给 BackHandler（BawanRoot 里注册的那套逻辑）
+                    onBackPressedDispatcher.onBackPressed()
+                    return true
+                }
+
+                KeyEvent.KEYCODE_MENU -> {
+                    // 三横「菜单/设置」键交给当前界面处理。
+                    //
+                    // 直播播放页用它呼出**清晰度/线路选择**；别的界面没接管就吞掉，
+                    // 避免弹出一个空的系统菜单把画面挡住。
+                    if (focusManager.dispatchRawKey(KeyEvent.KEYCODE_MENU)) return true
+                    if (focusManager.dispatchRawKey(KeyEvent.KEYCODE_SETTINGS)) return true
+                    return true
+                }
+            }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    companion object {
+        /**
+         * 飞鼠/手柄上用来"确定"的各种键码。
+         *
+         * 之所以要列一串：飞鼠厂商的实现很随意 —— 有的发 ENTER、
+         * 有的发 NUMPAD_ENTER、有的发 BUTTON_A，还有的干脆发 DPAD_CENTER 的变体。
+         * 只认 DPAD_CENTER 的话，用户会觉得"飞鼠的确认键坏了"。
+         */
+        private val AIR_MOUSE_CONFIRM_KEYS = setOf(
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_SPACE,
+        )
     }
 }
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -56,6 +57,7 @@ import com.chinut.bawantv.ui.ReadonlyKeyValue
 import com.chinut.bawantv.ui.theme.Dim
 import com.chinut.bawantv.ui.theme.entryFocusable
 import com.chinut.bawantv.ui.theme.Ink
+import com.chinut.bawantv.ui.theme.registerViewportScroll
 import com.chinut.bawantv.ui.theme.rememberTvFocusState
 import com.chinut.bawantv.ui.theme.sdp
 import com.chinut.bawantv.ui.theme.ssp
@@ -63,7 +65,6 @@ import com.chinut.bawantv.ui.theme.tvFocusable
 import com.chinut.bawantv.ui.theme.Txt
 import com.chinut.bawantv.ui.TvKeyboardDialog
 import com.chinut.bawantv.ui.TvSwitch
-import com.chinut.bawantv.vod.VodRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,8 +91,6 @@ fun SettingsScreen(
 
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     var showQr by remember { mutableStateOf(false) }
-    var siteCount by remember { mutableStateOf(0) }
-    var liveStatus by remember { mutableStateOf("未加载") }
     var resolvedDomain by remember { mutableStateOf(Ddys.activeBase) }
 
     // ---------- 未成年人保护的状态 ----------
@@ -114,19 +113,19 @@ fun SettingsScreen(
             DebugWebServer.start(context, prefs.debugPort)
         }
         withContext(Dispatchers.IO) {
-            val sites = runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
-                .getOrDefault(emptyList())
-            siteCount = sites.size
-            liveStatus = VodRepo.lastStatus
             resolvedDomain = Ddys.activeBase
         }
     }
 
     val listState = rememberLazyListState()
 
+    // 把设置列表注册成"焦点导航的兜底滚动目标"。
+    //
+    // 之前设置页**没有注册**，于是方向键移到屏幕外的那一项时就完全没反应 ——
+    // 表现就是"下拉看不到最下方内容"。这个机制在影视页有、设置页漏了。
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().registerViewportScroll { d -> listState.scrollBy(d.toFloat()) },
         contentPadding = PaddingValues(end = 12.sdp, bottom = 40.sdp),
         verticalArrangement = Arrangement.spacedBy(18.sdp),
     ) {
@@ -205,20 +204,15 @@ fun SettingsScreen(
             }
         }
 
-        // ==================== 影视库来源说明 + 辅助源开关 ====================
+        // ==================== 影视内容来源 ====================
         item {
             SettingsCard(
                 title = "影视内容来源",
-                subtitle = "低端影视是内容基础（片库缓存在本地，进影视页立刻有内容）；" +
-                    "下面的 TVBox 站点只作为**补充线路**，当低端影视播不了时才会用上。",
+                subtitle = "影视内容全部来自**低端影视**：片库缓存在电视本地，" +
+                    "进影视页立刻有内容，断网也能浏览已缓存的片子。" +
+                    "它的剧集是直连地址，不需要任何「解析接口」。",
                 accent = Ink.Green,
             ) {
-                TvSwitch(
-                    label = "允许 TVBox 作为补充源",
-                    hint = "关掉后影视只使用低端影视，更干净但可选线路变少",
-                    checked = prefs.tvboxSupplement,
-                ) { prefs.tvboxSupplement = it }
-                Spacer(Modifier.height(10.sdp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         com.chinut.bawantv.unified.LibraryStore.let { ls ->
@@ -240,60 +234,6 @@ fun SettingsScreen(
             }
         }
 
-        // ==================== 板块 B：影视订阅 ====================
-        item {
-            SettingsCard(
-                title = "影视订阅（板块 B）",
-                subtitle = "TVBox 接口地址，一行一个。内置一份默认接口，也可以填自己的。" +
-                    "这些站点**只是备用线路**，不参与主内容列表。",
-                accent = Ink.Accent,
-            ) {
-                ReadonlyKeyValue(
-                    value = prefs.subscriptionUrls,
-                    placeholder = "asset://default_sub.json（内置默认）",
-                    onEditRequest = { editing = EditTarget.SubUrls },
-                )
-                Spacer(Modifier.height(10.sdp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "可用站点：$siteCount 个 · $liveStatus",
-                        color = if (siteCount > 0) Ink.Green else Ink.Amber,
-                        fontSize = Txt.Tiny,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    SmallButton("恢复内置") {
-                        prefs.subscriptionUrls = com.chinut.bawantv.core.AppPrefs.DEFAULT_SUB_URLS
-                        VodRepo.invalidate()
-                        scope.launch {
-                            siteCount = withContext(Dispatchers.IO) {
-                                runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
-                                    .getOrDefault(emptyList()).size
-                            }
-                            liveStatus = VodRepo.lastStatus
-                        }
-                    }
-                    Spacer(Modifier.width(10.sdp))
-                    SmallButton("重新加载") {
-                        VodRepo.invalidate()
-                        scope.launch {
-                            siteCount = withContext(Dispatchers.IO) {
-                                runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
-                                    .getOrDefault(emptyList()).size
-                            }
-                            liveStatus = VodRepo.lastStatus
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.sdp))
-                TvSwitch(
-                    label = "只显示影视类站点",
-                    hint = "过滤掉工具/网盘/直播类站点",
-                    checked = prefs.vodOnlySites,
-                ) { prefs.vodOnlySites = it }
-            }
-        }
 
         // ==================== 板块 C：低端影视 ====================
         item {
@@ -543,14 +483,13 @@ fun SettingsScreen(
         item {
             SettingsCard(
                 title = "关于焰火TV",
-                subtitle = "为电视大屏与遥控器重新设计的聚合播放器",
+                subtitle = "为电视大屏与遥控器重新设计的播放器",
                 accent = Ink.AccentBright,
             ) {
                 val about = listOf(
-                    "直播" to "内置央视频道表，支持自定义 m3u 直播源；播放中上下键换台、左右键调音量",
-                    "影视" to "基于 TVBox 订阅接口（只保留 HTTP-JSON 型站点，不需要额外爬虫插件）",
-                    "瀑布流" to "低端影视官方 JSON 接口，四个官方域名自动容错",
-                    "输入" to "电视端自带虚拟键盘；长文本建议扫码用手机改",
+                    "直播" to "内置央视频道表；也可填自定义 m3u 直播源。播放中上下键换台、左右键换源",
+                    "影视" to "内容全部来自低端影视，片库缓存在电视本地，断网也能浏览已缓存的片子",
+                    "输入" to "电视端自带虚拟键盘，遥控器字母键可直接输入（支持拼音首字母搜索）",
                 )
                 about.forEach { (k, v) ->
                     Row(Modifier.padding(vertical = 5.sdp)) {
@@ -558,10 +497,63 @@ fun SettingsScreen(
                         Text(v, color = Ink.TextTertiary, fontSize = Txt.Caption, lineHeight = 20.ssp)
                     }
                 }
-                Spacer(Modifier.height(8.sdp))
+
+                // ---------- 鸣谢 ----------
+                //
+                // 单独一块并加了标题色，是为了让它在"关于"页面里能被一眼看到 ——
+                // 这些人是真的花了时间和设备在这上面，不该混在功能说明里。
+                Spacer(Modifier.height(14.sdp))
+                Text(
+                    "鸣谢",
+                    color = Ink.Amber,
+                    fontSize = Txt.Label,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(6.sdp))
+
+                /**
+                 * (名字, 贡献)。
+                 *
+                 * 名字按提供者给的原文**原样保留**（含特殊字符与表情），
+                 * 不要做"规范化"——那是人家自己的标识。
+                 */
+                val credits = listOf(
+                    "™ᴰ  ⃔ ᥬ💀ᩤ  ⃕ 兔" to "提供测试环境",
+                    "夙丶夜" to "提供开发建议",
+                    "Bawan_xw" to "提供软件初期规则命名",
+                )
+                credits.forEach { (who, what) ->
+                    Row(
+                        Modifier.padding(vertical = 4.sdp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text(
+                            "·",
+                            color = Ink.TextFaint,
+                            fontSize = Txt.Caption,
+                            modifier = Modifier.width(14.sdp),
+                        )
+                        Text(
+                            who,
+                            color = Color.White,
+                            fontSize = Txt.Caption,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.width(190.sdp),
+                        )
+                        Text(
+                            what,
+                            color = Ink.TextTertiary,
+                            fontSize = Txt.Caption,
+                            lineHeight = 20.ssp,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.sdp))
                 Text(
                     "免责声明：本应用只做播放器与界面聚合，不存储、不传播任何影视资源。\n" +
-                        "直播源、订阅接口与在线影视地址均来自第三方公开接口，仅限个人学习研究使用，" +
+                        "直播源与在线影视地址均来自第三方公开接口，仅限个人学习研究使用，" +
                         "请勿用于任何商业用途。",
                     color = Ink.TextFaint,
                     fontSize = Txt.Tiny,
@@ -638,16 +630,6 @@ fun SettingsScreen(
             onConfirm = { value ->
                 target.apply(prefs, value)
                 editing = null
-                if (target == EditTarget.SubUrls || target == EditTarget.LiveSource) {
-                    VodRepo.invalidate()
-                    scope.launch {
-                        siteCount = withContext(Dispatchers.IO) {
-                            runCatching { VodRepo.loadSites(vodOnly = prefs.vodOnlySites, force = true) }
-                                .getOrDefault(emptyList()).size
-                        }
-                        liveStatus = VodRepo.lastStatus
-                    }
-                }
             },
         )
     }
@@ -657,16 +639,19 @@ fun SettingsScreen(
     revision
 }
 
-/** 设置项编辑目标。 */
+/**
+ * 设置项编辑目标。
+ *
+ * 去掉了 `SubUrls`（TVBox 订阅地址）：影视现在只有低端影视，
+ * 没有"订阅接口"这个概念了。
+ */
 private enum class EditTarget(val title: String) {
-    SubUrls("影视订阅地址（一行一个）"),
     Domain("低端影视域名"),
     LiveSource("直播源地址"),
     Port("调试端口"),
     Token("手机调试口令");
 
     fun current(prefs: com.chinut.bawantv.core.AppPrefs): String = when (this) {
-        SubUrls -> prefs.subscriptionUrls
         Domain -> prefs.domain
         LiveSource -> prefs.liveSourceUrl
         Port -> prefs.debugPort.toString()
@@ -675,7 +660,6 @@ private enum class EditTarget(val title: String) {
 
     fun apply(prefs: com.chinut.bawantv.core.AppPrefs, value: String) {
         when (this) {
-            SubUrls -> prefs.subscriptionUrls = value
             Domain -> prefs.domain = value
             LiveSource -> prefs.liveSourceUrl = value
             Port -> value.toIntOrNull()?.let { prefs.debugPort = it.coerceIn(1024, 65535) }

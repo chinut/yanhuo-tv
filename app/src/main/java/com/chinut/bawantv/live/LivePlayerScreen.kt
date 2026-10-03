@@ -13,6 +13,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -141,6 +143,13 @@ fun LivePlayerScreen(
     }
     var showing by remember { mutableStateOf(true) }
     var buffering by remember { mutableStateOf(true) }
+
+    /** 清晰度/线路选择面板是否打开（遥控器三横键呼出）。 */
+    var qualityPanel by remember { mutableStateOf(false) }
+
+    /** 面板里的光标位置。 */
+    var qualityCursor by remember { mutableIntStateOf(0) }
+
     var failed by remember { mutableStateOf<String?>(null) }
     var retryToken by remember { mutableLongStateOf(0L) }
 
@@ -169,17 +178,63 @@ fun LivePlayerScreen(
         list.getOrNull(sourceIndex.coerceIn(0, (list.size - 1).coerceAtLeast(0))) ?: current.url
     }
 
+    /**
+     * 网页播放器是否已经**真的出画面**。
+     *
+     * 用户要求：“后台先去加载，前台看到是转圈，等加载好了能播放了再输出给用户看”。
+     *
+     * 之前是让用户直接盯着央视频的加载占位图发呆（真机反馈“大部分时间都在显示那张图”），
+     * 体验很差。现在没出画面之前 WebView 是 INVISIBLE 的，用户只看到我们的转圈。
+     */
+    var webFirstFrame by remember(webUrl) { mutableStateOf(false) }
+
+    /** 是否已经在走 ExoPlayer 硬解（此时网页要藏起来，避免两路同时渲染）。 */
+    var nativeActive by remember(webUrl) { mutableStateOf(false) }
+
     /** 当前频道是否要走「浏览器引擎」路线。 */
     val useWeb = remember(webUrl) { LiveCatalog.isWebPage(webUrl) }
 
     /** 网页路线的 WebView 实例。 */
     var webView by remember { mutableStateOf<TvWebPlayerView?>(null) }
 
-    // 网页路线：进页面时给一段加载提示，之后交给网页自己
+    /**
+     * 从网页里捕获到的媒体流地址。
+     *
+     * 非空表示"可以改用 ExoPlayer 硬解播放了" —— 详见 TvWebPlayerView.onStreamFound。
+     * 这是解决真机「直播卡成 PPT」的关键手段：网页播放器在电视上太吃力，
+     * 而原生播放器直接走硬件解码。
+     */
+    var nativeFallbackUrl by remember { mutableStateOf<String?>(null) }
+
+    // 切台/换源时清掉上一次捕获的地址，否则会拿旧流去播新台
     //
     // 60 秒是"提示"的寿命，不是"判失败"的期限：
     // 到点只是把转圈提示收掉，让画面（如果已经在播）干净地露出来，
     // 绝不再弹错误页。
+    // ---------- 网页是否露面：**按状态统一决定** ----------
+    //
+    // 三种情况才让用户看到网页：
+    //   · 真的出画面了（webFirstFrame，由注入脚本回报）
+    //   · 兜底超时（12 秒还没出画面，别让用户一直盯着黑屏）
+    //   · 硬解路线已经放弃（nativeActive 回退）
+    //
+    // 关键点是**只有一个地方写 visibility**，不会互相打架。
+    LaunchedEffect(webUrl, webFirstFrame) {
+        if (!useWeb) return@LaunchedEffect
+        if (!webFirstFrame) {
+            kotlinx.coroutines.delay(WEB_VISIBLE_FALLBACK_MS)
+            if (!webFirstFrame) {
+                android.util.Log.w(TAG_LIVE, "网页 ${WEB_VISIBLE_FALLBACK_MS}ms 未回报出画面，先放出来")
+                webFirstFrame = true
+            }
+        }
+        // 硬解已经接管时不要抢（那时网页要藏着）
+        if (!nativeActive) {
+            webView?.visibility = android.view.View.VISIBLE
+            buffering = false
+        }
+    }
+
     LaunchedEffect(webUrl, useWeb) {
         if (useWeb) {
             buffering = true
@@ -237,13 +292,34 @@ fun LivePlayerScreen(
     val player = remember {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 1500,
-                /* maxBufferMs = */ 20_000,
-                /* bufferForPlaybackMs = */ 800,
-                /* bufferForPlaybackAfterRebufferMs = */ 1500,
+                        /* minBufferMs = */ 15_000,
+                        /* maxBufferMs = */ 60_000,
+                        /* bufferForPlaybackMs = */ 2_000,
+                        /* bufferForPlaybackAfterRebufferMs = */ 8_000,
             )
             .build()
+        // ---------- 选轨策略：直接上最高码率 ----------
+        //
+        // 真机反馈"直播又卡又不清"。查下来：抓到的流是**多码率 master playlist**：
+        //     1800000 / 1280x720   ← 最高
+        //     1350000 / 1024x576
+        //      900000 /  854x480
+        //      600000 /  640x360
+        // ExoPlayer 的默认自适应会**从最低档起播**，再靠带宽估算往上爬。
+        // 电视上这个估算经常爬不上去，甚至来回降档 —— 表现就是糊 + 卡。
+        //
+        // 直播不同于点播：**宁可偶尔缓冲，也不要一直糊**。
+        // 所以把初始档位直接设成最高，让自适应只在明显不行时才降。
+        val trackSelector = androidx.media3.exoplayer.trackselection
+            .DefaultTrackSelector(context).apply {
+                parameters = parameters.buildUpon()
+                    .setMaxVideoSize(1920, 1080)
+                    .setMaxVideoBitrate(20_000_000)
+                    .build()
+            }
+
         ExoPlayer.Builder(context)
+            .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
@@ -270,6 +346,54 @@ fun LivePlayerScreen(
             .setAllowChunklessPreparation(true)
             .createMediaSource(MediaItem.fromUri(Uri.parse(url)))
     }
+
+    // 切台/换源时清掉上一次捕获的流地址，否则会拿旧流去播新台
+    LaunchedEffect(webUrl, sourceIndex) {
+        nativeFallbackUrl = null
+        nativeActive = false
+    }
+
+    /**
+     * 捕获到流地址 → 切到 ExoPlayer 硬解。
+     *
+     * 这是解决真机「直播卡成 PPT」的关键：网页播放器在电视上太吃力
+     * （网页重 + 和解码抢 CPU），而原生播放器直接走硬件解码。
+     *
+     * 注意这里**不销毁 WebView**：留着它继续跑，万一原生解不了
+     * （确实是加密专有流）还能回退到网页画面。
+     */
+    LaunchedEffect(nativeFallbackUrl) {
+        val u = nativeFallbackUrl ?: return@LaunchedEffect
+        android.util.Log.i(TAG_LIVE, "使用捕获到的流地址起播（硬解）：$u")
+        runCatching {
+            player.setMediaSource(sourceFor(current, u))
+            player.prepare()
+            player.play()
+        }.onFailure { android.util.Log.w(TAG_LIVE, "捕获流起播失败：${it.message}") }
+
+        // ---------- 这里**先不要动 WebView** ----------
+        //
+        // 我在这里犯过一个错误：一"开始"走硬解就把网页隐藏掉（GONE）。
+        // 结果硬解一旦失败（电视上很常见：CDN 拒连、编解码器不支持），
+        // 用户看到的就是**纯黑屏、什么都没有**——比网页路线还糟。
+        //
+        // 正确做法：**等硬解真的渲染出第一帧**再隐藏网页（见播放器监听里的
+        // STATE_READY / onRenderedFirstFrame）。在那之前网页继续当保底画面。
+        //
+        // 下面设一个超时：如果 N 秒内硬解没出画面，就认定它不行，
+        // 把网页恢复出来（并停掉硬解，免得白烧 CPU）。
+        nativeActive = false
+        kotlinx.coroutines.delay(NATIVE_READY_TIMEOUT_MS)
+        if (!nativeActive) {
+            android.util.Log.w(TAG_LIVE, "硬解 $NATIVE_READY_TIMEOUT_MS ms 内未出画面，退回网页播放")
+            runCatching {
+                player.stop()
+                webView?.let { wv -> wv.visibility = android.view.View.VISIBLE }
+            }
+        }
+    }
+
+    // 网页路线：进页面时给一段加载提示，之后交给网页自己
 
     // 频道 / 重试令牌变化 → 切流
     LaunchedEffect(index, retryToken) {
@@ -318,6 +442,31 @@ fun LivePlayerScreen(
 
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                // ---------- 硬解真的出画面了，这才轮到隐藏网页 ----------
+                //
+                // 顺序很重要：必须**先确认硬解能出画面**，再去动网页。
+                // 反过来（起播时就隐藏网页）会在硬解失败时留下纯黑屏 ——
+                // 我踩过这个坑，真机反馈就是"直播不出画面"。
+                super.onRenderedFirstFrame()
+                if (useWeb) {
+                    android.util.Log.i(TAG_LIVE, "硬解已出画面，隐藏网页路线")
+                    nativeActive = true
+                    runCatching {
+                        webView?.let { wv ->
+                            wv.onFirstFrame = null
+                            // 停掉网页里的 video：两路同时解码既费 CPU 又会叠影
+                            wv.evaluateJavascript(
+                                "try{var vs=document.querySelectorAll('video');" +
+                                    "for(var i=0;i<vs.length;i++){vs[i].pause();}}catch(e){}",
+                                null,
+                            )
+                            wv.visibility = android.view.View.GONE
+                        }
+                    }
+                }
+            }
+
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
                 // 真正播起来了 → 把之前的失败提示清掉。
@@ -328,17 +477,57 @@ fun LivePlayerScreen(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                // 当前源播不出来 → 先自动试下一个备用源；
-                // 全都试过了才提示，而且提示是**半透明小面板**，
-                // 不再用全屏黑幕（黑幕会把"其实已经播起来"的画面挡掉）。
+                // ---------- 网页频道：完全忽略 ExoPlayer 的报错 ----------
+                //
+                // 真机/模拟器都踩过这个坑：画面明明在正常播（网页播放器起起来了），
+                // 却盖着一个「无法播放 …（ERROR_CODE_IO_BAD_HTTP_STATUS）」的浮层。
+                //
+                // 原因是网页频道的播放器**根本不是 ExoPlayer** ——
+                // tune() 仍会先把它交给 ExoPlayer 试一下（那些 URL 多是网页地址，
+                // ExoPlayer 当然解不了），于是这里报错 → 去试"备用源" →
+                // 备用源也没有 → 弹出失败提示，盖住了 WebView 正在播的画面。
+                //
+                // 所以：**网页频道的 ExoPlayer 错误直接丢掉**，不要动任何状态。
+                if (useWeb) {
+                    return
+                }
+                // ---------- 不做自动换源 ----------
+                //
+                // 用户明确要求：「不要每次自动跳到源2，应该是默认源1，
+                // 用户改了再改，每次都记住」。
+                //
+                // 自动往后跳有两个坏处：
+                //  · 用户明明选好了源，一次网络抖动就被改掉，下次打开又是别的源；
+                //  · 跳转期间黑屏等待，体感很差。
+                //
+                // 现在只提示、不擅自切换。用户按「← →」自己换，
+                // 换到能播的源之后会被 [rememberSource] 记住（见上面的源记忆逻辑）。
                 buffering = false
                 val ch = playlist.getOrNull(index)
                 val total = ch?.let { candidatesOf(it).size } ?: 0
-                if (sourceIndex < total - 1) {
-                    sourceIndex++
+
+                // ---------- 播着播着挂了 → **自动换源** ----------
+                //
+                // 用户反馈："部分频道明明可以播放，播放几秒后就黑屏了，声音也没了。"
+                //
+                // 这不是"用户选好的源被抢走"，而是**当前源真的断了**：
+                // 直连流很常见的情况是能起播、过几秒被 CDN 掐掉（鉴权过期 / 并发限制）。
+                // 这种必须自己换下一个源，否则用户看到的就是永久黑屏。
+                //
+                // 与"不要自动跳源"那条的区别：
+                //   · 用户主动按 ←→ 选了源 → 记住它、**不覆盖**（见 rememberSource）
+                //   · 当前源自己断了     → 自动往后试，这是救场，不是覆盖用户选择
+                if (total > 1) {
+                    val next = (sourceIndex + 1) % total
+                    android.util.Log.w(
+                        "BawanLive",
+                        "源 $sourceIndex 播放中断（" + error.errorCodeName + "），自动切到源 $next",
+                    )
+                    sourceIndex = next
                     retryToken++
+                    failed = "当前线路断了，正在自动换源…"
                 } else {
-                    failed = "该频道暂时无法播放（${error.errorCodeName}）\n可按「← →」换一个源试试"
+                    failed = "该频道暂时无法播放（" + error.errorCodeName + "）"
                 }
             }
         }
@@ -425,33 +614,75 @@ fun LivePlayerScreen(
     val focusManager = com.chinut.bawantv.ui.theme.LocalTvFocusManager.current
     DisposableEffect(focusManager, playlist.size) {
         focusManager?.setKeyInterceptor { dir ->
-            when (dir) {
-                com.chinut.bawantv.ui.theme.Direction.Up -> {
-                    tune(-1); true
-                }
+            // 清晰度面板打开时，方向键在面板里选择，不要拿去换台
+            if (qualityPanel) {
+                when (dir) {
+                    com.chinut.bawantv.ui.theme.Direction.Up -> {
+                        qualityCursor = (qualityCursor - 1).coerceAtLeast(0); true
+                    }
 
-                com.chinut.bawantv.ui.theme.Direction.Down -> {
-                    tune(1); true
-                }
+                    com.chinut.bawantv.ui.theme.Direction.Down -> {
+                        val max = (candidatesOf(current).size - 1).coerceAtLeast(0)
+                        qualityCursor = (qualityCursor + 1).coerceAtMost(max); true
+                    }
 
-                com.chinut.bawantv.ui.theme.Direction.Left -> {
-                    cycleSource(-1); true
+                    com.chinut.bawantv.ui.theme.Direction.Left,
+                    com.chinut.bawantv.ui.theme.Direction.Right,
+                    -> true
                 }
+            } else {
+                when (dir) {
+                    com.chinut.bawantv.ui.theme.Direction.Up -> {
+                        tune(-1); true
+                    }
 
-                com.chinut.bawantv.ui.theme.Direction.Right -> {
-                    cycleSource(1); true
+                    com.chinut.bawantv.ui.theme.Direction.Down -> {
+                        tune(1); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Left -> {
+                        cycleSource(-1); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Right -> {
+                        cycleSource(1); true
+                    }
                 }
             }
         }
         focusManager?.setConfirmInterceptor {
-            // 打开时重启自动收起计时；关闭时不需要
-            showing = !showing
-            if (showing) hudTimeoutToken++
+            if (qualityPanel) {
+                // 面板里按确定 = 选中这一档
+                if (qualityCursor != sourceIndex) {
+                    sourceIndex = qualityCursor
+                    retryToken++
+                }
+                qualityPanel = false
+            } else {
+                // 打开时重启自动收起计时；关闭时不需要
+                showing = !showing
+                if (showing) hudTimeoutToken++
+            }
             true
+        }
+        // 遥控器上那颗「三横键」（菜单/设置）→ 呼出清晰度选择
+        focusManager?.setRawKeyInterceptor { code ->
+            if (code == android.view.KeyEvent.KEYCODE_MENU ||
+                code == android.view.KeyEvent.KEYCODE_SETTINGS
+            ) {
+                qualityPanel = !qualityPanel
+                // 打开时把光标定位到当前正在用的那一档
+                if (qualityPanel) qualityCursor = sourceIndex
+                hudTimeoutToken++
+                true
+            } else {
+                false
+            }
         }
         onDispose {
             focusManager?.setKeyInterceptor(null)
             focusManager?.setConfirmInterceptor(null)
+            focusManager?.setRawKeyInterceptor(null)
         }
     }
 
@@ -508,13 +739,44 @@ fun LivePlayerScreen(
                 factory = { ctx ->
                     TvWebPlayerView(ctx).also { view ->
                         webView = view
+                        // ---------- 抓到流地址就切原生播放 ----------
+                        //
+                        // 真机实测：网页播放 1080p 在电视上**卡成 PPT** ——
+                        // 网页本身很重（央视页面一堆脚本/统计/广告），
+                        // 还要和视频解码抢 CPU，电视 SoC 扛不住。
+                        //
+                        // 但网页播放器最终还是要去拉一个真实的媒体流
+                        // （m3u8/mp4），那个地址我们能在 shouldInterceptRequest 里截到。
+                        // 拿到之后交给 ExoPlayer 走**硬件解码**，流畅度差一个量级。
+                        //
+                        // 策略：网页先加载并起播（保证能拿到地址、也兜住那些
+                        // 确实只能由网页解码的加密流），一旦截到地址就悄悄切过去。
+                        view.onStreamFound = { url ->
+                            if (url != nativeFallbackUrl) {
+                                android.util.Log.i(
+                                    "BawanLive",
+                                    "网页流地址已捕获，切换到 ExoPlayer 硬解：$url",
+                                )
+                                nativeFallbackUrl = url
+                            }
+                        }
+                        // 真的出画面了才让用户看到（之前只显示我们的转圈）
+                        view.onFirstFrame = {
+                            webFirstFrame = true
+                            buffering = false
+                        }
+                        view.visibility = android.view.View.INVISIBLE
                         view.loadChannel(webUrl)
                     }
                 },
                 update = { view ->
-                    // 无条件同步（loadChannel 内部有 url 相同就跳过的判断）。
-                    // 之前写成 `if (view.url != webUrl)` 会漏掉「首次 factory 里 load 还没生效」
-                    // 的那一次，导致切台后 WebView 仍停在旧页面。
+                    // 只同步 URL。
+                    //
+                    // ⚠️ **绝不要在这里碰 visibility** —— update 每次重组都会跑，
+                    // 之前在这里设可见性 + postDelayed 兜底，导致：
+                    //   · 可见性被反复翻转，和硬解超时后的恢复逻辑打架；
+                    //   · 定时器不断堆积，最终表现是"要等十分钟才出画面"。
+                    // 可见性交给下面的 LaunchedEffect，按状态来。
                     view.loadChannel(webUrl)
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -524,6 +786,12 @@ fun LivePlayerScreen(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         useController = false
+                        // 等比显示（不留黑边的责任交给页面本身，不要在这里硬拉伸）。
+                        //
+                        // PlayerView 默认是 RESIZE_MODE_FIT：视频宽高比和屏幕不一致时
+                        // 会等比缩放并**留黑边**（真机上表现为"下方和右边有黑边"）。
+                        // 电视看直播就该铺满整屏，所以用 FILL。
+                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                         setShutterBackgroundColor(android.graphics.Color.BLACK)
                         layoutParams = ViewGroup.LayoutParams(
@@ -621,6 +889,160 @@ fun LivePlayerScreen(
                 onPick = { tuneTo(it) },
             )
         }
+
+    // ---------- 清晰度 / 线路选择面板 ----------
+    //
+    // 遥控器「三横键」（菜单/设置）呼出。
+    //
+    // 说明一下这里的"清晰度"到底是什么：
+    // 直播是**电视台网页里的流**，清晰度由台站自己的播放器决定，
+    // 我们没法像点播那样直接切 720P/1080P 档位。
+    // 能提供的是**换个源** —— 不同源的清晰度/稳定性确实不一样，
+    // 所以面板列的是这个频道所有可用的播放源，并标出它是什么类型。
+    AnimatedVisibility(
+        visible = qualityPanel,
+        enter = fadeIn(tween(140)),
+        exit = fadeOut(tween(160)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f)),
+        )
+    }
+    AnimatedVisibility(
+        visible = qualityPanel,
+        enter = fadeIn(tween(140)) + slideInHorizontally(tween(200)) { it / 3 },
+        exit = fadeOut(tween(180)) + slideOutHorizontally(tween(200)) { it / 3 },
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .wrapContentHeight()
+            .padding(end = Dim.SafeH * 0.8f, top = Dim.SafeV, bottom = Dim.SafeV),
+    ) {
+        QualityPanel(
+            channel = current,
+            sources = candidatesOf(current),
+            activeIndex = sourceIndex,
+            cursor = qualityCursor,
+            onPick = { i ->
+                qualityCursor = i
+                if (i != sourceIndex) {
+                    sourceIndex = i
+                    retryToken++
+                }
+                qualityPanel = false
+            },
+        )
+    }
+    }
+}
+
+// ==================== 清晰度 / 线路面板 ====================
+
+/**
+ * 清晰度（源）选择面板。
+ *
+ * 为什么标题写「清晰度 / 线路」而不是只写"清晰度"：
+ * 直播流跑在电视台自己的网页播放器里，**没办法直接切码率档位**，
+ * 能切换的是"用哪个源"。不同源的画质和稳定性差别很大（有的 720P、
+ * 有的就是网页默认档），所以对用户来说它承担的就是"换个更清楚的"这个作用。
+ * 但标题必须诚实，不能让用户以为能在 720P/1080P 之间精确选。
+ */
+@Composable
+private fun QualityPanel(
+    channel: LiveChannel,
+    sources: List<String>,
+    activeIndex: Int,
+    cursor: Int,
+    onPick: (Int) -> Unit,
+) {
+    Column(
+        Modifier
+            .width(360.sdp)
+            .clip(RoundedCornerShape(Dim.BigRadius))
+            .background(Color.Black.copy(alpha = 0.82f))
+            .border(
+                width = 1.sdp,
+                color = Color.White.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(Dim.BigRadius),
+            )
+            .padding(20.sdp),
+    ) {
+        Text(
+            "清晰度 / 线路",
+            color = Color.White,
+            fontSize = Txt.Section,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(4.sdp))
+        Text(
+            channel.name,
+            color = Ink.TextTertiary,
+            fontSize = Txt.Caption,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(14.dp))
+
+        sources.forEachIndexed { i, url ->
+            val isActive = i == activeIndex
+            val isCursor = i == cursor
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.sdp)
+                    .clip(RoundedCornerShape(14.sdp))
+                    .background(
+                        when {
+                            isCursor -> Ink.Accent.copy(alpha = 0.30f)
+                            isActive -> Color.White.copy(alpha = 0.10f)
+                            else -> Color.White.copy(alpha = 0.05f)
+                        }
+                    )
+                    .border(
+                        width = if (isCursor) 3.sdp else 0.sdp,
+                        color = if (isCursor) Ink.AccentBright else Color.Transparent,
+                        shape = RoundedCornerShape(14.sdp),
+                    )
+                    .clickable { onPick(i) }
+                    .padding(horizontal = 14.sdp, vertical = 12.sdp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        // 网页源没有码率信息，就按类型如实标注
+                        if (LiveCatalog.isWebPage(url)) "线路 ${i + 1}（网页播放）"
+                        else "线路 ${i + 1}（直连流）",
+                        color = Color.White,
+                        fontSize = Txt.Label,
+                        fontWeight = if (isCursor || isActive) FontWeight.Bold else FontWeight.Normal,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        runCatching { java.net.URI(url).host ?: url }.getOrDefault(url),
+                        color = Ink.TextFaint,
+                        fontSize = Txt.Tiny,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (isActive) {
+                    Text(
+                        "使用中",
+                        color = Ink.Green,
+                        fontSize = Txt.Tiny,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "「确定」切换 · 「三横键」关闭",
+            color = Ink.TextFaint,
+            fontSize = Txt.Tiny,
+        )
     }
 }
 
@@ -857,3 +1279,25 @@ internal fun BufferingDot(progress: Float) {
             .background(Ink.Accent.copy(alpha = 0.4f + 0.6f * a))
     )
 }
+
+
+/**
+ * 从"开始走硬解"到"判定硬解不行"的等待上限。
+ *
+ * 太短会误判（直播流建立连接本来就要几秒），
+ * 太长则用户盯着黑屏等 —— 12 秒是个折中：
+ * 网页画面一直当保底，所以这段等待用户并不是在看黑屏。
+ */
+private const val NATIVE_READY_TIMEOUT_MS = 12_000L
+
+
+/**
+ * 网页多久没回报"出画面"就先让它露面。
+ *
+ * 之所以要兜底：注入脚本依赖页面结构，站点改版就可能失效。
+ * 没有这个兜底，用户会一直盯着黑屏 —— 真机反馈过"要等十分钟才出画面"。
+ *
+ * 12 秒是个折中：正常站点 3~6 秒就能出画面，超过 12 秒基本可以认为
+ * 脚本这条路没走通，宁可先放出网页（哪怕它还带着站点的加载图）。
+ */
+private const val WEB_VISIBLE_FALLBACK_MS = 12_000L

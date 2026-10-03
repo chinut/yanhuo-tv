@@ -25,28 +25,6 @@ class AppPrefs(context: Context) {
         _revision.value = _revision.value + 1
     }
 
-    // ==================== 板块 B：TVBox 订阅 ====================
-
-    /**
-     * 订阅接口地址，多个用换行分隔。按顺序尝试，第一个能解析出可用站点列表的生效。
-     * 内置值 `asset://default_sub.json` 表示使用 App 自带的默认订阅。
-     */
-    var subscriptionUrls: String
-        get() = sp.getString(KEY_SUB_URLS, DEFAULT_SUB_URLS) ?: DEFAULT_SUB_URLS
-        set(v) = sp.edit().putString(KEY_SUB_URLS, v).apply().also { touch() }
-
-    /** 当前选中的接口源下标（板块 B 顶部「线路」） */
-    var activeSubscriptionIndex: Int
-        get() = sp.getInt(KEY_SUB_INDEX, 0)
-        set(v) = sp.edit().putInt(KEY_SUB_INDEX, v).apply().also { touch() }
-
-    /** 板块 B 只显示影视站点（过滤掉直播/工具类站点） */
-    var vodOnlySites: Boolean
-        get() = sp.getBoolean(KEY_VOD_ONLY, true)
-        set(v) = sp.edit().putBoolean(KEY_VOD_ONLY, v).apply().also { touch() }
-
-    // ==================== 板块 C：低端影视 ====================
-
     /** 板块 C 的域名（网站换域名时在这里改）。默认用官方永久域名。 */
     var domain: String
         get() = sp.getString(KEY_DOMAIN, DEFAULT_DOMAIN)?.trim()?.trimEnd('/')
@@ -78,21 +56,6 @@ class AppPrefs(context: Context) {
     var autoDomain: Boolean
         get() = sp.getBoolean(KEY_AUTO_DOMAIN, true)
         set(v) = sp.edit().putBoolean(KEY_AUTO_DOMAIN, v).apply().also { touch() }
-
-    // ==================== 影视：低端影视为核心，TVBox 为辅助 ====================
-
-    /**
-     * 是否允许用 TVBox 站点作为**补充源**。
-     *
-     * 定位：低端影视是内容基础（官方接口、直连播放、稳定），
-     * TVBox 只在它的源播不了、或者它没有这部片时才补上来。
-     * 关掉之后就完全只用低端影视，更干净但可选线路少。
-     */
-    var tvboxSupplement: Boolean
-        get() = sp.getBoolean(KEY_TVBOX_SUPPLEMENT, true)
-        set(v) = sp.edit().putBoolean(KEY_TVBOX_SUPPLEMENT, v).apply().also { touch() }
-
-    /** 板块 C 的分页大小（一次拉多少条） */
     var ddysPageSize: Int
         get() = sp.getInt(KEY_DDYS_PAGE_SIZE, 30)
         set(v) = sp.edit().putInt(KEY_DDYS_PAGE_SIZE, v.coerceIn(12, 50)).apply().also { touch() }
@@ -261,13 +224,11 @@ class AppPrefs(context: Context) {
         get() = sp.getString(KEY_HOME_CACHE, "").orEmpty()
         set(v) = sp.edit().putString(KEY_HOME_CACHE, v).apply()
 
-    fun snapshot(): Map<String, String> = linkedMapOf(
-        KEY_SUB_URLS to subscriptionUrls,
+    /** 导出所有设置（手机网页调试页读取用）。 */
+    fun snapshot(): Map<String, String> = mapOf(
         KEY_DOMAIN to domain,
         KEY_LIVE_SRC to liveSourceUrl,
         KEY_UA to userAgent,
-        KEY_PORT to debugPort.toString(),
-        KEY_VOD_ONLY to vodOnlySites.toString(),
         KEY_AUTO_PICK to autoPickDomain.toString(),
         KEY_AUTO_DOMAIN to autoDomain.toString(),
         KEY_WEB_FALLBACK to webFallbackEnabled.toString(),
@@ -282,12 +243,9 @@ class AppPrefs(context: Context) {
     /** 供手机网页调试模式批量写入。 */
     fun applyRemote(map: Map<String, String>) {
         val e = sp.edit()
-        map[KEY_SUB_URLS]?.let { e.putString(KEY_SUB_URLS, it) }
         map[KEY_DOMAIN]?.let { e.putString(KEY_DOMAIN, it) }
         map[KEY_LIVE_SRC]?.let { e.putString(KEY_LIVE_SRC, it) }
         map[KEY_UA]?.let { e.putString(KEY_UA, it) }
-        map[KEY_PORT]?.toIntOrNull()?.let { e.putInt(KEY_PORT, it.coerceIn(1024, 65535)) }
-        map[KEY_VOD_ONLY]?.let { e.putBoolean(KEY_VOD_ONLY, it.toBoolean()) }
         map[KEY_AUTO_PICK]?.let { e.putBoolean(KEY_AUTO_PICK, it.toBoolean()) }
         map[KEY_AUTO_DOMAIN]?.let { e.putBoolean(KEY_AUTO_DOMAIN, it.toBoolean()) }
         map[KEY_DDYS_PAGE_SIZE]?.toIntOrNull()?.let { e.putInt(KEY_DDYS_PAGE_SIZE, it.coerceIn(12, 50)) }
@@ -305,9 +263,6 @@ class AppPrefs(context: Context) {
         /** 低端影视官方永久域名（要科学上网才能直连） */
         const val DEFAULT_DOMAIN = "ddys.io"
 
-        /** 内置默认订阅：App 自带一份「只含 HTTP-JSON 型影视站点」的接口文件。 */
-        const val DEFAULT_SUB_URLS = "asset://default_sub.json"
-
         /** 官方镜像域名，按顺序探测（首页脚注里公布的三个备用域名 + 主域名） */
         val DOMAIN_CANDIDATES = listOf(
             "ddys.io",
@@ -315,11 +270,6 @@ class AppPrefs(context: Context) {
             "ddys.live",
             "ddys.help",
         )
-
-        private const val KEY_SUB_URLS = "sub_urls"
-        private const val KEY_SUB_INDEX = "sub_index"
-        private const val KEY_VOD_ONLY = "vod_only"
-    private const val KEY_TVBOX_SUPPLEMENT = "tvbox_supplement"
         private const val KEY_DOMAIN = "domain"
         private const val KEY_AUTO_PICK = "auto_pick_domain"
         private const val KEY_RESOLVED_DOMAIN = "resolved_domain"

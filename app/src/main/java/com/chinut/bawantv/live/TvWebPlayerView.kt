@@ -34,6 +34,62 @@ class TvWebPlayerView(context: Context) : WebView(context) {
     var videoFound: Boolean = false
         private set
 
+    /**
+     * 网页里实际使用的**媒体流地址**（第一个被拦截到的 m3u8/mp4/ts）。
+     *
+     * 网页播放器在电视上往往很卡（网页本身重，还和视频解码抢 CPU）。
+     * 拿到这个地址就能改用 ExoPlayer 硬件解码，流畅度完全不同。
+     */
+    @Volatile
+    var foundStreamUrl: String? = null
+        private set
+
+    /**
+     * 捕获到媒体流时的回调。
+     *
+     * 上层收到后可以决定"切到原生播放器"（见 LivePlayerScreen 的处理）。
+     */
+    var onStreamFound: ((String) -> Unit)? = null
+
+    /**
+     * **真的出画面了**时的回调（预加载用）。
+     *
+     * 直播页用它做"后台先加载、加载好了再露出来"：
+     * 在收到这个回调之前 WebView 是 `INVISIBLE` 的，用户只看到转圈；
+     * 收到之后才显示出来，避免让他盯着央视频的加载占位图发呆
+     * （真机反馈：老电视上"大部分时间都在看那张加载图"）。
+     */
+    var onFirstFrame: (() -> Unit)? = null
+
+    /** 是否已经出过画面。 */
+    var hasFirstFrame: Boolean = false
+        private set
+
+    /** 视频是否已经真的在播（由注入脚本回报）。 */
+    private var videoPlaying = false
+
+    /**
+     * JavaScript 桥：注入脚本检测到 `<video>` 真的在播时调这里。
+     *
+     * 这是"出画面"最可靠的判据 —— 比"页面加载完成"准得多：
+     * 页面加载完不等于播放器起来了（那正是真机上卡住的原因）。
+     */
+    private inner class Bridge {
+        @android.webkit.JavascriptInterface
+        fun onPlaying() {
+            post {
+                videoPlaying = true
+                if (!hasFirstFrame) {
+                    hasFirstFrame = true
+                    android.util.Log.i(TAG, "网页播放器已出画面，可以让用户看了")
+                    onFirstFrame?.invoke()
+                }
+            }
+        }
+    }
+
+    private val bridge = Bridge()
+
     private var pageLoaded = false
 
     init {
@@ -45,11 +101,27 @@ class TvWebPlayerView(context: Context) : WebView(context) {
         @SuppressLint("SetJavaScriptEnabled")
         settings.apply {
             javaScriptEnabled = true
+            // 桥：注入脚本检测到 video 真的在播时会回调 onPlaying()，
+            // 用来实现“后台加载好再露出来”（见 onFirstFrame）。
+            runCatching { addJavascriptInterface(bridge, "BawanBridge") }
             domStorageEnabled = true
             @Suppress("DEPRECATION")
             databaseEnabled = true
             mediaPlaybackRequiresUserGesture = false
             loadsImagesAutomatically = true
+            // ---------- 缩放设置：**不要动** ----------
+            //
+            // 我在这里踩过两次坑，都直接毁掉了画面，所以留个警告：
+            //
+            //   1. 把这两个开关关掉（本意是"按设备宽度铺满"）
+            //      → 画面被**横向拉伸成椭圆**。播放页是靠它们配合自己的
+            //        viewport meta 来定尺寸的，关掉之后它算出的宽高就错了。
+            //   2. 把视频元素的宽高从百分比改成 100vw/100vh
+            //      → 变成**黑屏**。
+            //
+            // 结论：这两个开关配桌面 UA 是**能正常铺满**的（实测 1080p 全屏无黑边）。
+            // 黑边问题要到**播放器**那一层解决（见 LivePlayerScreen 里
+            // PlayerView 的 RESIZE_MODE_FILL），不要去改页面的排版方式。
             useWideViewPort = true
             loadWithOverviewMode = true
             cacheMode = WebSettings.LOAD_DEFAULT
@@ -77,12 +149,40 @@ class TvWebPlayerView(context: Context) : WebView(context) {
                 view: WebView?,
                 request: WebResourceRequest?,
             ): WebResourceResponse? {
-                val url = request?.url?.toString() ?: return null
-                if (!url.contains(".m3u8") && !url.contains(".ts") && !url.contains(".flv") &&
-                    !url.contains(".mp4") && !url.contains("m3u8")
-                ) {
+                val raw = request?.url?.toString() ?: return null
+
+                // ---------- 从请求里认出"真正的媒体流地址" ----------
+                //
+                // 这里踩过一个很隐蔽的坑，直接导致"能起播、几秒后黑屏"：
+                //
+                // 央视的播放页会往统计接口发一个请求，形如
+                //   https://p.data.cctv.com/play.1.3?gmkey=...&streamUrl=https%3A%2F%2F...index.m3u8%3F...
+                // 它的 **path 根本不是媒体文件**（是 /play.1.3），但 query 里带了
+                // "m3u8" 字样，于是旧代码的 `url.contains("m3u8")` 命中了，
+                // 被当成流地址交给 ExoPlayer —— 当然播不出任何画面。
+                //
+                // 真正的流地址就藏在 `streamUrl=` 参数里（本身还是 URL 编码的）。
+                // 所以顺序是：先尝试解出内嵌的 streamUrl，解不到再看 path。
+                val url = extractEmbeddedStreamUrl(raw) ?: raw
+                if (!looksLikeMediaUrl(url)) {
                     return null
                 }
+
+                // ---------- 记下真实的流地址 ----------
+                //
+                // 网页播放器的性能在电视上往往是瓶颈（网页本身很重，
+                // 还要和视频解码抢 CPU）。这里顺手把**媒体流的真实地址**记下来，
+                // 上层就能改用 ExoPlayer 走硬件解码播放 —— 流畅度完全不是一个量级。
+                //
+                // 只在第一次命中时回调（avoid 每个 .ts 分片都触发一次）。
+                if (foundStreamUrl == null) {
+                    foundStreamUrl = url
+                    android.util.Log.i(TAG, "捕获到媒体流：$url")
+                    onStreamFound?.let { cb ->
+                        post { runCatching { cb(url) } }
+                    }
+                }
+
                 val headers = LiveCatalog.headersFor(url)
                 val referer = headers["Referer"] ?: return null
                 val origin = runCatching {
@@ -137,6 +237,10 @@ class TvWebPlayerView(context: Context) : WebView(context) {
                 }
                 pageLoaded = true
                 injectPlayerCleanup()
+                // 同时强力促使站点自己的播放器起来 ——
+                // 真机上卡住的根因就是"播放器在等用户点击"，
+                // 光靠清理脚本（只在 video 已存在时才起作用）救不了。
+                injectAutoStart()
             }
 
             /** 同一页面的宽松比较（站点常有 301/补斜杠，故忽略末尾斜杠与 http/https 差异）。 */
@@ -287,8 +391,160 @@ class TvWebPlayerView(context: Context) : WebView(context) {
         evaluateJavascript(CLEANUP_JS, null)
     }
 
+    /** 触发强力起播（见 [AUTOSTART_JS]）。 */
+    private fun injectAutoStart() {
+        evaluateJavascript(AUTOSTART_JS, null)
+    }
+
+    /**
+     * 从"包装 URL"里解出真正的媒体流地址。
+     *
+     * 央视（以及不少台）的播放器会把真实流地址放在 query 参数里，
+     * 常见键名是 `streamUrl`，值还是 URL 编码过的。例如：
+     *
+     *   https://p.data.cctv.com/play.1.3?...&streamUrl=https%3A%2F%2Fxxx%2Findex.m3u8%3Fb%3D...
+     *
+     * 不解出来的话，交给 ExoPlayer 的就是那个统计接口，必然黑屏。
+     *
+     * @return 解出来的媒体地址；没有内嵌地址时返回 null
+     */
+    private fun extractEmbeddedStreamUrl(raw: String): String? {
+        val keys = listOf("streamUrl", "stream_url", "url", "src", "playUrl")
+        for (k in keys) {
+            val v = runCatching {
+                android.net.Uri.parse(raw).getQueryParameter(k)
+            }.getOrNull().orEmpty()
+            if (v.isBlank()) continue
+            // 解出来还得是个媒体地址，否则可能是别的用途的 url 参数
+            if (looksLikeMediaUrl(v)) return v
+        }
+        return null
+    }
+
+    /**
+     * 判断一个地址是不是媒体流。
+     *
+     * **只看 path，不看 query** —— 这是关键：
+     * query 里出现 "m3u8" 不代表这个请求就是媒体流
+     * （统计/上报接口经常把真实地址塞在参数里，见上面的坑）。
+     */
+    private fun looksLikeMediaUrl(url: String): Boolean {
+        val path = runCatching {
+            java.net.URI(url).path.orEmpty()
+        }.getOrDefault("").lowercase()
+        return path.endsWith(".m3u8") ||
+            path.endsWith(".ts") ||
+            path.endsWith(".m4s") ||
+            path.endsWith(".flv") ||
+            path.endsWith(".mp4") ||
+            path.contains(".m3u8")
+    }
+
     companion object {
         private const val TAG = "TvWebPlayer"
+
+        /**
+         * **强力起播脚本**：专治「页面加载了、播放器就是不起来」。
+         *
+         * ## 为什么需要它
+         *
+         * 真机实测（小米电视）：直播卡住时画面停在央视频的页面上，
+         * 中间一个红圈转菊花 —— 那是**央视频自己的加载指示器**，
+         * 说明它的播放器压根没初始化。
+         *
+         * 原因：现在的视频站普遍要**用户手势**才创建播放器实例
+         * （省流量 / 规避自动播放限制）。WebView 里虽然设了
+         * `mediaPlaybackRequiresUserGesture = false`，但那只是允许 `<video>`
+         * 自动播；**站点自己的 JS 逻辑**照样在等 click/touch。
+         *
+         * 所以这里模拟真实用户操作：在播放器区域派发一整套
+         * mousedown / mouseup / click / touchstart / touchend，
+         * 让站点的播放器"以为用户点了一下"。
+         *
+         * 节奏：前 12 秒每 700ms 试一次（覆盖播放器异步初始化的各种时机），
+         * 一旦真的有 `<video>` 在播就停手，不再打扰页面。
+         */
+        private const val AUTOSTART_JS = """
+        (function(){
+          if (window.__bawanAutostart) return 'again';
+          window.__bawanAutostart = true;
+
+          function tap(el){
+            if(!el) return;
+            var r = el.getBoundingClientRect();
+            var x = r.left + r.width/2, y = r.top + r.height/2;
+            if (x <= 0 || y <= 0 || r.width < 20 || r.height < 20) {
+              x = window.innerWidth/2; y = window.innerHeight/2;
+            }
+            var base = {bubbles:true, cancelable:true, clientX:x, clientY:y,
+                        screenX:x, screenY:y, button:0, buttons:1};
+            ['mousedown','mouseup','click'].forEach(function(t){
+              try{ el.dispatchEvent(new MouseEvent(t, base)); }catch(err){}
+            });
+            /* 有些站点只监听触摸事件 */
+            try{
+              el.dispatchEvent(new TouchEvent('touchstart', {bubbles:true, cancelable:true}));
+              el.dispatchEvent(new TouchEvent('touchend',   {bubbles:true, cancelable:true}));
+            }catch(err){}
+          }
+
+          /* 找出"最可能是播放器"的那块：优先已知类名，其次找大块的 video */
+          function target(){
+            var sels = ['[class*=player]','[class*=Player]','[class*=video]',
+                        'video','canvas','iframe'];
+            for (var i=0;i<sels.length;i++){
+              try{
+                var list = document.querySelectorAll(sels[i]);
+                for (var j=0;j<list.length;j++){
+                  var el = list[j];
+                  var r = el.getBoundingClientRect();
+                  if (r.width > window.innerWidth*0.3 && r.height > window.innerHeight*0.3) {
+                    return el.tagName === 'VIDEO' ? el : (el.parentElement || el);
+                  }
+                }
+              }catch(e){}
+            }
+            return document.body;
+          }
+
+          function playing(){
+            try{
+              var vs = document.querySelectorAll('video');
+              for (var i=0;i<vs.length;i++){
+                var v = vs[i];
+                if (v && !v.paused && (v.currentTime > 0 || v.videoWidth > 0)) return true;
+              }
+            }catch(e){}
+            return false;
+          }
+
+          var n = 0;
+          var t = setInterval(function(){
+            n++;
+            if (playing()) { clearInterval(t); return; }
+            /* 最快路径：直接让 video 播 */
+            try{
+              var vs = document.querySelectorAll('video');
+              for (var i=0;i<vs.length;i++){
+                var v = vs[i];
+                if (!v) continue;
+                if (v.muted) v.muted = false;
+                if (v.volume < 1) v.volume = 1;
+                if (v.paused) {
+                  var pr = v.play();
+                  if (pr && pr.catch) pr.catch(function(){});
+                }
+              }
+            }catch(e){}
+            /* 再模拟点击，促使站点自己初始化播放器 */
+            tap(target());
+            if (n > 17) clearInterval(t);
+          }, 700);
+
+          tap(target());
+          return 'autostart';
+        })();
+        """
 
         /** 出画面探测的轮询间隔。 */
         private const val HEALTH_INTERVAL_MS = 2000L
@@ -453,28 +709,41 @@ class TvWebPlayerView(context: Context) : WebView(context) {
               }catch(e){}
 
               /* 3d) 兜底：顶部那条「网站自己的导航栏」。
-                 央视频那类站点会在播放器上方留一条白色菜单栏（央视频/推荐/电视/赛事…），
-                 它不是 fixed 也没有高 z-index，前面那些选择器和规则都压不住。
-                 判据：位于顶部区域 + 占屏幕一半以上宽 + 背景是浅色 → 认定是站点导航，隐藏。 */
+                 真机反馈里最显眼的问题就是它 —— 央视/央视频在播放器上方留一整条
+                 菜单栏（首页/时政/新闻/…、地方/乡村振兴/…），用户一眼就看出
+                 "这不是电视，是个网页"。
+
+                 之前这里只认**浅色背景**，而央视频的导航栏是**深蓝渐变**，
+                 所以规则压根没命中。现在放宽成：
+                   位于顶部 15% + 横向占屏幕 60% 以上 + 高度小于 20% + 不是视频祖先链
+                 → 一律隐藏。不再看背景色。
+                 视频单独一条保护：safeToHide 已经排除了 video 及其祖先。 */
               try{
-                var tops=document.querySelectorAll('div,section,header,nav');
+                var tops=document.querySelectorAll('div,section,header,nav,ul');
                 for(var i6=0;i6<tops.length;i6++){
                   var e4=tops[i6];
                   if(!safeToHide(e4,v)) continue;
                   var r4=e4.getBoundingClientRect();
-                  if(r4.height<=0 || r4.height>window.innerHeight*0.35) continue;
-                  if(r4.top>window.innerHeight*0.25) continue;
-                  if(r4.width<window.innerWidth*0.5) continue;
-                  var st4=window.getComputedStyle(e4);
-                  var bg4=st4.backgroundColor||'';
-                  var m4=bg4.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
-                  if(!m4) continue;
-                  var alpha4 = m4[4]===undefined ? 1 : parseFloat(m4[4]);
-                  if(alpha4<0.5) continue;   /* 透明的不算 */
-                  /* 亮度：三条通道都 >200 视为浅色底（白/浅灰导航栏） */
-                  if(parseInt(m4[1],10)>200 && parseInt(m4[2],10)>200 && parseInt(m4[3],10)>200){
-                    e4.style.setProperty('display','none','important');
-                  }
+                  if(r4.height<=0 || r4.height>window.innerHeight*0.20) continue;
+                  if(r4.top>window.innerHeight*0.15) continue;
+                  if(r4.width<window.innerWidth*0.6) continue;
+                  e4.style.setProperty('display','none','important');
+                }
+              }catch(e){}
+
+              /* 3e) 底部那条「时间轴 / 节目单 / 播放控制条」。
+                 真机截图里央视频底部有一条带时间刻度和"时移/自动/原声"的控制条。
+                 判据：位于底部 25% + 横向占屏幕 60% 以上 + 高度小于 30%。 */
+              try{
+                var bots=document.querySelectorAll('div,section,footer');
+                for(var i7=0;i7<bots.length;i7++){
+                  var e5=bots[i7];
+                  if(!safeToHide(e5,v)) continue;
+                  var r5=e5.getBoundingClientRect();
+                  if(r5.height<=0 || r5.height>window.innerHeight*0.30) continue;
+                  if(r5.bottom < window.innerHeight*0.75) continue;
+                  if(r5.width<window.innerWidth*0.6) continue;
+                  e5.style.setProperty('display','none','important');
                 }
               }catch(e){}
 
@@ -512,19 +781,87 @@ class TvWebPlayerView(context: Context) : WebView(context) {
               try {
                 if (v.muted) v.muted = false;
                 if (v.volume < 1) v.volume = 1;
+
+                /* ---------- 铺满全屏（真机反馈「下方和右边有黑边」）----------
+                   页面的 <video> 常带自己的固定尺寸/宽高比，只靠 WebView 铺满不够。
+                   这里把 video 自身和它的祖先链一起撑到 100%×100%，
+                   并用 object-fit:fill 让它**填满而不是等比留边**。 */
+                v.style.setProperty('width', '100%', 'important');
+                v.style.setProperty('height', '100%', 'important');
+                v.style.setProperty('max-width', 'none', 'important');
+                v.style.setProperty('max-height', 'none', 'important');
+                v.style.setProperty('object-fit', 'fill', 'important');
+                v.style.setProperty('position', 'absolute', 'important');
+                v.style.setProperty('left', '0', 'important');
+                v.style.setProperty('top', '0', 'important');
+                v.style.setProperty('z-index', '2147483000', 'important');
+
+                /* 祖先链也要清掉限宽限高与 padding/margin，否则 video 撑不开 */
+                var p = v.parentElement, depth = 0;
+                while (p && p !== document.body && depth < 6) {
+                  p.style.setProperty('width', '100%', 'important');
+                  p.style.setProperty('height', '100%', 'important');
+                  p.style.setProperty('max-width', 'none', 'important');
+                  p.style.setProperty('max-height', 'none', 'important');
+                  p.style.setProperty('padding', '0', 'important');
+                  p.style.setProperty('margin', '0', 'important');
+                  p.style.setProperty('overflow', 'hidden', 'important');
+                  p = p.parentElement;
+                  depth++;
+                }
+                /* 页面本体掐掉滚动条和默认外边距，避免右下角露白边 */
+                document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+                if (document.body) {
+                  document.body.style.setProperty('overflow', 'hidden', 'important');
+                  document.body.style.setProperty('margin', '0', 'important');
+                  document.body.style.setProperty('background', '#000', 'important');
+                }
+
                 if (v.paused) { var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); }
+              /* 回报“真的在播了”，让原生层把 WebView 显示出来 */
+              try {
+                if (!window.__bawanReported && !v.paused && v.readyState >= 2) {
+                  window.__bawanReported = true;
+                  if (window.BawanBridge && window.BawanBridge.onPlaying) {
+                    window.BawanBridge.onPlaying();
+                  }
+                }
+              } catch(e){}
               } catch(e){}
               return true;
             }catch(e){ return false; }
           }
 
           window.__bawanCleanup = cleanup;
-          var n=0;
-          var t=setInterval(function(){
+
+          /* ---------- 清理节奏：前密后疏，出画面就停 ----------
+             真机实测「直播卡成 PPT」，这也是主因之一：
+             原来是无条件 `setInterval(500ms)` 跑 40 次（20 秒），
+             每次都对整个页面做多轮 querySelectorAll（央视页面 DOM 很重）。
+             视频一开始解码，这些全量 DOM 查询就跟解码抢 CPU。
+
+             现在改成：
+               · 前 6 次每 400ms（覆盖页面刚加载完、控件陆续冒出来的阶段）
+               · 之后每 1.5 秒，最多再跑 8 次（兜住慢站点）
+               · **一旦视频确实在播了就彻底停止**，不再干扰解码
+             清理是"把页面弄干净"的一次性工作，不该在观看全程持续跑。 */
+          var n = 0;
+          var t = null;
+          function tick(){
             n++;
+            /* 视频已经在放了 → 收工，不再动 DOM */
+            try{
+              var vs = document.querySelectorAll('video');
+              for(var i=0;i<vs.length;i++){
+                var v = vs[i];
+                if(v && !v.paused && (v.currentTime>0 || v.videoWidth>0)){ clearInterval(t); return; }
+              }
+            }catch(e){}
             cleanup();
-            if(n>40) clearInterval(t);
-          },500);
+            if(n >= 6 && t){ clearInterval(t); t = setInterval(tick, 1500); }
+            if(n >= 14 && t){ clearInterval(t); }
+          }
+          t = setInterval(tick, 400);
           cleanup();
           return 'started';
         })();

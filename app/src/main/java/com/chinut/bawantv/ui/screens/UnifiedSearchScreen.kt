@@ -36,6 +36,7 @@ import com.chinut.bawantv.ui.theme.AmbientBackdrop
 import com.chinut.bawantv.ui.theme.Dim
 import com.chinut.bawantv.ui.theme.Ink
 import com.chinut.bawantv.ui.theme.Txt
+import com.chinut.bawantv.ui.theme.focusBorder
 import com.chinut.bawantv.ui.theme.frostedGlass
 import com.chinut.bawantv.ui.theme.rememberTvFocusState
 import com.chinut.bawantv.ui.theme.sdp
@@ -113,8 +114,11 @@ fun UnifiedSearchScreen(
 
     LaunchedEffect(Unit) {
         loading = true
+        // 搜索数据源 = 低端影视的本地片库（影视只有这一个来源）
         val fresh = runCatching {
-            com.chinut.bawantv.unified.MovieAggregator.scrape(page = 1)
+            val lib = com.chinut.bawantv.unified.LibraryStore.load()
+            if (lib.isNotEmpty()) lib
+            else com.chinut.bawantv.unified.LibraryStore.refresh(pagesPerType = 3)
         }.getOrDefault(emptyList())
         if (fresh.isNotEmpty()) pool = fresh
         loading = false
@@ -155,7 +159,9 @@ fun UnifiedSearchScreen(
                 loading = loading,
                 poolSize = pool.size,
                 focusKey = entryKey,
-                onEdit = { showKeyboard = true },
+                // 不再弹软键盘：字母键盘就在下方，常驻可见。
+                // （遥控器自带的字母键也依然能直接输入。）
+                onEdit = { showKeyboard = false },
                 onClear = { query = "" },
                 onExit = onExit,
             )
@@ -166,7 +172,19 @@ fun UnifiedSearchScreen(
                 Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(18.sdp),
             ) {
-                // 左：直接命中的影视
+                // 左：字母键盘（**常驻，不弹窗**）
+                //
+                // 用户要求照参考图做成这样：遥控器直接上下左右选字母、确定输入，
+                // 不用再弹一个软键盘出来遮住结果。
+                // 遥控器自带的字母键通道依然有效（见上面的 RegisterTextInput），
+                // 两条路都能用 —— 有实体字母键的直接打，没有的用这个。
+                LetterPad(
+                    modifier = Modifier.width(350.sdp),
+                    onLetter = { ch -> query = (query + ch).take(24) },
+                    onBackspace = { query = query.dropLast(1) },
+                    onClear = { query = "" },
+                )
+                // 中：直接命中的影视
                 HitColumn(
                     hits = hits,
                     query = query,
@@ -177,7 +195,7 @@ fun UnifiedSearchScreen(
                 // 右：候选词（可从词再收窄搜索）
                 WordColumn(
                     words = words,
-                    modifier = Modifier.width(340.sdp).fillMaxHeight(),
+                    modifier = Modifier.width(300.sdp).fillMaxHeight(),
                     onPick = { w -> query = w.pinyin; onSearch(w.query) },
                 )
             }
@@ -289,7 +307,7 @@ private fun SearchHeader(
                 )
                 Spacer(Modifier.width(16.sdp))
                 Text(
-                    query.ifBlank { "按「确定」打开键盘 · 可输拼音首字母" },
+                    query.ifBlank { "用左侧键盘或遥控器字母键 · 支持拼音首字母" },
                     color = if (query.isBlank()) Ink.TextFaint else Color.White,
                     fontSize = if (query.isBlank()) Txt.Body.ssp else 34.ssp,
                     fontWeight = if (query.isBlank()) FontWeight.Normal else FontWeight.Bold,
@@ -549,3 +567,151 @@ private fun SectionTitle(title: String, subtitle: String, accent: Color) {
         Text(subtitle, color = Ink.TextFaint, fontSize = Txt.Tiny.ssp, maxLines = 1)
     }
 }
+
+// ==================== 字母键盘（常驻） ====================
+
+/**
+ * 常驻的字母键盘。
+ *
+ * 设计取舍：**不做弹窗**。
+ *
+ * 参考用户给的图（某电视应用）—— 字母表直接摆在页面上，用户按遥控器
+ * 上下左右选、确定输入。比"先按确定弹出软键盘、输完再关掉"少两步，
+ * 而且**不会遮住搜索结果**（输入的同时就能看到匹配变化）。
+ *
+ * 两列排布之外还铺了数字，是为了覆盖"片名里带数字"的情况（如"第2季"）。
+ * 遥控器自带的字母键通道依然有效 —— 有实体字母键的用户直接打更快。
+ */
+@Composable
+private fun LetterPad(
+    modifier: Modifier,
+    onLetter: (String) -> Unit,
+    onBackspace: () -> Unit,
+    onClear: () -> Unit,
+) {
+    // A-Z 按 6 列排；数字单独放在最后。
+    val letters = ('A'..'Z').map { it.toString() }
+    val digits = (1..9).map { it.toString() } + listOf("0")
+    val cols = 6
+
+    // **固定键宽**，不用 weight。
+    // 用 weight 的话，最后一行只有 Y/Z 两个键，它们会被拉成两倍宽 —— 网格就不整齐了。
+    val padH = 12.sdp          // 键盘内边距
+    val gap = 6.sdp            // 键间距
+    val keyW = (350.sdp - padH * 2 - gap * (cols - 1)) / cols
+
+    Column(
+        modifier
+            .fillMaxHeight()
+            .frostedGlass(shape = RoundedCornerShape(Dim.CardRadius))
+            .padding(12.sdp),
+    ) {
+        Text("字母键盘", color = Color.White, fontSize = Txt.Label, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.sdp))
+
+        // A-Z
+        letters.chunked(cols).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.sdp)) {
+                row.forEach { ch ->
+                    LetterKey(ch, Modifier.width(keyW)) { onLetter(ch.lowercase()) }
+                }
+            }
+            Spacer(Modifier.height(5.sdp))
+        }
+
+        // 数字
+        digits.chunked(cols).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.sdp)) {
+                row.forEach { ch ->
+                    LetterKey(ch, Modifier.width(keyW)) { onLetter(ch) }
+                }
+                // 补满整行，保持网格整齐
+                repeat(cols - row.size) { Spacer(Modifier.width(padH + gap)) }
+            }
+            Spacer(Modifier.height(5.sdp))
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        // 操作键
+        Row(horizontalArrangement = Arrangement.spacedBy(6.sdp)) {
+            ActionKey("删除", Modifier.weight(1f), Ink.Amber, onBackspace)
+            ActionKey("清空", Modifier.weight(1f), Ink.Pink, onClear)
+        }
+    }
+}
+
+/** 一个字母/数字键。 */
+@Composable
+private fun LetterKey(label: String, modifier: Modifier, onClick: () -> Unit) {
+    val f = rememberTvFocusState()
+    Box(
+        modifier
+            .height(38.sdp)
+            .clip(RoundedCornerShape(9.sdp))
+            .background(
+                if (f.focused) Ink.Accent.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.07f)
+            )
+            .focusBorder(
+                visible = f.focused,
+                cornerRadius = 10.sdp,
+                color = Ink.AccentBright,
+                width = 3.sdp,
+            )
+            .tvFocusable(
+                focusState = f,
+                shape = RoundedCornerShape(10.sdp),
+                focusedScale = 1.10f,
+                glow = false,
+                borderWidth = 0.sdp,
+                baseBackground = Color.Transparent,
+                focusedBackground = Color.Transparent,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = Color.White,
+            fontSize = Txt.Label,
+            fontWeight = if (f.focused) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+/** 键盘底部的操作键（删除/清空）。 */
+@Composable
+private fun ActionKey(
+    label: String,
+    modifier: Modifier,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    val f = rememberTvFocusState()
+    Box(
+        modifier
+            .height(40.sdp)
+            .clip(RoundedCornerShape(11.sdp))
+            .background(if (f.focused) accent.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.09f))
+            .focusBorder(
+                visible = f.focused,
+                cornerRadius = 12.sdp,
+                color = accent,
+                width = 3.sdp,
+            )
+            .tvFocusable(
+                focusState = f,
+                shape = RoundedCornerShape(12.sdp),
+                focusedScale = 1.08f,
+                glow = false,
+                borderWidth = 0.sdp,
+                baseBackground = Color.Transparent,
+                focusedBackground = Color.Transparent,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = Color.White, fontSize = Txt.Label, fontWeight = FontWeight.Bold)
+    }
+}
+

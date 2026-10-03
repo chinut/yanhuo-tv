@@ -63,7 +63,11 @@ import kotlinx.coroutines.delay
  * 直播播放是「全屏浮层」而不是新页面：老电视的体验是「一按就是台」。
  */
 @Composable
-fun BawanRoot(focusManager: TvFocusManager) {
+fun BawanRoot(
+    focusManager: TvFocusManager,
+    /** 首页再按返回时回调（由 Activity 执行 finish 退出）。 */
+    onExitRequested: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
 
     // 滚动作用域：给焦点导航当"兜底滚动"。没有它的话，
@@ -106,6 +110,18 @@ fun BawanRoot(focusManager: TvFocusManager) {
      */
     var pendingUnified by remember { mutableStateOf<com.chinut.bawantv.unified.UnifiedMovie?>(null) }
 
+    /** 调试用：进直播后是否自动起播第一个频道。 */
+    var debugLivePlay by remember { mutableStateOf(false) }
+
+    /** 调试用：进详情后是否自动起播第一集。 */
+    var debugAutoPlay by remember { mutableStateOf(false) }
+
+    /** 调试用：广播指定要自动播放的影片序号。 */
+    var debugPlayIndex by remember { mutableIntStateOf(0) }
+
+    /** 调试用：每次收到 vod_play 广播就 +1，够 LaunchedEffect 感知到"又触发了一次"。 */
+    var debugPlayTrigger by remember { mutableIntStateOf(0) }
+
     /**
      * 从首页「继续观看」直接恢复播放。
      *
@@ -113,7 +129,7 @@ fun BawanRoot(focusManager: TvFocusManager) {
      * **不需要重新搜索或重新进详情页**，点一下就直接接着看。
      * 播放页自己会按记录里的集数/进度续播（见 ui/player/WatchProgress.kt）。
      */
-    var resumeVod by remember { mutableStateOf<com.chinut.bawantv.ui.screens.PlayingEpisode?>(null) }
+    var resumeVod by remember { mutableStateOf<com.chinut.bawantv.unified.PlayRequest?>(null) }
 
     /**
      * 影视播放请求（板块 B / C 点剧集时上抛到这里）。
@@ -124,11 +140,37 @@ fun BawanRoot(focusManager: TvFocusManager) {
      * 返回键会被送到那个窗口，BackHandler 收不到，表现就是"按返回退不出来"。
      * 所以统一由这里挂在根 Box 里渲染，和直播播放页同一套做法。
      */
-    var playVod by remember { mutableStateOf<com.chinut.bawantv.ui.screens.PlayingEpisode?>(null) }
-    /** 当前播放的作品（用于播放失败时自动换补充源）。 */
-    var playMovie by remember { mutableStateOf<com.chinut.bawantv.unified.UnifiedMovie?>(null) }
-    /** 防止自动换源递归触发。 */
-    var autoSwitching by remember { mutableStateOf(false) }
+    var playVod by remember { mutableStateOf<com.chinut.bawantv.unified.PlayRequest?>(null) }
+
+    /**
+     * 影视板块当前是否停在「某一部片子的详情页」。
+     *
+     * 由 UnifiedVideoScreen 通过 onDetailChanged 上报。
+     * 用途：让返回键在详情页先退回影视列表，而不是一路跳回首页。
+     */
+    var inVodDetail by remember { mutableStateOf(false) }
+
+    /**
+     * 影视当前正在看详情的作品。
+     *
+     * **放在根层而不是 UnifiedVideoScreen 里**，因为播放时本文件会把内容树
+     * 整个摘掉（见下面那个 `if (livePlaying == null && ...)`）——
+     * 树一摘，子组件里的 remember 全丢。之前的表现就是：
+     * 从播放页返回，用户被扔回列表顶部，而不是回到刚才那部片的详情。
+     */
+    var vodDetail by remember { mutableStateOf<com.chinut.bawantv.unified.UnifiedMovie?>(null) }
+
+    /**
+     * 影视列表的滚动位置（首个可见项下标 + 偏移）。
+     *
+     * 同样是为了"从播放/详情返回后不要跳回最上面"。
+     * 用户反馈："每次下滚一段时候返回一下就又到最上面了，这个很不合理"。
+     */
+    var vodGridIndex by remember { mutableIntStateOf(0) }
+    var vodGridOffset by remember { mutableIntStateOf(0) }
+
+    /** 影视板块每次重新挂载时用来恢复滚动位置的令牌。 */
+    var vodRestoreToken by remember { mutableIntStateOf(0) }
 
     // 返回键：播放中先退出播放；否则回到首页（不要直接退出 App，
     // 否则在电视上误按一次返回就掉出应用，体验很差）
@@ -140,12 +182,30 @@ fun BawanRoot(focusManager: TvFocusManager) {
                 focusEpoch++
             }
 
+            playVod != null -> playVod = null
+            resumeVod != null -> resumeVod = null
+
+            // ---------- 影视详情页：先回影视列表，不要直接跳首页 ----------
+            //
+            // 用户反馈："在影视的单独标签页内点击返回应该是返回影视主界面"。
+            //
+            // 原来详情页的返回直接 section = Home，等于从"某部片子的详情"
+            // 一路退到首页 —— 中间那层被跳过了，用户得重新进影视、重新找列表位置。
+            // 现在先关掉详情，停在影视列表上。
+            section == TopSection.Vod && inVodDetail -> inVodDetail = false
+
             section != TopSection.Home -> {
                 section = TopSection.Home
                 focusEpoch++
             }
 
-            else -> Unit
+            // 已经在首页了 → 退出 App。
+            //
+            // 之前这里是 `else -> Unit`，等于**把返回键吞掉**：
+            // 用户在首页按返回没有任何反应，也就永远退不出 App（只能用遥控器的
+            // HOME 键回桌面）。这在电视上尤其难受 —— 遥控器上最顺手的"退出"
+            // 就是返回键。
+            else -> onExitRequested?.invoke()
         }
     }
 
@@ -162,9 +222,108 @@ fun BawanRoot(focusManager: TvFocusManager) {
         }
     }
 
+    // ---------- 调试：收到 vod_play 广播就自动播一部 ----------
+    //
+    // 走的是**真实业务路径**（读库 → 进详情 → 取源 → 起播），
+    // 不是另写一条捷径，所以验证结果对真实使用是有意义的。
+    androidx.compose.runtime.LaunchedEffect(debugPlayTrigger) {
+        if (debugPlayTrigger == 0) return@LaunchedEffect
+        val movies = runCatching {
+            com.chinut.bawantv.unified.LibraryStore.load()
+        }.getOrDefault(emptyList())
+        val pick = movies.getOrNull(debugPlayIndex) ?: movies.firstOrNull()
+        if (pick == null) {
+            android.util.Log.w("BawanRoute", "vod_play：本地片库为空，无法自动播")
+            return@LaunchedEffect
+        }
+        android.util.Log.i("BawanRoute", "vod_play：选中《${pick.title}》")
+        pendingUnified = pick
+    }
+
     // 上报当前界面给网络遥控（手机端 /api/remote/status 会读它）
     androidx.compose.runtime.LaunchedEffect(section) {
         com.chinut.bawantv.core.RemoteBus.setScreen(section.route)
+    }
+
+    // ---------- 调试用：广播跳转 ----------
+    //
+    // 为什么不用 `am start --es dsh_route ...`：
+    // MainActivity 是 singleTop，Activity 已存在时 `am start` 会**复用实例**，
+    // onCreate 不再执行 → extra 永远读不到（这就是"明明带了 --es，读出来是 null"）。
+    //
+    // 广播走 onNewIntent/动态注册，**每次都会送达**，所以自动化验证靠它定位界面。
+    //
+    //   adb shell am broadcast -a com.chinut.bawantv.DEBUG_ROUTE --es route vod
+    androidx.compose.runtime.DisposableEffect(context) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context?, i: android.content.Intent?) {
+                val route = i?.getStringExtra("route").orEmpty()
+                val target = when (route) {
+                    "live" -> TopSection.Live
+                    "vod", "vod_search" -> TopSection.Vod
+                    "settings" -> TopSection.Settings
+                    "home" -> TopSection.Home
+                    else -> null
+                }
+                if (target != null) {
+                    section = target
+                    focusEpoch++
+                    android.util.Log.i("BawanRoute", "广播跳转 → ${target.route}")
+                } else if (route == "vod_play") {
+                    // 调试捷径：直接进影视并**自动播第一部**。
+                    //
+                    // 为什么要这个：验证播放器的按键（暂停/拖动）时，
+                    // 靠"分类栏 → 下 → 确定 → 下 → 确定"盲按非常不可靠，
+                    // 经常落在搜索框或别的控件上。这个路由一步到位。
+                    //
+                    // 支持 --ei index N 指定第几部（默认 0）。
+                    section = TopSection.Vod
+                    debugPlayIndex = i?.getIntExtra("index", 0) ?: 0
+                    debugPlayTrigger++
+                    focusEpoch++
+                    android.util.Log.i("BawanRoute", "广播跳转 → vod 自动播放 #$debugPlayIndex")
+                } else if (route == "live_play") {
+                    // 调试：直接进直播并**起播第一个频道**。
+                    //
+                    // 和 vod_autoplay 同理：验证播放页时要可靠抵达，
+                    // 不能靠"下、下、确定"这种盲按（经常落错位置）。
+                    section = TopSection.Live
+                    debugLivePlay = true
+                    debugPlayTrigger++
+                    focusEpoch++
+                    android.util.Log.i("BawanRoute", "广播跳转 → live 自动起播")
+                } else if (route == "vod_autoplay") {
+                    // 调试：进详情后**自动起播第一集**。
+                    // 用来可靠地抵达播放页 —— 盲按方向键选剧集按钮经常失败，
+                    // 而"播放页按键"正是要验证的东西。
+                    section = TopSection.Vod
+                    debugPlayIndex = i?.getIntExtra("index", 0) ?: 0
+                    debugAutoPlay = true
+                    debugPlayTrigger++
+                    focusEpoch++
+                    android.util.Log.i("BawanRoute", "广播跳转 → vod 自动起播 #$debugPlayIndex")
+                } else if (route == "back") {
+                    // 回到首页（方便脚本把状态复位）
+                    section = TopSection.Home
+                    focusEpoch++
+                }
+            }
+        }
+        // 为什么必须是 **RECEIVER_EXPORTED**：
+        //
+        //  · Android 14 起强制显式声明 EXPORTED / NOT_EXPORTED，
+        //    用裸 registerReceiver 会直接抛 SecurityException（踩过，App 秒崩）；
+        //  · 这里要的又恰恰是 EXPORTED —— adb shell 的 UID 和应用不同，
+        //    NOT_EXPORTED 会把脚本发来的广播丢掉，自动化就永远送不进来。
+        //
+        // 这个 action 只用于开发调试，且不加任何敏感数据，导出是可接受的。
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            receiver,
+            android.content.IntentFilter(DEBUG_ROUTE_ACTION),
+            androidx.core.content.ContextCompat.RECEIVER_EXPORTED,
+        )
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
 
     ProvideTvFocus(focusManager, focusScope) {
@@ -175,6 +334,20 @@ fun BawanRoot(focusManager: TvFocusManager) {
                     Brush.linearGradient(listOf(Ink.Deep, Ink.Base, Ink.Soft))
                 )
         ) {
+            // ---------- 播放中：把下面的界面整棵树摘掉 ----------
+            //
+            // 真机实测「直播卡成 PPT」，这是一大主因：
+            // 直播播放器是**浮层**（见下方 livePlaying），而底下的首页/影视页
+            // 之前一直在组合树里活着 —— 首页那个极光背景是
+            // `rememberInfiniteTransition` 驱动的无限动画，
+            // **每帧都在重组 + 重绘**，还有 Canvas 里 3 个大半径径向渐变。
+            //
+            // 电视 SoC 性能有限，一边解 1080p 视频一边全屏重绘渐变，
+            // 直接就把 frame budget 吃光了。
+            //
+            // 现在播放一开始就把整棵树移除（`if` 直接不组合，不是隐藏），
+            // 播放期间只保留播放器本身。
+            if (livePlaying == null && resumeVod == null && playVod == null) {
             // 隐藏状态标记：给自动化回归脚本读屏用
             Text(
                 text = "MARK:" + section.route.uppercase(),
@@ -212,6 +385,7 @@ fun BawanRoot(focusManager: TvFocusManager) {
                         )
 
                             TopSection.Live -> LiveScreen(
+                                debugAutoPlayFirst = debugLivePlay,
                                 entryKey = FocusKeys.entry(TopSection.Live.route),
                                 onPlayingChanged = { ch, list ->
                                     livePlaying = ch
@@ -228,67 +402,39 @@ fun BawanRoot(focusManager: TvFocusManager) {
                                 entryKey = FocusKeys.entry(TopSection.Vod.route),
                                 pendingMovie = pendingUnified,
                                 onPendingConsumed = { pendingUnified = null },
+                                    onDetailChanged = { inVodDetail = it },
+                                    externalDetail = vodDetail,
+                                    onExternalDetailChanged = {
+                                        vodDetail = it
+                                        inVodDetail = it != null
+                                    },
+                                    externalGridIndex = vodGridIndex,
+                                    externalGridOffset = vodGridOffset,
+                                    onExternalGridScroll = { i, o ->
+                                        vodGridIndex = i
+                                        vodGridOffset = o
+                                    },
+                                    debugAutoPlay = debugAutoPlay,
+                                    onDebugAutoPlayConsumed = { debugAutoPlay = false },
                                 onBack = {
                                     section = TopSection.Home
                                     focusEpoch++
                                 },
                                 onPlay = { movie, source, eps, i ->
-                                    // 把统一剧集映射成播放器认识的 VodEpisode。
-                                    // flag 传**源标识**（ddys / siteKey），这样 ddys 走直连、
-                                    // TVBox 站走 VodResolver 解析，两边都对。
-                                    playVod = com.chinut.bawantv.ui.screens.PlayingEpisode(
+                                    // 影视只保留低端影视，剧集地址是**直连 m3u8**，
+                                    // 不需要任何解析接口 —— 拿到地址直接交给播放器。
+                                    playVod = com.chinut.bawantv.unified.PlayRequest(
                                         episodes = eps.map {
-                                            com.chinut.bawantv.vod.VodEpisode(
+                                            com.chinut.bawantv.unified.Episode(
                                                 name = it.name,
                                                 url = it.url,
                                             )
                                         },
                                         index = i,
-                                        flag = source.id,
                                         title = movie.title,
                                         vodId = movie.id,
                                         poster = movie.poster,
-                                        sourceLabel = source.name,
                                     )
-                                    // 记下作品本身，供"播不了就自动换补充源"使用
-                                    playMovie = movie
-                                },
-                                onPlaybackFailed = { failedFlag ->
-                                    // ---------- 播放失败 → 自动切到下一个源 ----------
-                                    //
-                                    // 这是"低端影视为核心 + TVBox 补充"的最后一环：
-                                    // 用户点了 ddys 那条线路，如果它播不了，不应该只是弹个
-                                    // 错误让他自己去找别的源 —— 直接自动换成补充源继续放。
-                                    val movie = playMovie ?: return@UnifiedVideoScreen
-                                    if (autoSwitching) return@UnifiedVideoScreen
-                                    autoSwitching = true
-                                    scope.launch {
-                                        val all = runCatching {
-                                            com.chinut.bawantv.unified.MovieAggregator
-                                                .buildPlayableSources(movie)
-                                        }.getOrDefault(emptyList())
-                                        // 挑一个"还没试过、且有剧集"的源
-                                        val next = all.firstOrNull {
-                                            it.id != failedFlag && it.episodes.isNotEmpty()
-                                        }
-                                        if (next != null) {
-                                            playVod = com.chinut.bawantv.ui.screens.PlayingEpisode(
-                                                episodes = next.episodes.map {
-                                                    com.chinut.bawantv.vod.VodEpisode(
-                                                        name = it.name,
-                                                        url = it.url,
-                                                    )
-                                                },
-                                                index = 0,
-                                                flag = next.id,
-                                                title = movie.title,
-                                                vodId = movie.id,
-                                                poster = movie.poster,
-                                                sourceLabel = next.name,
-                                            )
-                                        }
-                                        autoSwitching = false
-                                    }
                                 },
                             )
 
@@ -301,6 +447,9 @@ fun BawanRoot(focusManager: TvFocusManager) {
             }
 
             // 启动后静默检查一次更新（3 秒后，避免和首屏抢网络）
+            // 注意：这个状态和检查逻辑**必须放在「播放中不组合主界面」的 if 外面** ——
+            // 放里面的话每次进出播放，`remember` 的位置就变了，状态会被重置，
+            // 更新提示会反复弹或永远弹不出来。
             var pendingUpdate by remember { mutableStateOf<com.chinut.bawantv.core.UpdateInfo?>(null) }
             LaunchedEffect(Unit) {
                 if (!prefs.autoCheckUpdate) return@LaunchedEffect
@@ -311,6 +460,8 @@ fun BawanRoot(focusManager: TvFocusManager) {
                 }
             }
 
+            // ---------- 更新提示弹窗 ----------
+            // 放在被移除的那棵树**里面**：播放时不该弹更新框打断观看
             pendingUpdate?.let { info ->
                 UpdateDialog(
                     info = info,
@@ -320,6 +471,7 @@ fun BawanRoot(focusManager: TvFocusManager) {
                     },
                 )
             }
+            }   // ← 关掉「播放中不组合主界面」的 if
 
             // ---------- 直播全屏播放浮层 ----------
             livePlaying?.let { channel ->
@@ -394,3 +546,13 @@ internal fun SectionEmpty(text: String) {
 
 /** 保留 FocusRequester 引用（部分屏幕仍在用 Compose 的焦点做局部行为） */
 internal val unusedFocusRequester = FocusRequester::class
+
+/**
+ * 调试跳转广播的 action。
+ *
+ * 只用于自动化回归（开发和真机排查），不是给用户的功能。
+ * 之所以用广播而不是 intent extra：MainActivity 是 singleTop，
+ * Activity 已存在时 am start 会复用实例、onCreate 不再执行，
+ * extra 读不到；广播每次都能送达。
+ */
+const val DEBUG_ROUTE_ACTION = "com.chinut.bawantv.DEBUG_ROUTE"

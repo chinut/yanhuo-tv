@@ -4,6 +4,7 @@ import android.content.Context
 import com.chinut.bawantv.live.LiveCatalog
 import com.chinut.bawantv.live.LiveChannel
 import com.chinut.bawantv.live.LiveGroup
+import com.chinut.bawantv.unified.LibraryStore
 import com.chinut.bawantv.unified.MovieAggregator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -85,19 +86,22 @@ object HomeWarmup {
                 allChannelsCache = uniq.values.toList()
             }
 
-            // 2) 海报片单：先看有没有缓存（有就秒用），再后台刷新
+            // 2) 影视片单：影视只保留低端影视，所以直接用它的本地库
             runCatching {
-                val cached = MovieAggregator.cachedHomeMovies()
+                val cached = LibraryStore.load()
                 if (cached.isNotEmpty()) {
-                    MovieAggregator.preloadPosters(context, cached)
-                }
-                val fresh = MovieAggregator.scrape(page = 1)
-                    .filter { it.hasPoster }
-                    .take(9)
-                if (fresh.isNotEmpty()) {
-                    MovieAggregator.cacheHomeMovies(fresh)
-                    // 预热图片：进首页时直接命中缓存，不会白一下
-                    MovieAggregator.preloadPosters(context, fresh)
+                    // 首页只要前几张做视觉
+                    val top = cached.filter { it.hasPoster }.take(12)
+                    MovieAggregator.cacheHomeMovies(top)
+                    MovieAggregator.preloadPosters(context, top)
+                } else {
+                    // 首次安装：拉一份库（每类 2 页，够首页用就行，不拖慢开屏）
+                    val fresh = LibraryStore.refresh(pagesPerType = 2)
+                    val top = fresh.filter { it.hasPoster }.take(12)
+                    if (top.isNotEmpty()) {
+                        MovieAggregator.cacheHomeMovies(top)
+                        MovieAggregator.preloadPosters(context, top)
+                    }
                 }
             }
 

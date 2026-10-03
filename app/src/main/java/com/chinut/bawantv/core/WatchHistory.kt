@@ -25,12 +25,29 @@ import com.chinut.bawantv.BawanApp
  * @param updatedAt 最后观看时间戳，用于排序
  */
 data class WatchRecord(
+    /**
+     * 来源标识。
+     *
+     * 影视现在只有低端影视，所以新记录一律是 [KIND_DDYS]。
+     * 保留这个字段是因为它是记录去重键的一部分（`kind|id`），
+     * 删掉会让旧记录和"继续观看"的匹配逻辑出问题。
+     */
     val kind: String,
     val id: String,
     val title: String,
     val poster: String = "",
     val episodeIndex: Int = 0,
     val episodeName: String = "",
+    /**
+     * 线路标识。
+     *
+     * **已经不再使用**：影视只保留低端影视之后，"按线路解析地址"那套
+     * （TVBox 时代的东西）没有了，地址本身就是直连的。
+     *
+     * 但字段**必须保留**：它是 [encode] 的第 7 个字段，
+     * 删掉会让老用户已存的观看记录整体错位、解析失败（等于清空历史）。
+     * 所以继续占位，读的时候照旧忽略。
+     */
     val flag: String = "",
     val episodeUrls: List<String> = emptyList(),
     val episodeNames: List<String> = emptyList(),

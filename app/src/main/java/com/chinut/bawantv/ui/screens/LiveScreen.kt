@@ -81,6 +81,14 @@ import kotlinx.coroutines.withContext
 fun LiveScreen(
     entryKey: Any,
     onPlayingChanged: (LiveChannel, List<LiveChannel>) -> Unit,
+
+    /**
+     * 调试：频道表就绪后自动起播第一个频道。
+     *
+     * 只为自动化验证服务（`am broadcast --es route live_play`）——
+     * 验证播放页时靠方向键盲按选台经常落错位置。正常使用恒为 false。
+     */
+    debugAutoPlayFirst: Boolean = false,
     /** 返回键：回首页 */
     onBack: (() -> Unit)? = null,
 ) {
@@ -141,6 +149,16 @@ fun LiveScreen(
             }
         }
         uniq.values.toList()
+    }
+
+    // 调试自动起播：频道表就绪后直接播第一个频道（见 debugAutoPlayFirst）。
+    // 仅用于自动化验证 —— 验证播放页时靠方向键盲按选台经常落错位置。
+    androidx.compose.runtime.LaunchedEffect(debugAutoPlayFirst, allChannels) {
+        if (!debugAutoPlayFirst) return@LaunchedEffect
+        val first = allChannels.firstOrNull() ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(800)
+        android.util.Log.i("BawanRoute", "live_play：起播 " + first.name)
+        onPlayingChanged(first, allChannels)
     }
 
     /** 按频道名去重后的台数（合并来源后，同一台只算一个）。 */
@@ -286,6 +304,7 @@ fun LiveScreen(
                     onLeft = {
                         // 内容区最左侧按「左」回导航栏
                         manager?.moveTo(FocusKeys.nav("live"))
+                        true
                     },
                 )
             }
@@ -337,7 +356,7 @@ private fun ChannelCard(
     channel: LiveChannel,
     focusKey: Any?,
     onClick: () -> Unit,
-    onLeft: (() -> Unit)? = null,
+    onLeft: (() -> Boolean)? = null,
 ) {
     val focus = rememberTvFocusState()
     val mod = Modifier

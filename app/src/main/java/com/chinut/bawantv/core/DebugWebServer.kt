@@ -153,7 +153,6 @@ object DebugWebServer {
                             respond(out, 200, pageHome(context, "", cookieToken, "口令不正确，修改未生效"))
                         } else {
                             BawanApp.prefs.applyRemote(params)
-                            VodRepoBridge.invalidate()
                             log("已通过手机网页更新设置")
                             respond(
                                 out, 200,
@@ -400,7 +399,6 @@ object DebugWebServer {
         val p = BawanApp.prefs
         val ok = query.contains("ok=1")
         val token = if (p.debugToken.isNotBlank()) p.debugToken else ""
-        val subUrls = p.subscriptionUrls
         val version = com.chinut.bawantv.BuildConfig.VERSION_NAME
         val ip = Qr.lanIp(context)
 
@@ -459,11 +457,10 @@ ${if (error != null) """<div class="err">⚠️ ${esc(error)}</div>""" else ""}
 
 <form method="POST" action="/save">
 <div class="card">
- <h2>影视订阅（板块 B）</h2>
- <p class="hint">TVBox 接口地址，一行一个，按顺序尝试。支持 GitHub / Gitee 上的 raw 链接。</p>
- <textarea name="sub_urls" placeholder="https://raw.githubusercontent.com/xxx/xxx/main/config.json">${esc(subUrls)}</textarea>
- <div class="row"><span>只显示影视类站点</span>
-  <label class="switch"><input type="checkbox" name="vod_only" ${if (p.vodOnlySites) "checked" else ""}><i class="slider"></i></label></div>
+ <h2>影视内容</h2>
+ <p class="hint">影视内容来自<b>低端影视</b>，片库缓存在电视本地。
+  它的剧集是直连地址，不需要任何"解析接口"。<br>
+  要换域名请改下面的「低端影视域名」。</p>
 </div>
 
 <div class="card">
@@ -516,12 +513,5 @@ ${if (error != null) """<div class="err">⚠️ ${esc(error)}</div>""" else ""}
 </body>
 </html>
         """.trimIndent()
-    }
-}
-
-/** 避免 core 包直接依赖 vod 包 */
-private object VodRepoBridge {
-    fun invalidate() {
-        runCatching { com.chinut.bawantv.vod.VodRepo.invalidate() }
     }
 }

@@ -1,6 +1,10 @@
 package com.chinut.bawantv.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -65,6 +69,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.chinut.bawantv.ui.theme.focusBorder
+import com.chinut.bawantv.ui.theme.registerViewportScroll
 import com.chinut.bawantv.unified.LibraryStore
 import com.chinut.bawantv.ui.theme.Ink
 import com.chinut.bawantv.ui.theme.LocalTvFocusManager
@@ -74,7 +79,7 @@ import com.chinut.bawantv.ui.theme.ssp
 import com.chinut.bawantv.ui.theme.tvFocusable
 import com.chinut.bawantv.ui.theme.Txt
 import com.chinut.bawantv.unified.MovieAggregator
-import com.chinut.bawantv.unified.UnifiedEpisode
+import com.chinut.bawantv.unified.Episode
 import com.chinut.bawantv.unified.UnifiedMovie
 import com.chinut.bawantv.unified.UnifiedSource
 import kotlinx.coroutines.delay
@@ -104,19 +109,32 @@ fun UnifiedVideoScreen(
     pendingMovie: UnifiedMovie? = null,
     onPendingConsumed: () -> Unit = {},
     /** 返回键：回首页 */
-    onBack: (() -> Unit)? = null,
     /**
-     * 播放失败回调：参数是**失败的那个源标识**。
-     *
-     * 存在的意义是让上层能自动换一个补充源继续播 ——
-     * 用户点了低端影视的线路，它播不了时不该只弹错误让他自己找。
+     * 详情页开/关时上报，让主框架的返回键能"先退详情、再退板块"。
      */
-    onPlaybackFailed: ((String) -> Unit)? = null,
+    onDetailChanged: (Boolean) -> Unit = {},
+    /**
+     * 当前正在看详情的作品。**由主框架持有**（不放在本文件里）。
+     *
+     * 为什么必须提升上去：播放时 BawanRoot 会把整个内容树摘掉 ——
+     * 那是为了修直播卡顿，主界面不能和播放器抢 CPU。但树一摘，
+     * 本文件里的 remember 状态就全没了：返回时"正在看哪部片"变成 null，
+     * 用户就看到**从播放页莫名其妙跳回列表**（而不是回到那部片的详情）。
+     */
+    externalDetail: UnifiedMovie? = null,
+    onExternalDetailChanged: (UnifiedMovie?) -> Unit = {},
+    /** 网格滚动位置（首个可见项 + 偏移），由主框架持有以便返回后恢复。 */
+    externalGridIndex: Int = 0,
+    externalGridOffset: Int = 0,
+    onExternalGridScroll: (Int, Int) -> Unit = { _, _ -> },
+    /** 调试：详情页数据就绪后自动起播第一集（用于自动化验证播放页）。 */
+    debugAutoPlay: Boolean = false,
+    /** 调试：自动起播只做一次，做完通知上层复位。 */
+    onDebugAutoPlayConsumed: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     /** 起播：上抛主框架，在根布局层全屏渲染 */
-    onPlay: (UnifiedMovie, UnifiedSource, List<UnifiedEpisode>, Int) -> Unit,
+    onPlay: (UnifiedMovie, UnifiedSource, List<Episode>, Int) -> Unit,
 ) {
-    // 返回键回首页
-    BackHandler(enabled = onBack != null) { onBack?.invoke() }
 
     val manager = LocalTvFocusManager.current
     val scope = rememberCoroutineScope()
@@ -141,12 +159,43 @@ fun UnifiedVideoScreen(
     /** 库里出现过的类型，用于筛选栏。 */
     var typeOptions by remember { mutableStateOf<List<String>>(emptyList()) }
 
+    /** 分类切换面板是否打开（遥控器三横键呼出）。 */
+    var typePanel by remember { mutableStateOf(false) }
+
+    /** 面板里的光标位置。 */
+    var typeCursor by remember { mutableIntStateOf(0) }
+
+    /**
+     * 面板里列出的条目。
+     *
+     * 第一项固定是「搜索」—— 头部的搜索按钮被去掉了，
+     * 不留个入口的话搜索功能就没法用了。
+     */
+    val typePanelItems = remember(typeOptions) {
+        listOf("搜索") + listOf("全部") + typeOptions
+    }
+
     // 调试入口：--es dsh_route vod_search 时直接进搜索态。
     // LocalContext.current 必须在 composable 作用域里取，不能塞进 remember 的 lambda。
     val debugRoute = (androidx.compose.ui.platform.LocalContext.current as? android.app.Activity)
         ?.intent?.getStringExtra("dsh_route")
     var searchMode by remember { mutableStateOf(debugRoute == "vod_search") }
-    var detailOf by remember { mutableStateOf<UnifiedMovie?>(null) }
+    // 外部（主框架）给了就用它，否则用本地 state —— 这样两种调用方式都能工作
+    var localDetail by remember { mutableStateOf<UnifiedMovie?>(null) }
+    val detailOf: UnifiedMovie? = externalDetail ?: localDetail
+    val setDetailOf: (UnifiedMovie?) -> Unit = { m ->
+        onExternalDetailChanged(m)
+        localDetail = m
+    }
+
+    // 返回键：详情页打开时先关详情（回影视列表），否则回首页。
+    // 用户要求：不要在详情页一路跳回首页。
+    BackHandler(enabled = detailOf != null || onBack != null) {
+        if (detailOf != null) setDetailOf(null) else onBack?.invoke()
+    }
+
+    // 上报"当前是否在详情页"，供主框架决定返回键行为
+    LaunchedEffect(detailOf) { onDetailChanged(detailOf != null) }
 
     /** 未成年人保护：不合适的内容不进列表 */
     fun visible(list: List<UnifiedMovie>): List<UnifiedMovie> = list.filter {
@@ -205,7 +254,7 @@ fun UnifiedVideoScreen(
     // 首页直接点进来的作品
     LaunchedEffect(pendingMovie) {
         if (pendingMovie != null) {
-            detailOf = pendingMovie
+            setDetailOf(pendingMovie)
             onPendingConsumed()
         }
     }
@@ -222,7 +271,7 @@ fun UnifiedVideoScreen(
                 // 选中直接进详情，不用再搜一次（detailOf 一改就切到详情页）
                 searchMode = false
                 keyword = ""
-                detailOf = m
+                setDetailOf(m)
             },
             onSearch = { kw ->
                 // 选中「候选词」→ 就地按这个词筛选
@@ -242,9 +291,10 @@ fun UnifiedVideoScreen(
     if (detail != null) {
         UnifiedDetailScreen(
             movie = detail,
-            onBack = { detailOf = null },
+            onBack = { setDetailOf(null) },
+            debugAutoPlay = debugAutoPlay,
+            onDebugAutoPlayConsumed = onDebugAutoPlayConsumed,
             onPlay = onPlay,
-            onPlaybackFailed = onPlaybackFailed,
         )
         return
     }
@@ -254,7 +304,86 @@ fun UnifiedVideoScreen(
         return
     }
 
-    val gridState = rememberLazyStaggeredGridState()
+    val gridState = rememberLazyStaggeredGridState(
+        initialFirstVisibleItemIndex = externalGridIndex,
+        initialFirstVisibleItemScrollOffset = externalGridOffset,
+    )
+
+    // 滚动位置上报（节流：只在值真的变了才写回主框架，避免每帧重组）
+    androidx.compose.runtime.LaunchedEffect(gridState) {
+        snapshotFlow {
+            gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+        }.collect { (i, o) -> onExternalGridScroll(i, o) }
+    }
+
+
+    // ---------- 三横键：切换分类 ----------
+    //
+    // 用户的设计：分类不再用光标去选（那样会和瀑布流抢焦点），
+    // 而是**独立于焦点系统的一个面板**。屏幕提示文字也这么写。
+    //
+    // 面板第一项是「搜索」—— 因为头部的搜索按钮被去掉了，
+    // 不留入口的话搜索功能就没法用了。
+    androidx.compose.runtime.DisposableEffect(manager, typePanel) {
+        manager?.setRawKeyInterceptor { code ->
+            if (code == android.view.KeyEvent.KEYCODE_MENU) {
+                typePanel = !typePanel
+                if (typePanel) {
+                    // 落在「搜索」上（第一项）。当前分类有「使用中」标记，
+                    // 用户一眼能看到自己在哪一类；按一下下键就到分类列表。
+                    typeCursor = 0
+                }
+                true
+            } else {
+                false
+            }
+        }
+        onDispose { manager?.setRawKeyInterceptor(null) }
+    }
+
+    // 面板打开时接管方向键与确定键（不要影响瀑布流）
+    androidx.compose.runtime.DisposableEffect(manager, typePanel) {
+        if (!typePanel) return@DisposableEffect onDispose { }
+        manager?.setKeyInterceptor { dir ->
+            when (dir) {
+                com.chinut.bawantv.ui.theme.Direction.Up -> {
+                    typeCursor = (typeCursor - 1).coerceAtLeast(0); true
+                }
+
+                com.chinut.bawantv.ui.theme.Direction.Down -> {
+                    typeCursor = (typeCursor + 1).coerceAtMost(typePanelItems.size - 1); true
+                }
+
+                com.chinut.bawantv.ui.theme.Direction.Left,
+                com.chinut.bawantv.ui.theme.Direction.Right,
+                -> true
+            }
+        }
+        manager?.setConfirmInterceptor {
+            val picked = typePanelItems.getOrNull(typeCursor)
+            when {
+                // 「搜索」是**动作**，不是分类。
+                // 之前它落到下面的 else，typeFilter 被设成 "搜索"、
+                // 列表被过滤成空 —— 界面显示"影视库还是空的"，看着像数据丢了。
+                picked == null -> Unit
+                picked == "搜索" -> searchMode = true
+                picked == "全部" -> {
+                    typeFilter = ""
+                    scope.launch { gridState.scrollToItem(0) }
+                }
+                else -> {
+                    typeFilter = picked
+                    scope.launch { gridState.scrollToItem(0) }
+                }
+            }
+            typePanel = false
+            true
+        }
+        onDispose {
+            manager?.setKeyInterceptor(null)
+            manager?.setConfirmInterceptor(null)
+        }
+    }
 
     // 加入搜索框的文本输入（遥控器字母键直接可用，
     // 不必每次都用屏幕软键盘一个个点）
@@ -265,13 +394,26 @@ fun UnifiedVideoScreen(
 
     // 把瀑布流注册成"焦点导航的兜底滚动目标"：
     // 方向键在网格里找不到下一项时（屏幕外的项没有坐标），
-    // 焦点系统会回调这里把列表滚一点，让新的项进入可视区。
-    // 没有这一步，遥控器上下键在网格里完全不动 —— 这是之前最影响使用的问题。
-    com.chinut.bawantv.ui.theme.RegisterViewportScroll { delta ->
+    // 焦点系统会回调把列表滚一点，让新的项进入可视区。
+    // 注册成 Modifier 形式，让焦点系统能知道这个容器的范围 ——
+    // 否则「在分类栏按右键」会把网格滚下去（真机反馈的 bug）。
+    val gridScrollModifier = Modifier.registerViewportScroll { delta ->
         gridState.scrollBy(delta.toFloat())
     }
 
-    Column(Modifier.fillMaxSize()) {
+    // ⚠️ 必须留安全边距。
+    //
+    // 用户反馈："整体影视界面感觉像往左上角移动了，最左侧一列的瀑布流图片
+    // 部分已经出了屏幕，『影视』两个字紧紧贴在屏幕边缘"。
+    //
+    // 原因就是这里原来是裸的 fillMaxSize()，一点边距都没有；
+    // 电视普遍还有 overscan（边缘会被切掉几像素），于是标题贴边、首列被裁。
+    // 首页用的是 SafeH*0.7 / SafeV*0.8，这里保持一致。
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = Dim.SafeH * 0.7f, vertical = Dim.SafeV * 0.8f),
+    ) {
         // ---------- 顶栏 ----------
         //
         // 结构说明：低端影视是**基础库**，所以这里第一眼看到的是
@@ -286,25 +428,37 @@ fun UnifiedVideoScreen(
                 fontSize = Txt.Caption,
             )
             Spacer(Modifier.weight(1f))
-            IconChip(Icons.Default.Search, "搜索") { searchMode = true }
-            Spacer(Modifier.width(10.sdp))
-            IconChip(Icons.Default.Refresh, "刷新片库") {
-                scope.launch { loadFromLibrary() }
-            }
+            // ---------- 这里原来有「搜索」「刷新片库」两个按钮 ----------
+            //
+            // 用户要求去掉，原因很实在：**在电视上它们只会添乱**。
+            // 焦点在瀑布流里活动时，按上键会被几何导航带到这两个按钮上，
+            // 于是出现"一会儿在分类里、一会儿跑到刷新、一会儿又回瀑布流"的乱跳。
+            //
+            // 现在影视页**只有瀑布流一个可聚焦区域**，方向键再也不会跑出去。
+            // 刷新仍然是自动的（进页面就在后台补货），不需要按钮。
+            Text(
+                "按遥控器「三横键」切换分类",
+                color = Ink.TextFaint,
+                fontSize = Txt.Caption,
+            )
         }
 
         Spacer(Modifier.height(12.sdp))
 
-        // ---------- 类型筛选 ----------
-        // 用库里真实出现过的分类，而不是写死一份 —— 片库更新后菜单自动跟着变
-        if (typeOptions.isNotEmpty()) {
-            TypeFilterRow(
-                options = listOf("全部") + typeOptions,
-                selected = if (typeFilter.isBlank()) "全部" else typeFilter,
-                onSelect = { typeFilter = if (it == "全部") "" else it },
-            )
-            Spacer(Modifier.height(12.sdp))
-        }
+        // ---------- 当前分类（**不可聚焦**，只是一行状态） ----------
+        //
+        // 用户明确要求："分类栏直接是按设置键（三横键）切换，不让光标进入分类栏里"。
+        //
+        // 这样影视页就只剩瀑布流一个可聚焦区域，上下键的范围是确定的，
+        // 不会再出现"光标在几个区域之间乱跳"。
+        Text(
+            if (typeFilter.isBlank()) "分类：全部" else "分类：$typeFilter",
+            color = Ink.AccentBright,
+            fontSize = Txt.Label,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(12.sdp))
+
 
         if (movies.isEmpty()) {
             SectionEmpty(
@@ -314,6 +468,96 @@ fun UnifiedVideoScreen(
             return@Column
         }
 
+        // ---------- 分类切换面板（三横键呼出） ----------
+        //
+        // 单独画在最上层、**不参与焦点系统** ——
+        // 这正是不让光标"跑进分类栏"的实现方式。
+        // 用两列排布，分类多的时候也不会超出屏幕。
+        AnimatedVisibility(
+            visible = typePanel,
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(140)),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Dim.CardRadius))
+                    .background(Ink.Deep.copy(alpha = 0.97f))
+                    .focusBorder(
+                        visible = true,
+                        cornerRadius = Dim.CardRadius,
+                        color = Ink.AccentBright,
+                        width = 2.sdp,
+                    )
+                    .padding(18.sdp),
+            ) {
+                Text(
+                    "切换分类",
+                    color = Color.White,
+                    fontSize = Txt.Section,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(4.sdp))
+                Text(
+                    "上下选择 · 「确定」切换 · 「三横键」关闭",
+                    color = Ink.TextFaint,
+                    fontSize = Txt.Tiny,
+                )
+                Spacer(Modifier.height(12.sdp))
+
+                val perCol = (typePanelItems.size + 1) / 2
+                Row(horizontalArrangement = Arrangement.spacedBy(10.sdp)) {
+                    listOf(0, 1).forEach { col ->
+                        Column(Modifier.weight(1f)) {
+                            val from = col * perCol
+                            val to = (from + perCol).coerceAtMost(typePanelItems.size)
+                            for (i in from until to) {
+                                val name = typePanelItems[i]
+                                val isCur = i == typeCursor
+                                val isActive = (name == "全部" && typeFilter.isBlank()) ||
+                                    (name != "全部" && name == typeFilter)
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 6.sdp)
+                                        .clip(RoundedCornerShape(10.sdp))
+                                        .background(
+                                            when {
+                                                isCur -> Ink.Accent.copy(alpha = 0.35f)
+                                                isActive -> Color.White.copy(alpha = 0.10f)
+                                                else -> Color.Transparent
+                                            }
+                                        )
+                                        .focusBorder(
+                                            visible = isCur,
+                                            cornerRadius = 10.sdp,
+                                            color = Ink.AccentBright,
+                                            width = 2.sdp,
+                                        )
+                                        .padding(horizontal = 12.sdp, vertical = 9.sdp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        name,
+                                        color = if (isCur || isActive) Color.White else Ink.TextSecondary,
+                                        fontSize = Txt.Label,
+                                        fontWeight = if (isCur) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (isActive) {
+                                        Text("使用中", color = Ink.Green, fontSize = Txt.Tiny)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
         // ---------- 无限滚动海报墙 ----------
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 138.sdp),
@@ -321,7 +565,7 @@ fun UnifiedVideoScreen(
             contentPadding = PaddingValues(bottom = 32.sdp, end = 8.sdp),
             horizontalArrangement = Arrangement.spacedBy(14.sdp),
             verticalItemSpacing = 16.sdp,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().then(gridScrollModifier),
         ) {
             items(movies, key = { it.id }) { m ->
                 UnifiedCard(
@@ -330,7 +574,46 @@ fun UnifiedVideoScreen(
                     // 不用 onLeft 覆盖：首页的导航栏已经没了，
                     // "nav:vod" 这个 key 没人注册，写了反而会把左键吃掉（踩过）
                     onLeft = null,
-                    onClick = { detailOf = m },
+                    // ---------- 向上：先滚回画面，别直接跳到分类栏 ----------
+                    //
+                    // 用户反馈："向下卷动瀑布流看了很久后再向上卷动，
+                    // 选择框会直接跳到分类里，而不是继续向上卷动画面"。
+                    //
+                    // 根因：焦点在第 1 行时，向上找最近的可聚焦项就是**分类栏**
+                    // （几何上确实离得最近），所以焦点一下跳上去了。
+                    //
+                    // 修法：只要网格**还能往上滚**（firstVisibleItemIndex > 0 或
+                    // 偏移量不为 0），就先把网格滚回去、焦点留在原地。
+                    // 只有在网格已经滚到顶时才真的把焦点交给上面的分类栏。
+                    onUp = {
+                        // 向上键：**只在"上面还有未显示的内容"时才滚动**，
+                        // 已经滚到顶就把事件交回几何导航，让焦点自然往上走一行。
+                        //
+                        // 这里踩过两次坑，都值得记下来：
+                        //
+                        //   1. 最初没有覆盖 → 焦点在第一行按上，几何导航会跳到
+                        //      页面最上方的其它控件（分类栏/刷新按钮），用户说"乱跳"。
+                        //   2. 后来写成"无条件滚动 + return true" → 焦点**再也无法
+                        //      向上移动**，下到第二行就回不了第一行；
+                        //      而向下没有覆盖处理、走的几何导航，于是"上不去、下得来"，
+                        //      行为不对称，非常怪。
+                        //
+                        // 正确做法是区分这两种情形，并且允许返回 false 交回导航 ——
+                        // 为此把方向处理器的返回类型从 Unit 改成了 Boolean。
+                        val gridAtTop = gridState.firstVisibleItemIndex == 0 &&
+                            gridState.firstVisibleItemScrollOffset == 0
+                        if (gridAtTop) {
+                            // 已经在最上面：交回几何导航。
+                            // 几何导航会去找"上方最近的可聚焦项"——因为分类栏和
+                            // 右上角按钮都已经不可聚焦了，所以它只会走到上一行；
+                            // 真到第一行时上方无项可去，焦点就停住。
+                            false
+                        } else {
+                            scope.launch { gridState.scrollBy(-GRID_SCROLL_STEP) }
+                            true
+                        }
+                    },
+                    onClick = { setDetailOf(m) },
                 )
             }
         }
@@ -342,7 +625,8 @@ fun UnifiedVideoScreen(
 private fun UnifiedCard(
     movie: UnifiedMovie,
     focusKey: Any?,
-    onLeft: (() -> Unit)?,
+    onLeft: (() -> Boolean)?,
+    onUp: (() -> Boolean)? = null,
     onClick: () -> Unit,
 ) {
     val focus = rememberTvFocusState()
@@ -361,6 +645,7 @@ private fun UnifiedCard(
                 focusedBackground = Ink.CardStrong,
                 onClick = onClick,
                 onLeft = onLeft,
+                onUp = onUp,
             )
             .padding(8.sdp),
     ) {
@@ -452,30 +737,70 @@ private fun UnifiedCard(
 private fun UnifiedDetailScreen(
     movie: UnifiedMovie,
     onBack: () -> Unit,
-    onPlay: (UnifiedMovie, UnifiedSource, List<UnifiedEpisode>, Int) -> Unit,
-    /** 播放失败时上报「失败的源」，让上层自动换一个补充源。 */
-    onPlaybackFailed: ((String) -> Unit)? = null,
+    onPlay: (UnifiedMovie, UnifiedSource, List<Episode>, Int) -> Unit,
+    /** 调试：数据就绪后自动起播第一集（自动化验证播放页用）。 */
+    debugAutoPlay: Boolean = false,
+    onDebugAutoPlayConsumed: () -> Unit = {},
 ) {
     var sources by remember(movie.id) { mutableStateOf(movie.sources) }
     var loading by remember(movie.id) { mutableStateOf(true) }
     var activeSource by remember(movie.id) { mutableIntStateOf(0) }
-    /** 是否还在后台找补充源（TVBox）。 */
-    var supplementing by remember(movie.id) { mutableStateOf(false) }
 
-    // 剧集要到详情接口才有，进页面时并行补齐所有源。
+    /**
+     * "剧集确实为空"是否已经确认。
+     *
+     * 拉取是两次请求（详情 + sources），源列表可能先到、剧集稍后补上。
+     * 在这个标志变 true 之前，空列表只显示"正在获取"，不报错。
+     * 详见下方剧集区的注释。
+     */
+    var emptySettled by remember(movie.id, activeSource) { mutableStateOf(false) }
+
+    // 调试自动起播：等剧集到手后点第一集。
+    // 只在自动化验证时开启（debugAutoPlay），正常使用完全不受影响。
+    LaunchedEffect(debugAutoPlay, sources, loading) {
+        if (!debugAutoPlay || loading) return@LaunchedEffect
+        val src = sources.getOrNull(activeSource) ?: return@LaunchedEffect
+        val eps = src.episodes
+        if (eps.isEmpty()) return@LaunchedEffect
+        android.util.Log.i("BawanRoute", "debug 自动起播：${movie.title} 第1集")
+        onPlay(movie, src, eps, 0)
+        onDebugAutoPlayConsumed()
+    }
+
+    // 剧集要到详情接口才有，进页面时补齐。
     //
-    // 源的组织规则（本版重点）：**低端影视永远排第一**，
-    // TVBox 站只在"ddys 没有可播剧集"时才去搜同一个片名补充进来。
-    // 这样详情页第一眼看到的、最容易点的，就是最靠谱的那条线路。
+    // 影视现在只有低端影视一个源，所以这里简单直接：
+    // 拿它的官方接口取剧集列表（**直连 m3u8，不需要任何解析接口**）。
+    //
+    // ⚠️ 必须**重试**，这是用户反馈的"进来说没有源、过一会再进来又有了"的根因：
+    // 之前只试一次，遇到一次超时/抖动就把结果当最终结论，界面显示"没有剧集"。
+    // 而重进一次网络好了，就又有内容了 —— 用户看到的就是随机行为。
+    //
+    // 现在按 1s / 2s / 4s 退避重试，最多 4 次；只要有一次拿到剧集就停。
     LaunchedEffect(movie.id) {
         loading = true
-        val withSupplement = com.chinut.bawantv.BawanApp.prefs.tvboxSupplement
-        val full = runCatching {
-            MovieAggregator.buildPlayableSources(movie, withSupplement = withSupplement)
-        }.getOrDefault(movie.sources)
-        sources = full
+        var best = movie.sources
+        val delays = listOf(0L, 1_000L, 2_000L, 4_000L)
+        for ((attempt, waitMs) in delays.withIndex()) {
+            if (waitMs > 0) kotlinx.coroutines.delay(waitMs)
+            val got = runCatching { MovieAggregator.loadSources(movie) }.getOrNull()
+            if (got != null && got.any { it.episodes.isNotEmpty() }) {
+                best = got
+                android.util.Log.i(
+                    "BawanVod",
+                    "取源成功（第 ${attempt + 1} 次尝试）《${movie.title}》",
+                )
+                break
+            }
+            if (got != null) best = got
+            android.util.Log.w(
+                "BawanVod",
+                "取源第 ${attempt + 1} 次未拿到剧集《${movie.title}》，准备重试",
+            )
+        }
+        sources = best
         // 默认停在第一个"有剧集"的源，避免打开就是空的
-        activeSource = full.indexOfFirst { it.episodes.isNotEmpty() }.coerceAtLeast(0)
+        activeSource = best.indexOfFirst { it.episodes.isNotEmpty() }.coerceAtLeast(0)
         loading = false
     }
 
@@ -579,8 +904,12 @@ private fun UnifiedDetailScreen(
                             loading = loading && s.episodes.isEmpty(),
                             onClick = {
                                 activeSource = i
-                                // 电影只有一个"剧集"，直接起播最省事
-                                if (s.episodes.size == 1) onPlay(movie, s, s.episodes, 0)
+                                // 电影只有一个"剧集"，直接起播最省事。
+                                // **必须判非空**：源刚显示出来、剧集还在拉的时候，
+                                // 点下去会拿一个空列表去起播，播放器那边会闪退。
+                                if (s.episodes.size == 1) {
+                                    onPlay(movie, s, s.episodes, 0)
+                                }
                             },
                         )
                     }
@@ -592,7 +921,9 @@ private fun UnifiedDetailScreen(
                 val eps = current?.episodes.orEmpty()
                 if (eps.isNotEmpty()) {
                     Text(
-                        "剧集（${eps.size}）",
+                        // 电影只有一条时叫"线路"更准确 —— 它本来就是播放源，
+                        // 不是"第几集"
+                        if (eps.size == 1) "播放线路（1 条）" else "剧集 / 线路（${eps.size}）",
                         color = Ink.TextSecondary,
                         fontSize = Txt.Label,
                         fontWeight = FontWeight.Bold,
@@ -606,15 +937,56 @@ private fun UnifiedDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         items(eps.size) { i ->
+                            // 命名规则（用户反馈"4 个按钮都叫播放，看不出区别"）：
+                            //
+                            // ddys 接口对**电影**给的剧集 label 是空串，于是全都落到
+                            // 兜底的"播放"上，一排按钮长得一模一样 —— 用户根本不知道该点哪个。
+                            //
+                            // 实际上这时候"剧集"就是**不同的线路**（播放源 1/2/3/4）。
+                            // 所以：只有一条时叫"立即播放"；多条时按线路编号命名，
+                            // 接口给了有意义的名字（剧集类常是"第1集/国语/粤语"）就优先用它。
+                            val raw = eps[i].name
+                            val label = when {
+                                raw.isNotBlank() && raw != "播放" -> raw
+                                eps.size == 1 -> "立即播放"
+                                else -> "线路 ${i + 1}"
+                            }
                             EpisodeButton(
-                                name = eps[i].name,
+                                name = label,
                                 onClick = { if (current != null) onPlay(movie, current, eps, i) },
                             )
                         }
                     }
-                } else if (!loading) {
+                } else if (loading) {
+                    // 还在拉取 → 明确说"正在获取"，不要报错
                     Text(
-                        "这个源没有返回可播放的剧集，换一个源试试",
+                        "正在获取剧集…",
+                        color = Ink.TextTertiary,
+                        fontSize = Txt.Label,
+                    )
+                } else if (!emptySettled) {
+                    // 关键：**不要一发现列表为空就报错**。
+                    //
+                    // 用户反馈："经常显示『这个源没有返回可播放的剧集』，
+                    // 有的时候就等一会就又有了 —— 既然没有你列出来干啥"。
+                    //
+                    // 原因是这里在数据到达前就下了结论：详情接口和 sources 接口
+                    // 是两次请求，源先回来、剧集稍后补上，中间那个空档就弹了错误文案。
+                    // 现在先等一小会儿，剧集到了就正常显示，真的没有才说没有。
+                    LaunchedEffect(current?.id, loading) {
+                        // loading 还是 true 说明剧集可能马上到，别急着判定为空
+                        if (loading) return@LaunchedEffect
+                        delay(1800)
+                        emptySettled = true
+                    }
+                    Text(
+                        "正在获取剧集…",
+                        color = Ink.TextTertiary,
+                        fontSize = Txt.Label,
+                    )
+                } else {
+                    Text(
+                        "这个源确实没有可播放的剧集，按「←」回上一页换一部试试",
                         color = Ink.Amber,
                         fontSize = Txt.Label,
                     )
@@ -739,13 +1111,20 @@ private fun TypeFilterRow(
     onSelect: (String) -> Unit,
 ) {
     val rowState = rememberLazyListState()
+
+    // 类别栏也注册滚动。注册成 Modifier 形式后，焦点系统能分辨
+    // "焦点在类别栏里"还是"在下面的网格里"，从而只滚对应的那个容器。
+    val rowScrollModifier = Modifier.registerViewportScroll { delta ->
+        rowState.scrollBy(delta.toFloat())
+    }
+
     LazyRow(
+        modifier = rowScrollModifier
+            .fillMaxWidth()
+            .height(48.sdp),
         state = rowState,
         horizontalArrangement = Arrangement.spacedBy(10.sdp),
         contentPadding = PaddingValues(end = 8.sdp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.sdp),
     ) {
         items(options, key = { "tf:$it" }) { name ->
             val f = rememberTvFocusState()
@@ -825,3 +1204,13 @@ private fun IconChip(
         Text(label, color = Ink.TextSecondary, fontSize = Txt.Caption, maxLines = 1)
     }
 }
+
+/**
+ * 「向上滚回画面」每次滚动的像素量。
+ *
+ * 取得比一屏小、比一行大一些：按一下能明显回退一段，
+ * 又不会一下冲过头（用户是在找刚才看过的位置）。
+ */
+private const val GRID_SCROLL_STEP = 320f
+
+

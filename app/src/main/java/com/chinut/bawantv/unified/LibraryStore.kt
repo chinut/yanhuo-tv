@@ -37,7 +37,20 @@ import java.io.File
 object LibraryStore {
 
     private const val FILE_NAME = "ddys_library.tsv"
+
+    /**
+     * 字段分隔符：U+001F（ASCII 的 "Unit Separator"）。
+     *
+     * 选它是因为片名里几乎不可能出现这个控制字符，
+     * 比逗号、竖线之类的安全得多。
+     */
     private const val SEP = '\u001F'
+
+    /** 当前序列化格式的字段数（加字段时同步 +1）。 */
+    private const val LINE_FIELDS = 9
+
+    private const val TAG = "BawanLibrary"
+
     private const val MAX_ITEMS = 3000
 
     /** 库里的最后更新时间（毫秒）。 */
@@ -51,14 +64,37 @@ object LibraryStore {
 
     private fun file(): File = File(BawanApp.ctx().filesDir, FILE_NAME)
 
-    /** 读本地库（进程内缓存）。没有缓存文件返回空。 */
+    /**
+     * 读本地库（进程内缓存）。没有缓存文件返回空。
+     *
+     * ⚠️ 这里会做一次**缓存格式升级检查**：
+     * 老缓存只有 8 个字段、没有 ddys slug（见 [toLine] 的说明），
+     * 用它去取详情必然失败。检测到就**直接丢掉**，让上层重新抓一次 ——
+     * 宁可多等一次抓取，也不要留着"看着有片、点进去没剧集"的坏数据。
+     */
     fun load(): List<UnifiedMovie> {
         memo?.let { return it }
         val f = file()
         if (!f.exists()) return emptyList()
+        val lines = runCatching { f.readLines() }.getOrDefault(emptyList())
+        if (lines.isEmpty()) return emptyList()
+
+        // 抽样判断格式：只要有任意一行少于 9 个字段，就是老格式
+        val stale = lines.asSequence()
+            .filter { it.isNotBlank() }
+            .take(20)
+            .any { it.split(SEP).size < LINE_FIELDS }
+        if (stale) {
+            android.util.Log.w(
+                TAG,
+                "本地片库是老格式（缺 ddys slug），已丢弃并等待重新抓取",
+            )
+            runCatching { f.delete() }
+            return emptyList()
+        }
+
         val list = runCatching {
-            f.readLines()
-                .asSequence()
+            lines.asSequence()
                 .mapNotNull { parseLine(it) }
                 .toList()
         }.getOrDefault(emptyList())
@@ -194,14 +230,30 @@ object LibraryStore {
         }
     }
 
+    /**
+     * 序列化一行。
+     *
+     * 字段顺序（**追加新字段只能放在末尾**，老缓存才不会错位）：
+     *   0 id  1 标题  2 海报  3 年份  4 分类  5 地区  6 评分  7 备注  8 ddys slug
+     *
+     * ⚠️ 第 8 个字段（slug）是后加的，但**必须有**：
+     * 之前只存了前 8 个，反序列化时只能拿 `id`（形如 `杀死福顺|2023`）
+     * 当 remoteId 去请求详情接口 —— 那不是合法 slug，接口必然返回 null，
+     * 界面就显示「这个源没有可播放的剧集」。查了很久才定位到这一层。
+     */
     private fun toLine(m: UnifiedMovie): String = listOf(
         m.id, m.title, m.poster, m.year, m.typeName, m.area, m.score, m.remarks,
+        m.sources.firstOrNull { it.id == "ddys" }?.remoteId.orEmpty(),
     ).joinToString(SEP.toString()) { esc(it) }
 
     private fun parseLine(line: String): UnifiedMovie? {
         if (line.isBlank()) return null
         val f = line.split(SEP)
         if (f.size < 8) return null
+        // 第 9 个字段是后加的：老缓存没有，此时退回 id。
+        // 那种情况下 slug 是错的，取源会失败 —— 所以启动后要让片库重新抓一次
+        // （见 LibraryStore.refresh 的调用方），把真正的 slug 补上。
+        val slug = f.getOrNull(8)?.let { unesc(it) }.orEmpty().ifBlank { unesc(f[0]) }
         return UnifiedMovie(
             id = unesc(f[0]),
             title = unesc(f[1]),
@@ -211,11 +263,11 @@ object LibraryStore {
             area = unesc(f[5]),
             score = unesc(f[6]),
             remarks = unesc(f[7]),
-            // 核心库的内容天生带 ddys 源；TVBox 补充源在需要时才去查
+            // 核心库的内容天生带 ddys 源
             sources = listOf(
                 UnifiedSource(
                     id = "ddys",
-                    remoteId = unesc(f[0]),
+                    remoteId = slug,
                     name = "低端影视",
                     quality = "官方",
                 )

@@ -83,11 +83,11 @@ import com.chinut.bawantv.ui.player.saveProgressNow
 import com.chinut.bawantv.ui.theme.Dim
 import com.chinut.bawantv.ui.theme.Ink
 import com.chinut.bawantv.ui.theme.rememberTvFocusState
+import com.chinut.bawantv.ui.theme.focusBorder
 import com.chinut.bawantv.ui.theme.sdp
+import com.chinut.bawantv.ui.theme.ssp
 import com.chinut.bawantv.ui.theme.tvFocusable
 import com.chinut.bawantv.ui.theme.Txt
-import com.chinut.bawantv.vod.VodRepo
-import com.chinut.bawantv.vod.VodResolver
 import kotlinx.coroutines.delay
 
 /**
@@ -105,18 +105,27 @@ import kotlinx.coroutines.delay
 @UnstableApi
 @Composable
 fun VodPlayerScreen(
-    request: PlayingEpisode,
+    request: com.chinut.bawantv.unified.PlayRequest,
     onClose: () -> Unit,
-    onSwitchEpisode: (PlayingEpisode) -> Unit,
+    onSwitchEpisode: (com.chinut.bawantv.unified.PlayRequest) -> Unit,
 ) {
     val context = LocalContext.current
     val prefs = BawanApp.prefs
 
     var index by remember(request) {
-        // 断点续播：上次看到第几集，打开时就直接从那一集开始
+        // 断点续播：上次看到第几集，打开时就直接从那一集开始。
+        //
+        // ⚠️ 这里必须防住"剧集列表为空"的情况：
+        // 空列表时 lastIndex == -1，`coerceIn(0, -1)` 会直接抛
+        // IllegalArgumentException（minimum > maximum）导致闪退。
+        // 之前的写法是 `coerceIn(0, request.episodes.lastIndex.coerceAtLeast(0))`，
+        // 看着好像防住了，实际 coerceAtLeast(0) 把 -1 变成 0 之后
+        // 仍然会对"列表为空"的输入产生越界索引。
+        val lastIdx = request.episodes.lastIndex
         val saved = WatchHistory.find(WatchHistory.KIND_VOD, request.vodId)
-        val start = saved?.episodeIndex?.takeIf { it in request.episodes.indices } ?: request.index
-        mutableIntStateOf(start.coerceIn(0, request.episodes.lastIndex.coerceAtLeast(0)))
+        val start = saved?.episodeIndex?.takeIf { it in request.episodes.indices }
+            ?: request.index
+        mutableIntStateOf(if (lastIdx < 0) 0 else start.coerceIn(0, lastIdx))
     }
     var url by remember { mutableStateOf<String?>(null) }
     var headerMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -128,10 +137,65 @@ fun VodPlayerScreen(
     var isPlaying by remember { mutableStateOf(true) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
+
+    // ---------- 拖动进度（左右键）状态 ----------
+    //
+    // 设计要点（用户要求"允许左右键拖动播放条 + 提供阻尼效果"）：
+    //
+    // **不每按一次就 seek**。ExoPlayer 对 HLS 的 seek 是重新拉分片，
+    // 连按十下就是十次重新缓冲 —— 真机上表现就是"拖一下卡半天"。
+    // 所以这里只累加一个**目标位置**，画面照常播；等用户停手 600ms
+    // 才真正 seek 一次（见下面的 LaunchedEffect）。
+    //
+    // 拖动期间 HUD 强制显示，进度条上会画出"要跳到哪里"的预览。
+    var scrubbing by remember { mutableStateOf(false) }
+
+    /** 拖动目标位置（毫秒）。 */
+    var scrubTarget by remember { mutableLongStateOf(0L) }
+
+    /** 开始拖动时的原始位置，用于同时显示"从哪到哪"。 */
+    var scrubOrigin by remember { mutableLongStateOf(0L) }
+
+    /** 当前这一档的步长 —— 阻尼就体现在它随按住时间变大。 */
+    var scrubStepMs by remember { mutableLongStateOf(SCRUB_MIN_MS) }
+
+    /** 上一次按左右键的时间戳，用来判断"是不是在连续按"。 */
+    var lastScrubAt by remember { mutableLongStateOf(0L) }
     var buffered by remember { mutableLongStateOf(0L) }
     var retry by remember { mutableIntStateOf(0) }
 
+    /** 失败弹窗里光标停在哪个按钮（0=重试，1=下一集）。 */
+    var failCursor by remember { mutableIntStateOf(0) }
+
+    // ---------- 播放期间不让系统息屏 ----------
+    //
+    // 真机实测：播几分钟后电视进入待机画面，**但音频还在继续**。
+    // 原因是之前只给 PlayerView 这个子 View 设了 keepScreenOn，
+    // 而部分电视只认**窗口级**的 FLAG_KEEP_SCREEN_ON，不认子 View 的标记。
+    // 这里在播放页存在期间给窗口加上这个标志，离开时撤掉。
+    DisposableEffect(Unit) {
+        val activity = context as? android.app.Activity
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     val episode = request.episodes.getOrNull(index) ?: request.episodes.firstOrNull()
+
+    // 没有剧集就别往下走了：直接显示提示，避免后面一堆空指针/越界。
+    // 正常路径不会到这里（上层已判非空），这是兜底。
+    if (episode == null) {
+        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("这部作品没有可播放的剧集", color = Color.White, fontSize = Txt.Section.ssp)
+                Spacer(Modifier.height(16.sdp))
+                com.chinut.bawantv.ui.components.PlayButton("返回", onClick = onClose)
+            }
+        }
+        return
+    }
+
     val player = remember {
         ExoPlayer.Builder(context)
             // ---------- 缓冲策略：专治"卡卡顿顿" ----------
@@ -145,9 +209,15 @@ fun VodPlayerScreen(
             // 电视用户对"开头转圈两秒"的容忍度，远高于"看着看着卡"。
             .setLoadControl(
                 DefaultLoadControl.Builder()
-                    // 起播前至少攒够 20 秒
+                    // ⚠️ ExoPlayer 有一组**硬性约束**，写反了会直接抛
+                    // IllegalArgumentException，把播放页整个崩掉（真机实测踩过）：
+                    //     minBufferMs >= bufferForPlaybackMs
+                    //     minBufferMs >= bufferForPlaybackAfterRebufferMs
+                    // 上一版把 minBufferMs 设成 25000、rebuffer 设成 35000，
+                    // 正好违反第二条 → **所有影视点播放立刻闪退**。
+                    // 现在 minBufferMs 抬到 40000 满足约束。
                     .setBufferDurationsMs(
-                        /* minBufferMs = */ 25_000,
+                        /* minBufferMs = */ 40_000,
                         /* maxBufferMs = */ 90_000,
                         /* bufferForPlaybackMs = */ 20_000,
                         /* bufferForPlaybackAfterRebufferMs = */ 35_000,
@@ -183,25 +253,23 @@ fun VodPlayerScreen(
         }
     }
 
-    // ---------- 解析剧集地址 ----------
+    // ---------- 准备播放地址 ----------
+    //
+    // 影视现在只有低端影视，它给的剧集地址是**直连 m3u8**，
+    // 不需要任何"解析接口"。所以这里从原来的一段解析流程
+    // 简化成"拿来就用" —— TVBox 时代那套解析器已随包一起删除。
     LaunchedEffect(episode?.url, retry) {
         val raw = episode?.url ?: return@LaunchedEffect
         resolving = true
         failed = null
         url = null
-        val resolver = VodRepo.resolver(request.flag)
-        val resolved = runCatching { resolver.resolve(raw, request.flag) }.getOrNull()
-        if (resolved == null) {
+        if (raw.isBlank()) {
             resolving = false
-            failed = if (raw.startsWith("http") && raw.contains(".")) {
-                "解析失败：该线路的播放地址需要对应解析接口，可在「设置 → 解析接口」里补充"
-            } else {
-                "解析失败：地址格式无法识别"
-            }
+            failed = "这一集没有可播放的地址"
         } else {
-            url = resolved.url
-            headerMap = resolved.headers
-            via = resolved.via
+            url = raw
+            headerMap = com.chinut.bawantv.live.LiveCatalog.headersFor(raw)
+            via = ""
             resolving = false
         }
     }
@@ -235,13 +303,15 @@ fun VodPlayerScreen(
             // 退出时补记一次进度：自动联播的协程到这里已被取消，不补的话最后几秒会丢
             saveProgressNow(
                 player = player,
-                kind = WatchHistory.KIND_VOD,
+                kind = WatchHistory.KIND_DDYS,
                 id = request.vodId,
                 title = request.title,
                 poster = request.poster,
                 episodeIndex = index,
                 episodeName = episode?.name.orEmpty(),
-                flag = request.flag,
+                // flag 是 TVBox 时代的线路标识，现在恒为空串
+                // （字段保留只为兼容旧观看记录的解析格式）
+                flag = "",
                 episodeUrls = request.episodes.map { it.url },
             )
             player.removeListener(listener)
@@ -269,6 +339,18 @@ fun VodPlayerScreen(
         }
     }
 
+    // ---------- 松手后才真正 seek（拖动阻尼的落点）----------
+    //
+    // 用户停手 600ms 才执行一次 seek，而不是每按一下都 seek。
+    // 这样连按十几下也不会触发十几次重新缓冲。
+    LaunchedEffect(scrubbing, scrubTarget) {
+        if (!scrubbing || listVisible) return@LaunchedEffect
+        delay(SCRUB_COMMIT_DELAY_MS)
+        runCatching { player.seekTo(scrubTarget) }
+        scrubbing = false
+        hudVisible = true
+    }
+
     // ---------- 观看记录 / 断点续播 / 自动联播 ----------
     // 和板块 C 共用同一套逻辑（见 ui/player/WatchProgress.kt）
     val episodeUrls = remember(request.episodes) { request.episodes.map { it.url } }
@@ -278,11 +360,11 @@ fun VodPlayerScreen(
         isLiveStream = false,
         episodeUrls = episodeUrls,
         identityId = request.vodId,
-        kind = WatchHistory.KIND_VOD,
+        kind = WatchHistory.KIND_DDYS,
         title = request.title,
         poster = request.poster,
-        flag = request.flag,
         episodeName = episode?.name.orEmpty(),
+        flag = "",
         onSwitchToEpisode = { onSwitchEpisode(request.copy(index = it)) },
         onReachedEnd = onClose,
     )
@@ -301,16 +383,143 @@ fun VodPlayerScreen(
         hudVisible = true
     }
 
+    /**
+     * 左右键拖动进度（带阻尼）。
+     *
+     * ## 阻尼是怎么做的
+     *
+     * 第一次按：±[SCRUB_MIN_MS]（10 秒），方便精确微调。
+     * 如果**连续按**（两次间隔小于 [SCRUB_CHAIN_MS]），步长按 [SCRUB_GROWTH] 增长，
+     * 上限 [SCRUB_MAX_MS]（120 秒）—— 按住不放就能快速扫过整部片子。
+     *
+     * 这就是"阻尼"的手感：**轻点微调、长按加速**，
+     * 而不是不管按多久都只跳固定 10 秒（那是现在的问题，拖一部长片要按几十次）。
+     *
+     * @param forward true = 向右（前进）
+     */
+    fun scrub(forward: Boolean) {
+        val total = runCatching { player.duration }.getOrDefault(0L).coerceAtLeast(0L)
+        if (total <= 0L) return
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        val chained = scrubbing && (now - lastScrubAt) < SCRUB_CHAIN_MS
+
+        if (!scrubbing) {
+            // 刚开始拖：记下起点
+            scrubOrigin = runCatching { player.currentPosition }.getOrDefault(0L)
+            scrubTarget = scrubOrigin
+            scrubStepMs = SCRUB_MIN_MS
+        } else if (chained) {
+            // 连续按 → 步长递增（阻尼加速），并限制上限
+            scrubStepMs = (scrubStepMs * SCRUB_GROWTH).toLong().coerceAtMost(SCRUB_MAX_MS)
+        } else {
+            // 停了一会儿又按 → 回到微调档
+            scrubStepMs = SCRUB_MIN_MS
+        }
+        lastScrubAt = now
+
+        val delta = if (forward) scrubStepMs else -scrubStepMs
+        scrubTarget = (scrubTarget + delta).coerceIn(0L, total)
+        scrubbing = true
+        hudVisible = true
+    }
+
     fun step(delta: Int) {
         val next = index + delta
         if (next !in request.episodes.indices) return
         onSwitchEpisode(request.copy(index = next))
     }
 
+    /**
+     * 失败弹窗里可选的按钮。
+     *
+     * 「下一集」只在**确实有下一集**时才给 —— 电影只有一集，
+     * 给它一个"下一集"按钮没有任何意义（用户也在问"这个下一集代表什么"）。
+     */
+    fun failActions(): List<Pair<String, () -> Unit>> = buildList {
+        add("重试" to { retry++ })
+        if (index + 1 in request.episodes.indices) add("下一集" to { step(1) })
+    }
+
     BackHandler {
         when {
             listVisible -> listVisible = false
             else -> onClose()
+        }
+    }
+
+    // ---------- 把按键接管下来（这就是"只有返回能点"的根因）----------
+    //
+    // 之前这里只靠 `onPreviewKeyEvent` 收按键 —— 但**收不到**：
+    // `MainActivity.dispatchKeyEvent` 在 ACTION_DOWN 就把方向键/确定键
+    // 交给了焦点系统并 return true，事件根本到不了 Compose 的预览回调。
+    // 于是播放页上除返回键（走 onBackPressedDispatcher）之外全都失效：
+    // 暂停没反应、左右键拖不动进度。
+    //
+    // 直播页一直是靠这套拦截器工作的，点播页漏了 —— 现在对齐。
+    val focusManager = com.chinut.bawantv.ui.theme.LocalTvFocusManager.current
+    DisposableEffect(focusManager) {
+        focusManager?.setKeyInterceptor { dir ->
+            // 失败弹窗显示时，方向键只在"重试 / 下一集"之间走，不要拿去拖进度。
+            // （用户反馈过：弹窗上的按钮遥控器选不中。）
+            if (failed != null) {
+                val acts = failActions()
+                when (dir) {
+                    com.chinut.bawantv.ui.theme.Direction.Left -> {
+                        failCursor = (failCursor - 1).coerceAtLeast(0); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Right -> {
+                        failCursor = (failCursor + 1).coerceAtMost(acts.size - 1); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Up,
+                    com.chinut.bawantv.ui.theme.Direction.Down,
+                    -> true
+                }
+            } else {
+                when (dir) {
+                    com.chinut.bawantv.ui.theme.Direction.Left -> {
+                        scrub(forward = false); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Right -> {
+                        scrub(forward = true); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Up -> {
+                        step(-1); true
+                    }
+
+                    com.chinut.bawantv.ui.theme.Direction.Down -> {
+                        step(1); true
+                    }
+                }
+            }
+        }
+        focusManager?.setConfirmInterceptor {
+            // 失败弹窗优先：确定 = 执行当前选中的按钮
+            val acts = failActions()
+            if (failed != null && acts.isNotEmpty()) {
+                acts.getOrNull(failCursor.coerceIn(0, acts.size - 1))?.second?.invoke()
+                return@setConfirmInterceptor true
+            }
+            // 否则确定键始终暂停/恢复（用户要求"按确定键暂停或恢复播放"）。
+            // 暂停时让控制条留在屏幕上，多半接着要拖进度。
+            togglePlay()
+            true
+        }
+        focusManager?.setRawKeyInterceptor { code ->
+            if (code == android.view.KeyEvent.KEYCODE_MENU) {
+                listVisible = !listVisible; true
+            } else {
+                false
+            }
+        }
+        onDispose {
+            focusManager?.setKeyInterceptor(null)
+            focusManager?.setConfirmInterceptor(null)
+            focusManager?.setRawKeyInterceptor(null)
         }
     }
 
@@ -328,11 +537,11 @@ fun VodPlayerScreen(
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (e.key) {
                     Key.DirectionLeft -> {
-                        seekBy(-10_000); true
+                        scrub(forward = false); true
                     }
 
                     Key.DirectionRight -> {
-                        seekBy(10_000); true
+                        scrub(forward = true); true
                     }
 
                     Key.DirectionUp -> {
@@ -344,11 +553,16 @@ fun VodPlayerScreen(
                     }
 
                     Key.Enter, Key.DirectionCenter, Key.NumPadEnter -> {
-                        if (hudVisible && !listVisible) {
-                            togglePlay()
-                        } else {
-                            hudVisible = true
-                        }
+                        // 确定键**始终**暂停/恢复。
+                        //
+                        // 原来是"控制条显示时才暂停，否则先唤出控制条"，
+                        // 结果用户按一下没反应（只是把控制条调出来了），得按两下才暂停。
+                        // 用户明确要求"按确定键暂停或恢复播放"，所以改成一步到位。
+                        // 控制条的自动收起仍然管着"怎么让它出现"（按左右键即可）。
+                        togglePlay()
+                        // 暂停时保持控制条可见（用户多半要接着拖进度），
+                        // 恢复播放时让它照常自动收起
+                        hudVisible = !isPlaying
                         true
                     }
 
@@ -356,7 +570,8 @@ fun VodPlayerScreen(
                         togglePlay(); true
                     }
 
-                    Key.Menu, Key.M -> {
+                    // 菜单键：剧集列表
+                    Key.Menu -> {
                         listVisible = !listVisible; true
                     }
 
@@ -367,6 +582,7 @@ fun VodPlayerScreen(
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
+                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     useController = false
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
@@ -414,11 +630,73 @@ fun VodPlayerScreen(
                     Spacer(Modifier.height(10.sdp))
                     Text(msg, color = Ink.TextTertiary, fontSize = Txt.Label)
                     Spacer(Modifier.height(20.sdp))
+                    // ---------- 失败弹窗的两个按钮 ----------
+                    //
+                    // 用户反馈："播放失败的时候，无法用遥控器选择重试和下一集"。
+                    //
+                    // 根因和播放页其它按键一样：这个弹窗里的按钮**既没接焦点系统，
+                    // 也没接按键拦截**，遥控器按下去当然没反应。
+                    // 现在左右键在两者间切换、确定键触发（见上面的 keyInterceptor）。
                     Row(horizontalArrangement = Arrangement.spacedBy(12.sdp)) {
-                        PlayButton("重试", onClick = { retry++ })
-                        PlayButton("下一集", onClick = { step(1) })
+                        for ((i, item) in failActions().withIndex()) {
+                            val selected = i == failCursor
+                            Box(
+                                Modifier
+                                    .focusBorder(
+                                        visible = selected,
+                                        cornerRadius = Dim.CardRadius,
+                                        color = Ink.AccentBright,
+                                        width = 3.sdp,
+                                    )
+                            ) {
+                                PlayButton(item.first, onClick = item.second)
+                            }
+                        }
                     }
                 }
+            }
+        }
+
+        // ---------- 拖动进度时的居中提示 ----------
+        //
+        // 没有这个反馈，用户按住左右键时只能盯着底部那条细进度线猜
+        // —— 电视上离得远，根本看不清。这里给一个大号时间提示：
+        //   目标时间（大）+ 起点→目标 + 跳转幅度。
+        AnimatedVisibility(
+            visible = scrubbing && failed == null && duration > 0L,
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
+            val diffSec = (scrubTarget - scrubOrigin) / 1000
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.sdp))
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .padding(horizontal = 34.sdp, vertical = 22.sdp),
+            ) {
+                Text(
+                    fmt(scrubTarget),
+                    color = Color.White,
+                    fontSize = 40.ssp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(6.sdp))
+                Text(
+                    "${fmt(scrubOrigin)}  →  ${fmt(scrubTarget)}",
+                    color = Ink.TextTertiary,
+                    fontSize = Txt.Caption,
+                )
+                Spacer(Modifier.height(4.sdp))
+                Text(
+                    (if (diffSec >= 0) "+" else "−") +
+                        (kotlin.math.abs(diffSec) / 60) + ":" +
+                        (kotlin.math.abs(diffSec) % 60).toString().padStart(2, '0'),
+                    color = Ink.AccentBright,
+                    fontSize = Txt.Label,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
 
@@ -426,13 +704,14 @@ fun VodPlayerScreen(
         //
         // 控制条收起后，底部只留一条细线 + 一个亮点：
         // 既能一眼看出「播到哪了」，又不会挡画面。
-        // 用户一按左右键，完整的控制条就会重新出现（见 seekBy）。
-        if (!hudVisible && failed == null && duration > 0L) {
+        // 拖动中会把"将要跳到的位置"一起画出来，让左右键有明确的落点反馈。
+        if ((!hudVisible || scrubbing) && failed == null && duration > 0L) {
+            val cursorPos = if (scrubbing) scrubTarget else position
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(3.sdp)
+                    .height(if (scrubbing) 5.sdp else 3.sdp)
                     .background(Ink.Deep.copy(alpha = 0.55f))
             ) {
                 Box(
@@ -441,17 +720,29 @@ fun VodPlayerScreen(
                         .fillMaxHeight()
                         .background(Ink.AccentBright.copy(alpha = 0.9f))
                 )
+                // 拖动中的"目标位置"预览：半透明的第二层盖上去
+                if (scrubbing) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth((scrubTarget.toFloat() / duration).coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .background(Color.White.copy(alpha = 0.55f))
+                    )
+                }
                 // 进度头部的小亮点，像播放器的"光标"
                 Box(
                     Modifier
                         .align(Alignment.CenterStart)
-                        .fillMaxWidth((position.toFloat() / duration).coerceIn(0f, 1f))
+                        .fillMaxWidth((cursorPos.toFloat() / duration).coerceIn(0f, 1f))
                 ) {
                     Box(
                         Modifier
                             .align(Alignment.CenterEnd)
-                            .size(9.sdp)
-                            .background(Ink.AccentBright, RoundedCornerShape(5.sdp))
+                            .size(if (scrubbing) 14.sdp else 9.sdp)
+                            .background(
+                                if (scrubbing) Color.White else Ink.AccentBright,
+                                RoundedCornerShape(7.sdp),
+                            )
                     )
                 }
             }
@@ -486,10 +777,9 @@ fun VodPlayerScreen(
                 Text(
                     buildString {
                         append(episode?.name.orEmpty())
-                        if (via.isNotBlank()) append("   ·   $via")
-                        // 显示来源名，而不是解析器标识（后者是内部开关，写出来只会让人困惑）
-                        val src = request.sourceLabel.ifBlank { request.flag }
-                        if (src.isNotBlank()) append("   ·   $src")
+                        // 影视只有低端影视一个来源，写死即可
+                        // （原来这里显示的是各源的解析器标识，那是 TVBox 时代的产物）
+                        append("   ·   低端影视")
                     },
                     color = Ink.TextTertiary,
                     fontSize = Txt.Caption,
@@ -585,7 +875,7 @@ private fun ControlHint(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 /** ↑↓ 图标的替代（Material 没有现成的上下箭头组合） */
 @Composable
 private fun EpisodePanel(
-    episodes: List<com.chinut.bawantv.vod.VodEpisode>,
+    episodes: List<com.chinut.bawantv.unified.Episode>,
     current: Int,
     onPick: (Int) -> Unit,
 ) {
@@ -651,3 +941,25 @@ private fun fmt(ms: Long): String {
     val s = total % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
 }
+
+// ==================== 进度拖动的阻尼参数 ====================
+
+/**
+ * 第一档步长：轻点一下跳 10 秒 —— 方便精确微调到想看的台词/镜头。
+ */
+private const val SCRUB_MIN_MS = 10_000L
+
+/**
+ * 步长上限：按住不放最快 120 秒/次。
+ * 再大就会"一跳跳过一整段剧情"，反而不好定位。
+ */
+private const val SCRUB_MAX_MS = 120_000L
+
+/** 每次连续按的步长放大倍数（阻尼加速的斜率）。 */
+private const val SCRUB_GROWTH = 1.35
+
+/** 两次按键间隔小于这个值就算"连续按"，步长才继续放大。 */
+private const val SCRUB_CHAIN_MS = 900L
+
+/** 停手多久后真正 seek。太短会在连按中途触发（等于没做阻尼）。 */
+private const val SCRUB_COMMIT_DELAY_MS = 600L

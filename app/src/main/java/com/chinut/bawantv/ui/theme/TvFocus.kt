@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import kotlin.math.abs
+import androidx.compose.runtime.rememberUpdatedState
 
 /**
  * TV 焦点与遥控器按键系统（自绘，不依赖 Compose 的 focus 机制）。
@@ -69,10 +71,12 @@ class TvFocusManager {
         internal val boundsProvider: () -> Rect,
     ) {
         internal var onActivate: (() -> Unit)? = null
-        internal var onLeft: (() -> Unit)? = null
-        internal var onRight: (() -> Unit)? = null
-        internal var onUp: (() -> Unit)? = null
-        internal var onDown: (() -> Unit)? = null
+        // 返回 true = 已处理；false = 没处理，交回几何导航。
+        // 允许"有条件的覆盖"，例如网格卡片只在"上面还有未显示的行"时才滚动。
+        internal var onLeft: (() -> Boolean)? = null
+        internal var onRight: (() -> Boolean)? = null
+        internal var onUp: (() -> Boolean)? = null
+        internal var onDown: (() -> Boolean)? = null
         internal var bringIntoView: (() -> Unit)? = null
         internal var enabled: Boolean = true
     }
@@ -126,7 +130,13 @@ class TvFocusManager {
         // 列表就卡住不动了（实测表现就是「瀑布流不能向下滚动」）。
         // 滚动之后新的项进入可视区，第二次 step 就能找到它们。
         val focusScope = tvFocusScope
-        if (focusScope != null && focusScope.scrollViewport(direction)) {
+        if (focusScope != null &&
+            focusScope.scrollViewport(direction) {
+                // 把"当前焦点项在窗口里的位置"交给滚动作用域，
+                // 它据此只滚包含焦点的那个容器
+                items[focusedKey]?.boundsProvider()
+            }
+        ) {
             return step(direction)
         }
         return false
@@ -145,8 +155,8 @@ class TvFocusManager {
             Direction.Down -> cur.onDown
         }
         if (custom != null) {
-            custom()
-            return true
+            // 处理器说"我处理了"才结束；说"没处理"就继续往下走几何导航。
+            if (custom()) return true
         }
 
         val origin = cur.boundsProvider()
@@ -200,6 +210,7 @@ class TvFocusManager {
 
     private var keyInterceptor: ((Direction) -> Boolean)? = null
     private var confirmInterceptor: (() -> Boolean)? = null
+    private var rawKeyInterceptor: ((Int) -> Boolean)? = null
 
     fun setKeyInterceptor(interceptor: ((Direction) -> Boolean)?) {
         keyInterceptor = interceptor
@@ -208,6 +219,22 @@ class TvFocusManager {
     fun setConfirmInterceptor(interceptor: (() -> Boolean)?) {
         confirmInterceptor = interceptor
     }
+
+    /**
+     * 接管"方向键和确定键之外"的按键（按 Android keyCode 传进来）。
+     *
+     * 用途：电视遥控器上那颗**三横「菜单/设置」键**。直播播放页用它呼出
+     * 清晰度选择 —— 这类按键不在方向/确定的语义里，需要单独一条通道。
+     *
+     * 返回 true 表示已消费（Activity 不再往下传）。
+     */
+    fun setRawKeyInterceptor(interceptor: ((Int) -> Boolean)?) {
+        rawKeyInterceptor = interceptor
+    }
+
+    /** 给 Activity 调用：把一个原始按键交给当前屏幕。 */
+    fun dispatchRawKey(keyCode: Int): Boolean =
+        rawKeyInterceptor?.let { runCatching { it(keyCode) }.getOrDefault(false) } ?: false
 
     /** 返回 true 表示该方向键已被当前屏幕接管。 */
     fun dispatchDirection(direction: Direction): Boolean {
@@ -241,14 +268,23 @@ class TvFocusScope(
     private val requesters = LinkedHashMap<Any, () -> Unit>()
 
     /**
-     * 当前**视口**的滚动回调（整个 App 同时只有一个滚动容器可见）。
+     * 当前界面上所有**可滚动容器**。
      *
-     * 存在的意义：懒加载列表里，**屏幕外的项没有坐标**，
-     * 于是 [TvFocusManager.move] 找不到候选、直接返回 false ——
-     * 表现就是「按上下键瀑布流不动」。有了这个回调，找不到候选时
-     * 就先把视口滚一点，下一帧屏幕里就出现了新的候选。
+     * ## 为什么要记"范围"
+     *
+     * 一个界面里常有好几个滚动容器：影视页有「分类横向栏」+「海报网格」，
+     * 设置页有纵向列表。之前只是把它们排成一队逐个尝试，真机上就出了这个 bug：
+     * **在分类栏上按右键，把下面的网格滚下去了**。
+     *
+     * 现在每个容器登记自己在窗口里的矩形，滚动时**只挑包含当前焦点**的那个。
+     * 分类栏只横向滚、网格只纵向滚，互不干扰。
      */
-    private var viewportScroll: ((Int) -> Unit)? = null
+    private class Viewport(
+        val scroll: (Int) -> Boolean,
+        val bounds: () -> androidx.compose.ui.geometry.Rect,
+    )
+
+    private val viewportScrolls = LinkedHashMap<Any, Viewport>()
 
     fun bind(key: Any, scroll: () -> Unit) {
         requesters[key] = scroll
@@ -263,27 +299,68 @@ class TvFocusScope(
     }
 
     /**
-     * 注册视口滚动（由滚动容器自己调用）。
+     * 注册一个滚动容器。
      *
+     * @param id 唯一标识（调用方用 remember 生成）
+     * @param bounds 容器在**窗口坐标系**里的矩形，用来判断焦点在不在里面
      * @param scroll 参数是滚动量：正数向下/右，负数向上/左
      */
-    fun setViewportScroll(scroll: ((Int) -> Unit)?) {
-        viewportScroll = scroll
+    fun addViewportScroll(
+        id: Any,
+        bounds: () -> androidx.compose.ui.geometry.Rect,
+        scroll: (Int) -> Boolean,
+    ) {
+        viewportScrolls[id] = Viewport(scroll, bounds)
     }
 
-    /** 把视口朝某方向滚一点。已处理返回 true。 */
-    fun scrollViewport(direction: Direction): Boolean {
-        val h = viewportScroll ?: return false
+    fun removeViewportScroll(id: Any) {
+        viewportScrolls.remove(id)
+    }
+
+    /**
+     * 把视口朝某方向滚一点。
+     *
+     * **只滚"包含当前焦点"的那个容器** —— 见 [viewportScrolls] 的说明。
+     * 这一步是修「在分类栏按右键却把网格滚下去」的关键。
+     *
+     * @param focusRectProvider 当前焦点项在窗口里的矩形（由管理器提供）
+     */
+    fun scrollViewport(
+        direction: Direction,
+        focusRectProvider: () -> androidx.compose.ui.geometry.Rect? = { null },
+    ): Boolean {
+        if (viewportScrolls.isEmpty()) return false
         val delta = when (direction) {
             Direction.Down -> SCROLL_STEP
             Direction.Up -> -SCROLL_STEP
             Direction.Right -> SCROLL_STEP
             Direction.Left -> -SCROLL_STEP
         }
-        return runCatching {
-            h(delta)
-            true
-        }.getOrDefault(false)
+
+        val focusRect = runCatching { focusRectProvider() }.getOrNull()
+        if (focusRect != null && !focusRect.isEmpty) {
+            viewportScrolls.values.forEach { vp ->
+                val r = runCatching { vp.bounds() }.getOrNull() ?: return@forEach
+                if (r.isEmpty) return@forEach
+                // 用"焦点中心落在容器内"判断归属，比整块相交稳
+                // （卡片可能有一半压在容器外）
+                val cx = focusRect.center.x
+                val cy = focusRect.center.y
+                if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+                    val moved = runCatching { vp.scroll(delta) }.getOrDefault(false)
+                    if (moved) return true
+                }
+            }
+            // 焦点确实在某个容器里但那个容器到头了 → **不要让别的容器乱滚**
+            return false
+        }
+
+        // 拿不到焦点矩形时（罕见）退回逐个尝试
+        viewportScrolls.values.forEach { vp ->
+            val moved = runCatching { vp.scroll(delta) }.getOrDefault(false)
+            if (moved) return true
+        }
+        return false
     }
 
     companion object {
@@ -319,25 +396,33 @@ fun ProvideTvFocus(
 }
 
 /**
- * 让当前这个滚动容器成为"焦点导航的兜底滚动目标"。
+ * 让某个 Composable 成为"焦点导航的兜底滚动目标"，并记录它的矩形范围。
  *
- * 用法：在懒加载列表所在处调用一次，传入 `scrollBy` 形式的挂起函数。
+ * 用法：把返回的 Modifier 挂到滚动容器上。
  * ```
- * RegisterViewportScroll { delta -> gridState.scrollBy(delta.toFloat()) }
+ * LazyVerticalGrid(modifier = Modifier.registerViewportScroll { d -> state.scrollBy(d.toFloat()) })
  * ```
- * 这样方向键在列表里找不到下一项时，会自动把列表滚一点，
- * 让新的项进入可视区（而不是按键完全没反应）。
+ * 只能滚包含当前焦点的那个容器 —— 这样分类横向栏和海报网格不会互相干扰。
  */
 @Composable
-fun RegisterViewportScroll(scrollBy: suspend (Int) -> Unit) {
-    val scope = LocalTvFocusScope.current ?: return
+fun Modifier.registerViewportScroll(scrollBy: suspend (Int) -> Unit): Modifier {
+    val scope = LocalTvFocusScope.current ?: return this
     val coroutineScope = rememberCoroutineScope()
-    DisposableEffect(scope) {
-        scope.setViewportScroll { delta ->
-            coroutineScope.launch { scrollBy(delta) }
-        }
-        onDispose { scope.setViewportScroll(null) }
+    val id = remember { Any() }
+    val current by rememberUpdatedState(scrollBy)
+    var bounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    DisposableEffect(scope, id) {
+        scope.addViewportScroll(
+            id = id,
+            bounds = { bounds },
+            scroll = { delta ->
+                coroutineScope.launch { current(delta) }
+                true
+            },
+        )
+        onDispose { scope.removeViewportScroll(id) }
     }
+    return this.onGloballyPositioned { bounds = it.boundsInWindow() }
 }
 
 /** TV 焦点状态。 */
@@ -371,10 +456,10 @@ fun Modifier.tvFocusable(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     onFocus: ((Boolean) -> Unit)? = null,
-    onLeft: (() -> Unit)? = null,
-    onRight: (() -> Unit)? = null,
-    onUp: (() -> Unit)? = null,
-    onDown: (() -> Unit)? = null,
+    onLeft: (() -> Boolean)? = null,
+    onRight: (() -> Boolean)? = null,
+    onUp: (() -> Boolean)? = null,
+    onDown: (() -> Boolean)? = null,
     scrollKey: Any? = null,
 ): Modifier {
     val manager = LocalTvFocusManager.current
@@ -394,6 +479,35 @@ fun Modifier.tvFocusable(
     val key = focusKey ?: remember { Any() }
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
+    // ---------- 拿到焦点时，把自己**完整**滚进可视区 ----------
+    //
+    // 真机反馈：「用下键显示未显示的内容时，应确保选中的内容 100% 显示在屏幕内」。
+    //
+    // 之前只有"焦点系统找不到下一项 → 滚动容器按固定像素滚一点"这一种机制，
+    // 滚完焦点项可能只露出半截（一半在屏幕外）。
+    //
+    // bringIntoViewRequester 交给 Compose 自己算：它知道滚动容器的可视范围，
+    // 会把这一项完整带进视野。
+    val bringRequester = androidx.compose.foundation.relocation.BringIntoViewRequester()
+    val scopeForBring = rememberCoroutineScope()
+    androidx.compose.runtime.LaunchedEffect(focusState.focused) {
+        if (focusState.focused) {
+            // 轻微延迟：等布局稳定（尤其刚切分类、列表项才重组完）
+            kotlinx.coroutines.delay(60)
+            runCatching {
+                bringRequester.bringIntoView(
+                    Rect(
+                        // 四周留边距，避免贴边时被圆角/光晕裁掉
+                        left = -24f,
+                        top = -24f,
+                        right = bounds.width + 24f,
+                        bottom = bounds.height + 24f,
+                    )
+                )
+            }
+        }
+    }
+
     if (manager != null) {
         DisposableEffect(manager, key) {
             val item = TvFocusManager.Item(key, focusState) { bounds }
@@ -404,7 +518,24 @@ fun Modifier.tvFocusable(
             item.onDown = onDown
             item.enabled = enabled
             item.bringIntoView = {
-                if (scrollKey != null) focusScope?.scrollTo(scrollKey)
+                // 显式指定的滚动目标优先（跨区域跳转用）
+                if (scrollKey != null) {
+                    focusScope?.scrollTo(scrollKey)
+                } else {
+                    // 没有指定就交给 Compose 把自己完整滚进视野
+                    scopeForBring.launch {
+                        runCatching {
+                            bringRequester.bringIntoView(
+                                androidx.compose.ui.geometry.Rect(
+                                    left = -24f,
+                                    top = -24f,
+                                    right = bounds.width + 24f,
+                                    bottom = bounds.height + 24f,
+                                )
+                            )
+                        }
+                    }
+                }
             }
             manager.register(item)
             onDispose { manager.unregister(key) }
@@ -425,6 +556,7 @@ fun Modifier.tvFocusable(
     }
 
     var m = this
+        .bringIntoViewRequester(bringRequester)
         .onGloballyPositioned { bounds = it.boundsInWindow() }
         .scale(scale)
         .background(if (focusState.focused) focusedBackground else baseBackground)

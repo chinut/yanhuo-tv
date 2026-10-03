@@ -183,12 +183,16 @@ fun ImmersiveHome(
         playlist = all
     }
 
-    // 影视按钮里的海报：预热已经处理过「拉取 + 落盘 + 预解码图片」，
-    // 这里只在**预热没跑到**时才自己补一次（例如冷启动直接进首页的情况）。
+    // 影视按钮里的海报：影视只保留低端影视，所以直接读它的本地库。
+    // 开屏期间的 HomeWarmup 通常已经把库拉好了，这里主要兜住
+    // "跳过开屏直接进首页"的情况。
     LaunchedEffect(Unit) {
         if (movies.isNotEmpty()) return@LaunchedEffect
-        val fresh = runCatching { MovieAggregator.scrape(page = 1) }
-            .getOrDefault(emptyList())
+        val fresh = runCatching {
+            val lib = com.chinut.bawantv.unified.LibraryStore.load()
+            if (lib.isNotEmpty()) lib
+            else com.chinut.bawantv.unified.LibraryStore.refresh(pagesPerType = 2)
+        }.getOrDefault(emptyList())
             .filter { it.hasPoster }
             .take(9)
         if (fresh.isNotEmpty()) {
@@ -328,8 +332,8 @@ private fun LiveHero(
                 // 纯几何导航在这里会跑到「设置」去：两块等宽时，
                 // 设置块的水平中心和直播块更接近，于是它算出来更"近"。
                 // 但用户直觉是"下面左边那块"，所以这里钉死。
-                onDown = { manager?.moveTo(KEY_MOVIE) },
-                onLeft = { /* 已在最左 */ },
+                onDown = { manager?.moveTo(KEY_MOVIE); true },
+                onLeft = { true /* 已在最左，吃掉事件 */ },
             ),
     ) {
         if (channel != null) {
