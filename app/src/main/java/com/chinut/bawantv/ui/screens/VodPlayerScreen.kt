@@ -89,6 +89,7 @@ import com.chinut.bawantv.ui.theme.ssp
 import com.chinut.bawantv.ui.theme.tvFocusable
 import com.chinut.bawantv.ui.theme.Txt
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.clickable
 
 /**
  * 影视播放页。
@@ -750,6 +751,70 @@ fun VodPlayerScreen(
             }
         }
 
+        // ---------- 短剧：利用竖屏两侧的黑边 ----------
+        //
+        // 短剧是 720x1280 竖屏，在横屏电视上居中后左右各空一块。
+        // 老人在电视上看短剧最需要两件事：**知道第几集**、**方便切下一集**。
+        // 所以左空区放「上一集」、右空区放「下一集 + 集数」。
+        //
+        // 只在 isShortDrama 时显示 —— 影视是宽屏内容，没有黑边可用。
+        if (isShortDrama && failed == null) {
+            val hasPrev = request.episodes.getOrNull(index - 1)?.url?.isNotBlank() == true
+            val hasNext = nextPlayable() != null
+
+            // 左：上一集
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.16f)
+                    .padding(horizontal = Dim.SafeH * 0.2f),
+                contentAlignment = Alignment.Center,
+            ) {
+                SideEpisodeButton(
+                    label = "上一集",
+                    hint = if (hasPrev) "第 ${index} 集" else "已是第一集",
+                    enabled = hasPrev,
+                    forward = false,
+                    onClick = { if (hasPrev) step(-1) },
+                )
+            }
+
+            // 右：下一集 + 集数
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.16f)
+                    .padding(horizontal = Dim.SafeH * 0.2f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        "${index + 1} / ${request.episodes.size}",
+                        color = Color.White,
+                        fontSize = Txt.Label,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(10.sdp))
+                    SideEpisodeButton(
+                        label = "下一集",
+                        hint = if (hasNext) {
+                            "第 ${(nextPlayable() ?: index) + 1} 集"
+                        } else {
+                            "已是最后一集"
+                        },
+                        enabled = hasNext,
+                        forward = true,
+                        onClick = { nextPlayable()?.let { step(it - index) } },
+                    )
+                }
+            }
+        }
+
         // ---------- 常驻的极简进度指示 ----------
         //
         // 控制条收起后，底部只留一条细线 + 一个亮点：
@@ -827,9 +892,11 @@ fun VodPlayerScreen(
                 Text(
                     buildString {
                         append(episode?.name.orEmpty())
-                        // 影视只有低端影视一个来源，写死即可
-                        // （原来这里显示的是各源的解析器标识，那是 TVBox 时代的产物）
-                        append("   ·   低端影视")
+                        // 来源名由发起方给（影视=低端影视，短剧=红果短剧）。
+                        // 原来这里写死"低端影视"，短剧复用播放器后就显示错了。
+                        val label = request.sourceLabel
+                            .ifBlank { if (isShortDrama) "红果短剧" else "低端影视" }
+                        if (label.isNotBlank()) append("   ·   $label")
                     },
                     color = Ink.TextTertiary,
                     fontSize = Txt.Caption,
@@ -1014,3 +1081,56 @@ private const val SCRUB_CHAIN_MS = 900L
 
 /** 停手多久后真正 seek。太短会在连按中途触发（等于没做阻尼）。 */
 private const val SCRUB_COMMIT_DELAY_MS = 600L
+
+/**
+ * 短剧两侧的大按钮（上一集 / 下一集）。
+ *
+ * 为什么要做成"大按钮"而不是小图标：电视的观看距离是 2~3 米，
+ * 老人更是看不清小字。这里用整块区域承接触摸/点击，也会被遥控器
+ * 的左右键顺带覆盖到（step() 的行为一致）。
+ *
+ * [enabled] 为 false 时画成灰色并且不可点 —— 比"点了没反应"清楚得多。
+ */
+@Composable
+private fun SideEpisodeButton(
+    label: String,
+    hint: String,
+    enabled: Boolean,
+    forward: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (enabled) Color.White else Ink.TextFaint
+    val bg = if (enabled) {
+        Color.White.copy(alpha = 0.10f)
+    } else {
+        Color.White.copy(alpha = 0.04f)
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.sdp))
+            .background(bg)
+            .then(if (enabled) Modifier.clickable { onClick() } else Modifier)
+            .padding(horizontal = 18.sdp, vertical = 22.sdp),
+    ) {
+        Text(
+            if (forward) "▶" else "◀",
+            color = tint,
+            fontSize = 30.ssp,
+        )
+        Spacer(Modifier.height(8.sdp))
+        Text(
+            label,
+            color = tint,
+            fontSize = Txt.Label,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(4.sdp))
+        Text(
+            hint,
+            color = if (enabled) Ink.TextTertiary else Ink.TextFaint,
+            fontSize = Txt.Tiny,
+        )
+    }
+}

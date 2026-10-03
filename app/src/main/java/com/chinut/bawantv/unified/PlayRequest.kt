@@ -27,6 +27,13 @@ data class PlayRequest(
      * 所以由发起方（板块）显式标记。
      */
     val autoNext: Boolean = false,
+    /**
+     * 内容来源的显示名，用于播放器左下角的「第 N 集 · 来源」。
+     *
+     * 为什么要有这个：原来这里**写死了"低端影视"**，短剧板块复用了同一个
+     * 播放器之后，红果的剧就显示成"低端影视 · 第 1 集"了 —— 明显不对。
+     */
+    val sourceLabel: String = "",
 ) {
     val current: Episode? get() = episodes.getOrNull(index) ?: episodes.firstOrNull()
 }

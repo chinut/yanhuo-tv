@@ -475,6 +475,9 @@ fun BawanRoot(
                                             poster = movie.poster,
                                             // 短剧：一集播完自动下一集
                                             autoNext = true,
+                                            sourceLabel = source.id.let {
+                                                if (it == "hongguo") "红果短剧" else "低端影视"
+                                            },
                                         )
                                     },
                                 )
