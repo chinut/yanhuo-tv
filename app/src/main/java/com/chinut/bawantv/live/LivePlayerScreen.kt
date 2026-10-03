@@ -183,6 +183,27 @@ fun LivePlayerScreen(
     }
 
     /**
+     * 网页路线"等太久了"。
+     *
+     * 和 buffering 的区别：buffering 是"还在接入"，这个是"接入时间已经不正常了"。
+     * 用来把提示从"正在接入…"升级成"按左右键换个源试试" ——
+     * 用户至少知道**自己能做点什么**，而不是干等一张占位图。
+     */
+    var webSlow by remember(webUrl) { mutableStateOf(false) }
+
+    /**
+     * 网页播放器**真的出过画面**（不是"页面加载完了"）。
+     *
+     * 和 webFirstFrame 的区别很关键：
+     *   · webFirstFrame —— "可以放用户看网页了"，兜底超时也会把它置 true
+     *   · sawRealFrame  —— 注入脚本确认 <video> 真的在播
+     *
+     * 只有后者能证明"这台电视放得出来"。用前者判断会把
+     * "页面加载完但视频起不来"误当成成功 —— 那正是老电视上的表现。
+     */
+    var sawRealFrame by remember(webUrl) { mutableStateOf(false) }
+
+    /**
      * 网页播放器是否已经**真的出画面**。
      *
      * 用户要求：“后台先去加载，前台看到是转圈，等加载好了能播放了再输出给用户看”。
@@ -294,7 +315,23 @@ fun LivePlayerScreen(
         // 硬解已经接管时不要抢（那时网页要藏着）
         if (!nativeActive) {
             webView?.visibility = android.view.View.VISIBLE
-            buffering = false
+            // ⚠️ 这里原来是 `buffering = false`，等于"到点就假装加载完了"。
+            //
+            // 后果：老电视上视频根本没起来，屏幕上却什么提示都没有，
+            // 用户只能盯着央视的占位海报，以为软件坏了。
+            //
+            // 现在改成：网页露出来了，但如果**始终没有片子出画面**，
+            // 就保持加载提示，并在再等一段时间后升级成"换个源试试"。
+            if (!sawRealFrame) {
+                buffering = true
+                kotlinx.coroutines.delay(WEB_SLOW_HINT_MS)
+                if (!sawRealFrame) {
+                    webSlow = true
+                    android.util.Log.w(TAG_LIVE, "网页起播超时，提示用户换源")
+                }
+            } else {
+                buffering = false
+            }
         }
     }
 
@@ -931,7 +968,8 @@ fun LivePlayerScreen(
                             siteFullscreenView = null
                         }
                         // 真的出画面了才让用户看到（之前只显示我们的转圈）
-                        view.onFirstFrame = {
+                        view.frameObserver = { sawRealFrame = true }
+                        view.onFirstFrame = { sawRealFrame = true;
                             webFirstFrame = true
                             buffering = false
                         }
@@ -977,7 +1015,18 @@ fun LivePlayerScreen(
         }
 
         // ---------- 加载中 ----------
-        if (buffering && failed == null && !useWeb) {
+        //
+        // ⚠️ 这里原来有 `&& !useWeb`，于是**网页路线完全没有加载提示**。
+        //
+        // 后果（真机反馈）：老电视上进央视，网页加载了但视频起不来，
+        // 用户看到的是央视频那张"白底 + 深蓝椭圆 + 播放三角"的**占位海报**，
+        // 而且 12 秒兜底一到连 buffering 都被清掉，屏幕上再没有任何反馈 ——
+        // 看起来就像"卡死了"，完全不知道是在加载、还是已经失败。
+        //
+        // 现在网页路线也给状态提示，并且区分两种情况：
+        //   · 还在加载（webSlow 为 false）→ 转圈 + "正在接入…"
+        //   · 拖太久了（webSlow 为 true）→ 给出**可操作的**提示：换源
+        if (buffering && failed == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = Ink.Accent, strokeWidth = 3.sdp)
@@ -987,6 +1036,14 @@ fun LivePlayerScreen(
                         color = Ink.TextSecondary,
                         fontSize = Txt.Label,
                     )
+                    if (webSlow) {
+                        Spacer(Modifier.height(10.sdp))
+                        Text(
+                            "这个源在这台电视上起得慢，可按「左右键」换一个源试试",
+                            color = Ink.Amber,
+                            fontSize = Txt.Caption,
+                        )
+                    }
                 }
             }
         }
@@ -1516,3 +1573,11 @@ private const val NATIVE_EXTRA_WAIT_MS = 12_000L
  * 脚本这条路没走通，宁可先放出网页（哪怕它还带着站点的加载图）。
  */
 private const val WEB_VISIBLE_FALLBACK_MS = 12_000L
+
+/**
+ * 网页露出之后，再等多久还没出画面就提示用户换源。
+ *
+ * 这个提示的意义：用户至少知道**自己能做点什么**（左右键换源），
+ * 而不是干等一张站点的占位海报，以为软件坏了。
+ */
+private const val WEB_SLOW_HINT_MS = 10_000L

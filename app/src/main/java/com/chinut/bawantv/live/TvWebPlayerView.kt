@@ -66,6 +66,14 @@ class TvWebPlayerView(context: Context) : WebView(context) {
     var hasFirstFrame: Boolean = false
         private set
 
+    /**
+     * 每次网页播放器**回报正在播放**时都会调用（不只第一次）。
+     *
+     * 用途：播放页用它来反复确认"确实出画面了"，
+     * 避免加载提示盖在已经在播的视频上。
+     */
+    var frameObserver: (() -> Unit)? = null
+
     /** 视频是否已经真的在播（由注入脚本回报）。 */
     private var videoPlaying = false
 
@@ -85,6 +93,15 @@ class TvWebPlayerView(context: Context) : WebView(context) {
                     android.util.Log.i(TAG, "网页播放器已出画面，可以让用户看了")
                     onFirstFrame?.invoke()
                 }
+                // ⚠️ 每次都上报，不只是第一次。
+                //
+                // 为什么：播放页现在会**反复**判断"到底出没出画面"
+                // （用来决定要不要保留加载提示）。如果只报一次，
+                // 中途任何一次状态重算都可能把它当成"还没出画面"，
+                // 于是转圈提示会盖在明明在播的视频上。
+                //
+                // 代价只是多几次回调，可以忽略。
+                frameObserver?.invoke()
             }
         }
     }
