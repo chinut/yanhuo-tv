@@ -123,6 +123,15 @@ fun BawanRoot(
     var debugPlayTrigger by remember { mutableIntStateOf(0) }
 
     /**
+     * 待展示的更新信息。
+     *
+     * 提升到顶层（而不是放在内容树里）的原因：
+     *  · 内容树在播放时会被整个摘掉，放里面 remember 的位置会变、状态被重置
+     *  · 调试广播 `route=update` 也要能写它 —— 否则更新框没法单独调出来验证
+     */
+    var pendingUpdate by remember { mutableStateOf<com.chinut.bawantv.core.UpdateInfo?>(null) }
+
+    /**
      * 从首页「继续观看」直接恢复播放。
      *
      * 观看记录里存了整条线路的剧集地址，所以这里能就地拼出播放请求、
@@ -309,6 +318,30 @@ fun BawanRoot(
                     // 回到首页（方便脚本把状态复位）
                     section = TopSection.Home
                     focusEpoch++
+                } else if (route == "update") {
+                    // 调试：强制弹出更新框。
+                    //
+                    // 为什么要这条通道：更新框只在"真的有新版本且没被跳过"时出现，
+                    // 否则根本调不出来 —— 而它里面那套遥控器交互（选按钮、下载、安装）
+                    // 恰恰是最容易出问题、也最需要反复验证的地方。
+                    // 靠"等下次发版碰运气"来测是不现实的。
+                    //
+                    // 指向的是一份**真实存在**的 APK，所以下载路径也能一并验证。
+                    pendingUpdate = com.chinut.bawantv.core.UpdateInfo(
+                        versionCode = 9999,
+                        versionName = "0.0.0-debug",
+                        notes = "这是调试用的假更新信息，用于验证更新框里的遥控器操作。",
+                        apkSources = listOf(
+                            com.chinut.bawantv.core.ApkSource(
+                                name = "GitHub",
+                                url = "https://github.com/chinut/yanhuo-tv/releases/download/" +
+                                    "v1.0.25/yanhuo-tv-1.0.25.apk",
+                                priority = 0,
+                            ),
+                        ),
+                        apkSize = 20_910_536L,
+                    )
+                    android.util.Log.i("BawanRoute", "广播跳转 → 强制弹出更新框")
                 }
             }
         }
@@ -455,7 +488,8 @@ fun BawanRoot(
             // 注意：这个状态和检查逻辑**必须放在「播放中不组合主界面」的 if 外面** ——
             // 放里面的话每次进出播放，`remember` 的位置就变了，状态会被重置，
             // 更新提示会反复弹或永远弹不出来。
-            var pendingUpdate by remember { mutableStateOf<com.chinut.bawantv.core.UpdateInfo?>(null) }
+            //
+            // （pendingUpdate 本身已提升到本函数顶层，理由同上：调试广播也要能写它。）
             LaunchedEffect(Unit) {
                 if (!prefs.autoCheckUpdate) return@LaunchedEffect
                 delay(3000)

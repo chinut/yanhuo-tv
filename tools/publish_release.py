@@ -54,16 +54,38 @@ def read_cred(target):
     return b.decode('utf-16-le')
 
 
-def http(method, url, headers=None, data=None, timeout=180):
-    r = urllib.request.Request(url, data=data, method=method)
-    for k, v in (headers or {}).items():
-        r.add_header(k, v)
-    try:
-        with urllib.request.urlopen(r, timeout=timeout) as resp:
-            raw = resp.read()
-            return resp.status, (json.loads(raw.decode('utf-8')) if raw else None)
-    except urllib.error.HTTPError as e:
-        return e.code, e.read().decode('utf-8', 'replace')
+def http(method, url, headers=None, data=None, timeout=180, retries=4):
+    """
+    带重试的 HTTP 调用。
+
+    GitHub 的 API 偶尔会瞬断（实测遇到 UNEXPECTED_EOF_WHILE_READING、
+    schannel 握手失败等）。这类错误重试一次基本就好，不该让整个发布失败
+    —— 否则发布脚本会变成"要盯着重跑"的东西，那就失去意义了。
+    """
+    import time as _time
+    last = None
+    for attempt in range(retries):
+        r = urllib.request.Request(url, data=data, method=method)
+        for k, v in (headers or {}).items():
+            r.add_header(k, v)
+        try:
+            with urllib.request.urlopen(r, timeout=timeout) as resp:
+                raw = resp.read()
+                return resp.status, (json.loads(raw.decode('utf-8')) if raw else None)
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', 'replace')
+            # 4xx 是请求本身的问题，重试没意义
+            if 400 <= e.code < 500 and e.code != 429:
+                return e.code, body
+            last = f'HTTP {e.code}: {body[:150]}'
+        except Exception as e:                      # 网络/SSL 类，可重试
+            last = f'{type(e).__name__}: {e}'
+        if attempt < retries - 1:
+            wait = 2 * (attempt + 1)
+            print(f'    （第 {attempt + 1} 次失败：{last}；{wait}s 后重试）')
+            _time.sleep(wait)
+    print(f'    !! 重试 {retries} 次仍失败：{last}')
+    return 0, last
 
 
 def jbody(o):

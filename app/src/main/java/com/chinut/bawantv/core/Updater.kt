@@ -60,6 +60,8 @@ object Updater {
     // ⚠️ 仓库名必须和实际发布的仓库一致，否则检查更新永远 404。
     // 这里曾经写成 "bawan-tv"（项目早期的名字），而实际仓库是 "yanhuo-tv"，
     // 结果两个源都返回 404 —— 界面一直提示"两个更新源都不可达"。
+    private const val TAG_INSTALL = "BawanInstall"
+
     private const val GITEE_OWNER = "chinut"
     private const val GITEE_REPO = "yanhuo-tv"
 
@@ -228,9 +230,54 @@ object Updater {
         dest.exists() && (expected <= 0 || dest.length() >= expected * 9 / 10)
     }.getOrDefault(false)
 
-    /** 调系统安装器。 */
-    fun install(context: Context, file: File) {
+    /**
+     * 本应用是否被允许安装未知来源应用（Android 8.0+ 才有这个概念）。
+     *
+     * Android 8.0 起装 APK 需要用户**对每个应用单独授权**，没授权时
+     * 系统会直接把安装拦掉。而各家电视把这个开关藏得很深，用户基本找不到 ——
+     * 所以我们要主动引导，而不是让"点安装没反应"。
+     */
+    fun canInstallPackages(context: Context): Boolean =
+        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O ||
+            context.packageManager.canRequestPackageInstalls()
+
+    /** 跳到"允许安装未知应用"的授权页。 */
+    fun openInstallPermissionSettings(context: Context) {
         runCatching {
+            val intent = Intent(
+                android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                android.net.Uri.parse("package:${context.packageName}"),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }.onFailure {
+            // 个别定制系统没有这个页面，退到应用详情页
+            runCatching {
+                context.startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:${context.packageName}"),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+        }
+    }
+
+    /**
+     * 调系统安装器。
+     *
+     * **不再静默吞异常**：原来整个包在 `runCatching{}` 里，失败时用户和开发者
+     * 都看不到任何东西 —— 表现就是"点了下载并安装，然后什么都没发生"，
+     * 完全无从判断是没下载完、没权限、还是安装器没起来。
+     * 现在把失败原因写进 [state]，界面上会显示出来。
+     */
+    fun install(context: Context, file: File) {
+        if (!canInstallPackages(context)) {
+            android.util.Log.w(TAG_INSTALL, "没有安装未知应用的权限，跳去授权页")
+            _state.value = UpdateState.Failed("需要先允许「安装未知应用」，已在设置里打开对应开关")
+            openInstallPermissionSettings(context)
+            return
+        }
+        val result = runCatching {
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
@@ -238,6 +285,12 @@ object Updater {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(intent)
+        }
+        result.onFailure { e ->
+            android.util.Log.e(TAG_INSTALL, "调起安装器失败", e)
+            _state.value = UpdateState.Failed(
+                "调起安装界面失败：${e.javaClass.simpleName} ${e.message.orEmpty()}".trim(),
+            )
         }
     }
 

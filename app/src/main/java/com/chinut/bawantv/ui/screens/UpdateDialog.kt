@@ -1,5 +1,6 @@
 package com.chinut.bawantv.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,8 +23,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.chinut.bawantv.core.UpdateInfo
+import androidx.compose.foundation.layout.fillMaxSize
+import com.chinut.bawantv.ui.theme.LocalTvFocusManager
 import com.chinut.bawantv.core.Updater
 import com.chinut.bawantv.core.UpdateState
 import com.chinut.bawantv.ui.theme.Dim
@@ -47,6 +48,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
+ * 主按钮的焦点 key。
+ * 「下载并安装」与「立即安装」共用它，所以无论处于哪个状态，
+ * 打开弹窗时焦点都能落到主按钮上。
+ */
+private const val UPDATE_PRIMARY_KEY = "update:primary"
+
+/**
  * 更新提示弹窗：遥控器可以直接「下载并安装」。
  * 下载完成后调系统安装器（TV 端标准做法）。
  */
@@ -58,13 +66,29 @@ fun UpdateDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by Updater.state.collectAsState()
-    val firstFocus = remember { FocusRequester() }
+    val tvFocusManager = LocalTvFocusManager.current
 
     // 弹窗自己吃掉返回键：否则返回会穿透到根 BackHandler 被当成「回首页」，
     // 而弹窗还挂在上面，看起来就像卡住了。
     BackHandler(enabled = true) { onDismiss() }
 
-    Dialog(onDismissRequest = onDismiss) {
+    // ---------- 为什么不用 Compose 的 Dialog ----------
+    //
+    // 踩过的坑：遥控器能选中按钮、但**按确定毫无反应**，方向键也移不动焦点。
+    //
+    // 原因是 Compose 的 Dialog 会开一个**独立窗口**接管按键，
+    // MainActivity.dispatchKeyEvent 根本收不到 —— 而本应用整套遥控器操作
+    // （方向键、确定键、返回键）全部依赖那个 dispatchKeyEvent 转发给
+    // 自定义的 TvFocusManager。按键进不来，弹窗里的按钮就永远点不到。
+    //
+    // 所以这里改成**应用内浮层**：就在主合成树里画一层，按键照常走原路径。
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.62f))
+            .clickable(enabled = false) { },
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             Modifier
                 .width(760.sdp)
@@ -148,7 +172,7 @@ fun UpdateDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(14.sdp)) {
                 when (val st = state) {
                     is UpdateState.Ready -> {
-                        DialogButton("立即安装", primary = true, focusRequester = firstFocus) {
+                        DialogButton("立即安装", primary = true, focusKey = UPDATE_PRIMARY_KEY) {
                             Updater.install(context, st.file)
                         }
                     }
@@ -156,7 +180,7 @@ fun UpdateDialog(
                     is UpdateState.Downloading -> Unit
 
                     else -> {
-                        DialogButton("下载并安装", primary = true, focusRequester = firstFocus) {
+                        DialogButton("下载并安装", primary = true, focusKey = UPDATE_PRIMARY_KEY) {
                             scope.launch {
                                 val f = withContext(Dispatchers.IO) { Updater.download(context, info) }
                                 if (f != null) Updater.install(context, f)
@@ -181,21 +205,37 @@ fun UpdateDialog(
         }
     }
 
-    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    // 打开时把焦点放到主按钮上。
+    //
+    // 这里**不能用 Compose 的 FocusRequester** —— 本应用用的是自定义焦点系统，
+    // FocusRequester 那套和它不通（这正是原来"按钮点不动"的原因之一）。
+    // 改成登记完之后调 TvFocusManager.moveTo。
+    //
+    // 「下载并安装」和「立即安装」共用同一个 key，所以无论处于哪个状态都能落到它上面。
+    LaunchedEffect(Unit) {
+        repeat(10) {
+            kotlinx.coroutines.delay(60)
+            if (tvFocusManager?.keys?.contains(UPDATE_PRIMARY_KEY) == true) {
+                tvFocusManager.moveTo(UPDATE_PRIMARY_KEY)
+                return@LaunchedEffect
+            }
+        }
+    }
 }
 
 @Composable
 private fun DialogButton(
     label: String,
     primary: Boolean,
-    focusRequester: FocusRequester? = null,
+    focusKey: Any? = null,
     onClick: () -> Unit,
 ) {
     val f = rememberTvFocusState()
-    var mod = Modifier
+    val mod = Modifier
         .height(50.sdp)
         .tvFocusable(
             focusState = f,
+            focusKey = focusKey,
             shape = RoundedCornerShape(25.sdp),
             focusedScale = 1.05f,
             borderWidth = 3.dp,
@@ -203,7 +243,6 @@ private fun DialogButton(
             focusedBackground = if (primary) Ink.AccentBright else Ink.CardStrong,
             onClick = onClick,
         )
-    if (focusRequester != null) mod = mod.focusRequester(focusRequester)
 
     Box(
         mod.padding(horizontal = 26.sdp),
