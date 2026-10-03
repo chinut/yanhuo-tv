@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -1061,7 +1062,22 @@ private fun UnifiedDetailScreen(
     }
 }
 
-/** 一个源的播放按钮。 */
+/**
+ * 一个源的按钮。
+ *
+ * ⚠️ 这里有个容易被误解的地方，值得写清楚：
+ *
+ * 源是**并行加载**的，所以详情页刚打开时会出现"某个源读取中"的状态。
+ * 这种卡片以前画得和按钮一模一样（播放图标 + 卡片底色 + 可聚焦，
+ * 聚焦时还有亮边框），用户就会去按它 —— 按了没反应，以为是坏了。
+ *
+ * 现在读取中的卡片：
+ *   · **不可聚焦**（遥控器直接跳过）
+ *   · 播放图标换成转圈
+ *   · 底色压暗、文字改成「正在读取…」
+ *
+ * 读完之后它才恢复成真正可点的按钮。
+ */
 @Composable
 private fun SourceButton(
     source: UnifiedSource,
@@ -1070,16 +1086,32 @@ private fun SourceButton(
     onClick: () -> Unit,
 ) {
     val f = rememberTvFocusState()
+
+    // 读取中 = 还不能点。既不可聚焦，也不显示成按钮的样子。
+    val clickable = !loading
+
+    val bg = when {
+        loading -> Ink.Card.copy(alpha = 0.45f)
+        active -> Ink.AccentSoft
+        else -> Ink.Card
+    }
+    val titleColor = when {
+        loading -> Ink.TextFaint
+        f.focused -> Color.White
+        else -> Ink.TextSecondary
+    }
+
     Row(
         Modifier
             .fillMaxWidth()
             .height(74.sdp)
             .tvFocusable(
                 focusState = f,
+                enabled = clickable,
                 shape = RoundedCornerShape(Dim.CardRadius),
                 focusedScale = 1.04f,
                 borderWidth = 3.dp,
-                baseBackground = if (active) Ink.AccentSoft else Ink.Card,
+                baseBackground = bg,
                 focusedBackground = Ink.CardStrong,
                 onClick = onClick,
             )
@@ -1090,32 +1122,45 @@ private fun SourceButton(
             Modifier
                 .size(34.sdp)
                 .background(
-                    if (active) Ink.Accent else Ink.CardStrong,
+                    when {
+                        loading -> Ink.CardStrong.copy(alpha = 0.5f)
+                        active -> Ink.Accent
+                        else -> Ink.CardStrong
+                    },
                     RoundedCornerShape(17.sdp),
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = if (active) Color.White else Ink.AccentBright,
-                modifier = Modifier.size(20.sdp),
-            )
+            if (loading) {
+                // 转圈表示"在等"，而不是"可以点"
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.sdp),
+                    color = Ink.TextFaint,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = if (active) Color.White else Ink.AccentBright,
+                    modifier = Modifier.size(20.sdp),
+                )
+            }
         }
         Spacer(Modifier.width(12.sdp))
         Column(Modifier.weight(1f)) {
             Text(
                 source.name,
-                color = if (f.focused) Color.White else Ink.TextSecondary,
+                color = titleColor,
                 fontSize = Txt.Label,
-                fontWeight = if (active || f.focused) FontWeight.Bold else FontWeight.Medium,
+                fontWeight = if (!loading && (active || f.focused)) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(2.sdp))
             Text(
                 buildString {
-                    if (loading) append("读取中…")
+                    if (loading) append("正在读取…")
                     else if (source.episodeCount > 0) append("${source.episodeCount} 集")
                     else if (source.quality.isNotBlank()) append(source.quality)
                     else append("点击播放")
