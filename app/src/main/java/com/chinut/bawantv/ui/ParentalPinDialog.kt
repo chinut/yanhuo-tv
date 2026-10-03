@@ -2,6 +2,7 @@ package com.chinut.bawantv.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,9 +85,14 @@ fun ParentalPinDialog(
         }
     }
 
-    Dialog(
-        onDismissRequest = onCancel,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    // 不用 Compose 的 Dialog：它开独立窗口接管按键，
+    // MainActivity.dispatchKeyEvent 收不到，自定义 TvFocusManager 会失效。
+    // （更新框、TV 键盘都踩过这个坑。）
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.62f)),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             Modifier

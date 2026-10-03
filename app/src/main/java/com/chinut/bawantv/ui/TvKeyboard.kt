@@ -1,6 +1,7 @@
 package com.chinut.bawantv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,9 +63,22 @@ fun TvKeyboardDialog(
     var text by remember { mutableStateOf(initial) }
     val firstKeyFocus = remember { FocusRequester() }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    // ---------- 为什么不用 Compose 的 Dialog ----------
+    //
+    // Dialog 会开一个**独立窗口接管按键**，MainActivity.dispatchKeyEvent
+    // 根本收不到 —— 而本应用整套遥控器操作全靠那个 dispatchKeyEvent 转发给
+    // 自定义的 TvFocusManager。按键进不来，键盘里的按键就永远点不到，
+    // 表现就是「弹出的键盘按返回关不掉」。
+    //
+    // 更新框踩过同一个坑，这里是同一类问题。
+    //
+    // 注意：设置页会把这个浮层放在 LazyColumn 的**外面**（与它平级），
+    // 否则 fillMaxSize 拿到的是 LazyColumn item 的边界，浮层会被裁成窄条。
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.62f)),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             Modifier

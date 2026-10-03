@@ -125,647 +125,654 @@ fun SettingsScreen(
     //
     // 之前设置页**没有注册**，于是方向键移到屏幕外的那一项时就完全没反应 ——
     // 表现就是"下拉看不到最下方内容"。这个机制在影视页有、设置页漏了。
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize().registerViewportScroll { d -> listState.scrollBy(d.toFloat()) },
-        contentPadding = PaddingValues(end = 12.sdp, bottom = 40.sdp),
-        verticalArrangement = Arrangement.spacedBy(18.sdp),
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("设置", color = Color.White, fontSize = Txt.Title, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(14.sdp))
-                Text(
-                    "遥控器上下选择，确定键进入/切换",
-                    color = Ink.TextTertiary,
-                    fontSize = Txt.Caption,
-                )
-            }
-        }
 
-        // ==================== 手机网页调试 ====================
-        item {
-            SettingsCard(
-                title = "手机网页调试",
-                subtitle = "电视上打字太麻烦：用手机扫码，在手机上改所有设置，保存后电视立即生效",
-                focusKey = entryKey,
-                accent = Ink.Green,
-            ) {
+    // ---------- 根容器 ----------
+    //
+    // 三个浮层（二维码 / 家长密码 / TV 键盘）要用 fillMaxSize 铺满整屏。
+    // 如果把它们留在 LazyColumn 的 item 里，fillMaxSize 拿到的是那个 item
+    // 的边界，浮层会被滚动容器裁成窄条 —— 所以必须和 LazyColumn 平级。
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().registerViewportScroll { d -> listState.scrollBy(d.toFloat()) },
+            contentPadding = PaddingValues(end = 12.sdp, bottom = 40.sdp),
+            verticalArrangement = Arrangement.spacedBy(18.sdp),
+        ) {
+            item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (serverRunning) {
-                                "服务运行中：${Qr.debugUrl(context, serverPort)}"
-                            } else {
-                                "服务未运行"
-                            },
-                            color = if (serverRunning) Ink.Green else Ink.TextTertiary,
-                            fontSize = Txt.Label,
-                        )
-                        Spacer(Modifier.height(4.sdp))
-                        Text(
-                            "手机与电视需连同一个 WiFi。默认端口 ${prefs.debugPort}。",
-                            color = Ink.TextFaint,
-                            fontSize = Txt.Tiny,
-                        )
-                    }
-                    Spacer(Modifier.width(12.sdp))
-                    SmallButton(if (showQr) "收起二维码" else "显示二维码") { showQr = !showQr }
-                    Spacer(Modifier.width(10.sdp))
-                    SmallButton(if (serverRunning) "停止" else "启动") {
-                        if (serverRunning) {
-                            DebugWebServer.stop()
-                        } else {
-                            DebugWebServer.start(context, prefs.debugPort)
-                        }
-                    }
-                }
-
-                if (showQr && serverRunning) {
-                    Spacer(Modifier.height(16.sdp))
-                    QrPanel(url = Qr.debugUrl(context, serverPort)) { showQr = false }
-                }
-                Spacer(Modifier.height(10.sdp))
-                TvSwitch(
-                    label = "允许手机调试",
-                    hint = "关闭后不再自动启动局域网服务",
-                    checked = prefs.debugEnabled,
-                ) { prefs.debugEnabled = it }
-
-                Spacer(Modifier.height(4.sdp))
-                KeyValueRow(
-                    label = "调试端口",
-                    value = prefs.debugPort.toString(),
-                    onEdit = { editing = EditTarget.Port },
-                )
-                KeyValueRow(
-                    label = "手机口令",
-                    value = prefs.debugToken.ifBlank { "（未设置）" },
-                    onEdit = { editing = EditTarget.Token },
-                )
-            }
-        }
-
-        // ==================== 影视内容来源 ====================
-        item {
-            SettingsCard(
-                title = "影视内容来源",
-                subtitle = "影视内容全部来自**低端影视**：片库缓存在电视本地，" +
-                    "进影视页立刻有内容，断网也能浏览已缓存的片子。" +
-                    "它的剧集是直连地址，不需要任何「解析接口」。",
-                accent = Ink.Green,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        com.chinut.bawantv.unified.LibraryStore.let { ls ->
-                            val n = runCatching { ls.load().size }.getOrDefault(0)
-                            if (n > 0) "本地片库：$n 部（已缓存，离线可看）"
-                            else "本地片库：空，去影视页按「刷新片库」拉取"
-                        },
-                        color = Ink.TextTertiary,
-                        fontSize = Txt.Tiny,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    SmallButton("清空片库") {
-                        com.chinut.bawantv.unified.LibraryStore.clear()
-                        toast(context, "本地片库已清空")
-                    }
-                }
-            }
-        }
-
-
-        // ==================== 板块 C：低端影视 ====================
-        item {
-            SettingsCard(
-                title = "低端影视域名（板块 C）",
-                subtitle = "网站换域名时改这里。官方永久域名 ddys.io，另有 ddys.pics / ddys.live / ddys.help 三个镜像。",
-                accent = Ink.Amber,
-            ) {
-                KeyValueRow(
-                    label = "当前域名",
-                    value = prefs.domain,
-                    onEdit = { editing = EditTarget.Domain },
-                )
-                Spacer(Modifier.height(6.sdp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "最近探测可用：${resolvedDomain.removePrefix("https://")}",
-                        color = Ink.TextFaint,
-                        fontSize = Txt.Tiny,
-                        modifier = Modifier.weight(1f),
-                    )
-                    SmallButton("探测可用域名") {
-                        scope.launch {
-                            val d = withContext(Dispatchers.IO) { Ddys.probe(force = true) }
-                            resolvedDomain = "https://$d"
-                            toast(context, "可用域名：$d")
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.sdp))
-                TvSwitch(
-                    label = "自动探测域名",
-                    hint = "启动时自动在四个官方域名里挑一个能通的",
-                    checked = prefs.autoPickDomain,
-                ) { prefs.autoPickDomain = it }
-                Spacer(Modifier.height(4.sdp))
-                TvSwitch(
-                    label = "网页兜底",
-                    hint = "接口异常时改用网页方式抓取（备用方案）",
-                    checked = prefs.webFallbackEnabled,
-                ) { prefs.webFallbackEnabled = it }
-            }
-        }
-
-        // ==================== 板块 A：直播 ====================
-        item {
-            SettingsCard(
-                title = "电视直播（板块 A）",
-                subtitle = "内置央视频道表；也可以填自己的 m3u / txt 直播源地址（留空用内置）",
-                accent = Ink.Pink,
-            ) {
-                ReadonlyKeyValue(
-                    value = prefs.liveSourceUrl,
-                    placeholder = "（留空使用内置频道表）",
-                    onEditRequest = { editing = EditTarget.LiveSource },
-                    maxLines = 2,
-                )
-                Spacer(Modifier.height(6.sdp))
-                TvSwitch(
-                    label = "开机自动播放上次频道",
-                    hint = "像老电视一样，打开就在台上",
-                    checked = prefs.autoPlayLastChannel,
-                ) { prefs.autoPlayLastChannel = it }
-                TvSwitch(
-                    label = "换台时显示台标浮层",
-                    hint = "关闭后换台更干净",
-                    checked = prefs.showChannelHud,
-                ) { prefs.showChannelHud = it }
-                TvSwitch(
-                    label = "硬件解码",
-                    hint = "画面花屏/绿屏时关掉试试",
-                    checked = prefs.hardwareDecode,
-                ) { prefs.hardwareDecode = it }
-
-                // ---------- 播放清晰度 ----------
-                //
-                // 为什么要给手动档：自动判定再准也猜不透每一台电视。
-                // 老电视解码弱的时候，用户自己降到「省流」就能流畅 ——
-                // 这比让他等我们改代码现实得多。确定键循环切换，遥控器好按。
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 4.sdp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "播放清晰度",
-                            color = Ink.TextSecondary,
-                            fontSize = Txt.Label,
-                        )
-                        Text(
-                            "画面卡顿/一直转圈就往下调一档；确定键循环切换",
-                            color = Ink.TextFaint,
-                            fontSize = Txt.Tiny,
-                        )
-                    }
+                    Text("设置", color = Color.White, fontSize = Txt.Title, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(14.sdp))
-                    SmallButton(
-                        listOf("自动", "省流 360p", "标清 480p", "高清 720p")
-                            .getOrElse(prefs.liveQuality) { "自动" },
-                    ) {
-                        prefs.liveQuality = (prefs.liveQuality + 1) % 4
-                        toast(
-                            context,
-                            "直播清晰度：" +
-                                listOf("自动", "省流 360p", "标清 480p", "高清 720p")
-                                    .getOrElse(prefs.liveQuality) { "自动" },
-                        )
-                    }
+                    Text(
+                        "遥控器上下选择，确定键进入/切换",
+                        color = Ink.TextTertiary,
+                        fontSize = Txt.Caption,
+                    )
                 }
             }
-        }
 
-        // ==================== 未成年人保护 ====================
-        item {
-            SettingsCard(
-                title = "未成年人保护",
-                subtitle = "按分类与关键词过滤不合适的内容；开关由 4 位家长密码保护",
-                accent = Ink.Amber,
-            ) {
-                TvSwitch(
-                    label = if (parentalOn) "已开启" else "已关闭",
-                    hint = if (parentalOn) {
-                        "少儿/动漫/科教/纪录等分类可看，恐怖/犯罪/情色等被拦下"
-                    } else {
-                        "开启后，明显不适合未成年人的内容不会出现在列表里"
-                    },
-                    checked = parentalOn,
-                ) { want ->
-                    if (!ParentalControl.hasPin) {
-                        // 第一次开启：先让家长设一个 PIN
-                        if (want) {
-                            pendingEnable = true
-                            pinStage = PinStage.SetFirst
-                        } else {
-                            parentalOn = false
+            // ==================== 手机网页调试 ====================
+            item {
+                SettingsCard(
+                    title = "手机网页调试",
+                    subtitle = "电视上打字太麻烦：用手机扫码，在手机上改所有设置，保存后电视立即生效",
+                    focusKey = entryKey,
+                    accent = Ink.Green,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (serverRunning) {
+                                    "服务运行中：${Qr.debugUrl(context, serverPort)}"
+                                } else {
+                                    "服务未运行"
+                                },
+                                color = if (serverRunning) Ink.Green else Ink.TextTertiary,
+                                fontSize = Txt.Label,
+                            )
+                            Spacer(Modifier.height(4.sdp))
+                            Text(
+                                "手机与电视需连同一个 WiFi。默认端口 ${prefs.debugPort}。",
+                                color = Ink.TextFaint,
+                                fontSize = Txt.Tiny,
+                            )
                         }
-                    } else if (ParentalControl.unlocked) {
-                        ParentalControl.setEnabled(want)
-                        parentalOn = want
-                    } else {
-                        // 已经有 PIN：改开关前必须验一次
-                        pendingEnable = want
-                        pinStage = PinStage.Verify
-                    }
-                }
-
-                if (ParentalControl.hasPin) {
-                    Spacer(Modifier.height(4.sdp))
-                    KeyValueRow(
-                        label = "家长密码",
-                        value = if (ParentalControl.unlocked) "本次已解锁" else "已设置（点此重设）",
-                        onEdit = { pinStage = PinStage.SetFirst },
-                    )
-                }
-
-                Spacer(Modifier.height(6.sdp))
-                Text(
-                    "怎么判断能不能看：内容源**都不提供年龄分级**，" +
-                        "所以这里是用「分类 + 关键词」做启发式过滤——" +
-                        "少儿/动漫/科教/纪录等放行，恐怖/犯罪/情色/暴力等拦下，" +
-                        "两条都没命中时默认拦（不确定就不放）。" +
-                        "它拦得住明显的，拦不住刻意包装的内容；" +
-                        "要更严格可以在下面的名单里补具体片名。",
-                    color = Ink.TextFaint,
-                    fontSize = Txt.Tiny,
-                    lineHeight = 18.ssp,
-                )
-
-                Spacer(Modifier.height(8.sdp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "自定义名单：拦 ${blockedCount()} 词 · 放行 ${allowedCount()} 词",
-                        color = Ink.TextSecondary,
-                        fontSize = Txt.Label,
-                        modifier = Modifier.weight(1f),
-                    )
-                    SmallButton("清空名单") {
-                        ParentalControl.clearWordLists()
-                        wordEpoch++
-                    }
-                }
-            }
-        }
-
-        // ==================== 更新 ====================
-        item {
-            SettingsCard(
-                title = "版本与更新",
-                subtitle = "发布在 Gitee 与 GitHub，优先走 Gitee 下载",
-                accent = Ink.Green,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "当前版本 v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                        color = Ink.TextSecondary,
-                        fontSize = Txt.Label,
-                        modifier = Modifier.weight(1f),
-                    )
-                    SmallButton("检查更新") {
-                        scope.launch {
-                            val info = withContext(Dispatchers.IO) { Updater.check(context) }
-                            if (info == null && Updater.state.value is UpdateState.UpToDate) {
-                                toast(context, "已经是最新版本")
+                        Spacer(Modifier.width(12.sdp))
+                        SmallButton(if (showQr) "收起二维码" else "显示二维码") { showQr = !showQr }
+                        Spacer(Modifier.width(10.sdp))
+                        SmallButton(if (serverRunning) "停止" else "启动") {
+                            if (serverRunning) {
+                                DebugWebServer.stop()
+                            } else {
+                                DebugWebServer.start(context, prefs.debugPort)
                             }
                         }
                     }
-                }
-                Spacer(Modifier.height(8.sdp))
-                when (val st = updateState) {
-                    is UpdateState.Checking -> StatusLine(st.message, Ink.TextTertiary)
 
-                    // ---------- 已是最新 ----------
-                    //
-                    // 以前这里只有一行字，**没有任何按钮** —— 用户在当前版本下
-                    // 翻遍设置都找不到"下载与安装"，反馈就是"现版本的下载与安装
-                    // 点选不到"。因为那个按钮原来只在"检测到新版"时才存在。
-                    //
-                    // 现在即使已是最新，也给一个「重新下载安装的版本」的出路：
-                    // 覆盖安装是电视上的常规操作，装坏了、想重装都用得上。
-                    is UpdateState.UpToDate -> {
-                        StatusLine("已经是最新版本", Ink.Green)
-                        Spacer(Modifier.height(8.sdp))
-                        SmallButton("重新下载并覆盖安装") {
+                    if (showQr && serverRunning) {
+                        Spacer(Modifier.height(16.sdp))
+                        QrPanel(url = Qr.debugUrl(context, serverPort)) { showQr = false }
+                    }
+                    Spacer(Modifier.height(10.sdp))
+                    TvSwitch(
+                        label = "允许手机调试",
+                        hint = "关闭后不再自动启动局域网服务",
+                        checked = prefs.debugEnabled,
+                    ) { prefs.debugEnabled = it }
+
+                    Spacer(Modifier.height(4.sdp))
+                    KeyValueRow(
+                        label = "调试端口",
+                        value = prefs.debugPort.toString(),
+                        onEdit = { editing = EditTarget.Port },
+                    )
+                    KeyValueRow(
+                        label = "手机口令",
+                        value = prefs.debugToken.ifBlank { "（未设置）" },
+                        onEdit = { editing = EditTarget.Token },
+                    )
+                }
+            }
+
+            // ==================== 影视内容来源 ====================
+            item {
+                SettingsCard(
+                    title = "影视内容来源",
+                    subtitle = "影视内容全部来自**低端影视**：片库缓存在电视本地，" +
+                        "进影视页立刻有内容，断网也能浏览已缓存的片子。" +
+                        "它的剧集是直连地址，不需要任何「解析接口」。",
+                    accent = Ink.Green,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            com.chinut.bawantv.unified.LibraryStore.let { ls ->
+                                val n = runCatching { ls.load().size }.getOrDefault(0)
+                                if (n > 0) "本地片库：$n 部（已缓存，离线可看）"
+                                else "本地片库：空，去影视页按「刷新片库」拉取"
+                            },
+                            color = Ink.TextTertiary,
+                            fontSize = Txt.Tiny,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        SmallButton("清空片库") {
+                            com.chinut.bawantv.unified.LibraryStore.clear()
+                            toast(context, "本地片库已清空")
+                        }
+                    }
+                }
+            }
+
+
+            // ==================== 板块 C：低端影视 ====================
+            item {
+                SettingsCard(
+                    title = "低端影视域名（板块 C）",
+                    subtitle = "网站换域名时改这里。官方永久域名 ddys.io，另有 ddys.pics / ddys.live / ddys.help 三个镜像。",
+                    accent = Ink.Amber,
+                ) {
+                    KeyValueRow(
+                        label = "当前域名",
+                        value = prefs.domain,
+                        onEdit = { editing = EditTarget.Domain },
+                    )
+                    Spacer(Modifier.height(6.sdp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "最近探测可用：${resolvedDomain.removePrefix("https://")}",
+                            color = Ink.TextFaint,
+                            fontSize = Txt.Tiny,
+                            modifier = Modifier.weight(1f),
+                        )
+                        SmallButton("探测可用域名") {
                             scope.launch {
-                                // 强制重新查一次，拿到当前最新 Release 的下载地址
-                                val info = runCatching {
-                                    withContext(Dispatchers.IO) { Updater.check(context, force = true) }
-                                }.getOrNull()
-                                if (info == null) {
-                                    toast(context, "拿不到下载地址，请稍后再试")
-                                } else {
-                                    val f = withContext(Dispatchers.IO) {
-                                        Updater.download(context, info)
-                                    }
-                                    if (f != null) Updater.install(context, f)
+                                val d = withContext(Dispatchers.IO) { Ddys.probe(force = true) }
+                                resolvedDomain = "https://$d"
+                                toast(context, "可用域名：$d")
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(6.sdp))
+                    TvSwitch(
+                        label = "自动探测域名",
+                        hint = "启动时自动在四个官方域名里挑一个能通的",
+                        checked = prefs.autoPickDomain,
+                    ) { prefs.autoPickDomain = it }
+                    Spacer(Modifier.height(4.sdp))
+                    TvSwitch(
+                        label = "网页兜底",
+                        hint = "接口异常时改用网页方式抓取（备用方案）",
+                        checked = prefs.webFallbackEnabled,
+                    ) { prefs.webFallbackEnabled = it }
+                }
+            }
+
+            // ==================== 板块 A：直播 ====================
+            item {
+                SettingsCard(
+                    title = "电视直播（板块 A）",
+                    subtitle = "内置央视频道表；也可以填自己的 m3u / txt 直播源地址（留空用内置）",
+                    accent = Ink.Pink,
+                ) {
+                    ReadonlyKeyValue(
+                        value = prefs.liveSourceUrl,
+                        placeholder = "（留空使用内置频道表）",
+                        onEditRequest = { editing = EditTarget.LiveSource },
+                        maxLines = 2,
+                    )
+                    Spacer(Modifier.height(6.sdp))
+                    TvSwitch(
+                        label = "开机自动播放上次频道",
+                        hint = "像老电视一样，打开就在台上",
+                        checked = prefs.autoPlayLastChannel,
+                    ) { prefs.autoPlayLastChannel = it }
+                    TvSwitch(
+                        label = "换台时显示台标浮层",
+                        hint = "关闭后换台更干净",
+                        checked = prefs.showChannelHud,
+                    ) { prefs.showChannelHud = it }
+                    TvSwitch(
+                        label = "硬件解码",
+                        hint = "画面花屏/绿屏时关掉试试",
+                        checked = prefs.hardwareDecode,
+                    ) { prefs.hardwareDecode = it }
+
+                    // ---------- 播放清晰度 ----------
+                    //
+                    // 为什么要给手动档：自动判定再准也猜不透每一台电视。
+                    // 老电视解码弱的时候，用户自己降到「省流」就能流畅 ——
+                    // 这比让他等我们改代码现实得多。确定键循环切换，遥控器好按。
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 4.sdp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "播放清晰度",
+                                color = Ink.TextSecondary,
+                                fontSize = Txt.Label,
+                            )
+                            Text(
+                                "画面卡顿/一直转圈就往下调一档；确定键循环切换",
+                                color = Ink.TextFaint,
+                                fontSize = Txt.Tiny,
+                            )
+                        }
+                        Spacer(Modifier.width(14.sdp))
+                        SmallButton(
+                            listOf("自动", "省流 360p", "标清 480p", "高清 720p")
+                                .getOrElse(prefs.liveQuality) { "自动" },
+                        ) {
+                            prefs.liveQuality = (prefs.liveQuality + 1) % 4
+                            toast(
+                                context,
+                                "直播清晰度：" +
+                                    listOf("自动", "省流 360p", "标清 480p", "高清 720p")
+                                        .getOrElse(prefs.liveQuality) { "自动" },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ==================== 未成年人保护 ====================
+            item {
+                SettingsCard(
+                    title = "未成年人保护",
+                    subtitle = "按分类与关键词过滤不合适的内容；开关由 4 位家长密码保护",
+                    accent = Ink.Amber,
+                ) {
+                    TvSwitch(
+                        label = if (parentalOn) "已开启" else "已关闭",
+                        hint = if (parentalOn) {
+                            "少儿/动漫/科教/纪录等分类可看，恐怖/犯罪/情色等被拦下"
+                        } else {
+                            "开启后，明显不适合未成年人的内容不会出现在列表里"
+                        },
+                        checked = parentalOn,
+                    ) { want ->
+                        if (!ParentalControl.hasPin) {
+                            // 第一次开启：先让家长设一个 PIN
+                            if (want) {
+                                pendingEnable = true
+                                pinStage = PinStage.SetFirst
+                            } else {
+                                parentalOn = false
+                            }
+                        } else if (ParentalControl.unlocked) {
+                            ParentalControl.setEnabled(want)
+                            parentalOn = want
+                        } else {
+                            // 已经有 PIN：改开关前必须验一次
+                            pendingEnable = want
+                            pinStage = PinStage.Verify
+                        }
+                    }
+
+                    if (ParentalControl.hasPin) {
+                        Spacer(Modifier.height(4.sdp))
+                        KeyValueRow(
+                            label = "家长密码",
+                            value = if (ParentalControl.unlocked) "本次已解锁" else "已设置（点此重设）",
+                            onEdit = { pinStage = PinStage.SetFirst },
+                        )
+                    }
+
+                    Spacer(Modifier.height(6.sdp))
+                    Text(
+                        "怎么判断能不能看：内容源**都不提供年龄分级**，" +
+                            "所以这里是用「分类 + 关键词」做启发式过滤——" +
+                            "少儿/动漫/科教/纪录等放行，恐怖/犯罪/情色/暴力等拦下，" +
+                            "两条都没命中时默认拦（不确定就不放）。" +
+                            "它拦得住明显的，拦不住刻意包装的内容；" +
+                            "要更严格可以在下面的名单里补具体片名。",
+                        color = Ink.TextFaint,
+                        fontSize = Txt.Tiny,
+                        lineHeight = 18.ssp,
+                    )
+
+                    Spacer(Modifier.height(8.sdp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "自定义名单：拦 ${blockedCount()} 词 · 放行 ${allowedCount()} 词",
+                            color = Ink.TextSecondary,
+                            fontSize = Txt.Label,
+                            modifier = Modifier.weight(1f),
+                        )
+                        SmallButton("清空名单") {
+                            ParentalControl.clearWordLists()
+                            wordEpoch++
+                        }
+                    }
+                }
+            }
+
+            // ==================== 更新 ====================
+            item {
+                SettingsCard(
+                    title = "版本与更新",
+                    subtitle = "发布在 Gitee 与 GitHub，优先走 Gitee 下载",
+                    accent = Ink.Green,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "当前版本 v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                            color = Ink.TextSecondary,
+                            fontSize = Txt.Label,
+                            modifier = Modifier.weight(1f),
+                        )
+                        SmallButton("检查更新") {
+                            scope.launch {
+                                val info = withContext(Dispatchers.IO) { Updater.check(context) }
+                                if (info == null && Updater.state.value is UpdateState.UpToDate) {
+                                    toast(context, "已经是最新版本")
                                 }
                             }
                         }
                     }
+                    Spacer(Modifier.height(8.sdp))
+                    when (val st = updateState) {
+                        is UpdateState.Checking -> StatusLine(st.message, Ink.TextTertiary)
 
-                    is UpdateState.Failed -> StatusLine(st.message, Ink.Amber)
-                    is UpdateState.Available -> {
-                        StatusLine(
-                            "发现新版本 v${st.info.versionName}（versionCode ${st.info.versionCode}）",
-                            Ink.AccentBright,
-                        )
-                        if (st.info.notes.isNotBlank()) {
+                        // ---------- 已是最新 ----------
+                        //
+                        // 以前这里只有一行字，**没有任何按钮** —— 用户在当前版本下
+                        // 翻遍设置都找不到"下载与安装"，反馈就是"现版本的下载与安装
+                        // 点选不到"。因为那个按钮原来只在"检测到新版"时才存在。
+                        //
+                        // 现在即使已是最新，也给一个「重新下载安装的版本」的出路：
+                        // 覆盖安装是电视上的常规操作，装坏了、想重装都用得上。
+                        is UpdateState.UpToDate -> {
+                            StatusLine("已经是最新版本", Ink.Green)
+                            Spacer(Modifier.height(8.sdp))
+                            SmallButton("重新下载并覆盖安装") {
+                                scope.launch {
+                                    // 强制重新查一次，拿到当前最新 Release 的下载地址
+                                    val info = runCatching {
+                                        withContext(Dispatchers.IO) { Updater.check(context, force = true) }
+                                    }.getOrNull()
+                                    if (info == null) {
+                                        toast(context, "拿不到下载地址，请稍后再试")
+                                    } else {
+                                        val f = withContext(Dispatchers.IO) {
+                                            Updater.download(context, info)
+                                        }
+                                        if (f != null) Updater.install(context, f)
+                                    }
+                                }
+                            }
+                        }
+
+                        is UpdateState.Failed -> StatusLine(st.message, Ink.Amber)
+                        is UpdateState.Available -> {
+                            StatusLine(
+                                "发现新版本 v${st.info.versionName}（versionCode ${st.info.versionCode}）",
+                                Ink.AccentBright,
+                            )
+                            if (st.info.notes.isNotBlank()) {
+                                Spacer(Modifier.height(6.sdp))
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.sdp))
+                                        .background(Ink.Deep)
+                                        .padding(12.sdp)
+                                ) {
+                                    Text(
+                                        st.info.notes.take(600),
+                                        color = Ink.TextTertiary,
+                                        fontSize = Txt.Tiny,
+                                        lineHeight = 18.ssp,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(10.sdp))
+                            Row {
+                                SmallButton("下载并安装") {
+                                    scope.launch {
+                                        val f = withContext(Dispatchers.IO) { Updater.download(context, st.info) }
+                                        if (f != null) Updater.install(context, f)
+                                    }
+                                }
+                            }
+                        }
+
+                        is UpdateState.Downloading -> {
+                            StatusLine("正在从 ${st.from} 下载 ${(st.progress * 100).toInt()}%", Ink.AccentBright)
                             Spacer(Modifier.height(6.sdp))
                             Box(
                                 Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.sdp))
-                                    .background(Ink.Deep)
-                                    .padding(12.sdp)
+                                    .height(6.sdp)
+                                    .clip(RoundedCornerShape(3.sdp))
+                                    .background(Ink.CardStrong)
                             ) {
-                                Text(
-                                    st.info.notes.take(600),
-                                    color = Ink.TextTertiary,
-                                    fontSize = Txt.Tiny,
-                                    lineHeight = 18.ssp,
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth(st.progress.coerceIn(0f, 1f))
+                                        .height(6.sdp)
+                                        .background(Ink.AccentBright)
                                 )
                             }
                         }
-                        Spacer(Modifier.height(10.sdp))
-                        Row {
-                            SmallButton("下载并安装") {
+
+                        is UpdateState.Ready -> {
+                            StatusLine("下载完成 ${st.info.sizeText}，点下面安装", Ink.Green)
+                            Spacer(Modifier.height(8.sdp))
+                            SmallButton("立即安装") { Updater.install(context, st.file) }
+                        }
+
+                        // ---------- 空闲：说明当前没有可下的新版 ----------
+                        //
+                        // 这里原来什么都不显示，于是"下载并安装"这个按钮**只在真有新版时
+                        // 才会出现** —— 用户在当前版本下翻遍设置也找不到它，
+                        // 反馈就是"现版本的下载与安装点选不到"。
+                        //
+                        // 现在 Idle 状态也给一个常驻按钮：检查完之后如果确实有新版，
+                        // 就接着下载并调起安装，省得用户再点一次。
+                        UpdateState.Idle -> {
+                            if (checkedAndCurrent) {
+                                StatusLine("已是最新版本，无需下载", Ink.Green)
+                            } else {
+                                StatusLine("点下面的按钮检查并下载新版本", Ink.TextTertiary)
+                            }
+                            Spacer(Modifier.height(8.sdp))
+                            SmallButton("检查更新并下载") {
                                 scope.launch {
-                                    val f = withContext(Dispatchers.IO) { Updater.download(context, st.info) }
-                                    if (f != null) Updater.install(context, f)
+                                    val info = runCatching {
+                                        withContext(Dispatchers.IO) { Updater.check(context) }
+                                    }.getOrNull()
+                                    if (info == null) {
+                                        checkedAndCurrent = true
+                                        toast(context, "已经是最新版本")
+                                    } else {
+                                        checkedAndCurrent = false
+                                        val f = withContext(Dispatchers.IO) {
+                                            Updater.download(context, info)
+                                        }
+                                        if (f != null) Updater.install(context, f)
+                                    }
                                 }
                             }
                         }
                     }
+                    Spacer(Modifier.height(6.sdp))
+                    TvSwitch(
+                        label = "启动时自动检查更新",
+                        hint = "打开 App 后台静默检查",
+                        checked = prefs.autoCheckUpdate,
+                    ) { prefs.autoCheckUpdate = it }
+                }
+            }
 
-                    is UpdateState.Downloading -> {
-                        StatusLine("正在从 ${st.from} 下载 ${(st.progress * 100).toInt()}%", Ink.AccentBright)
-                        Spacer(Modifier.height(6.sdp))
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(6.sdp)
-                                .clip(RoundedCornerShape(3.sdp))
-                                .background(Ink.CardStrong)
+            // ==================== 关于 ====================
+            // ==================== 诊断（测试用） ====================
+            item {
+                SettingsCard(
+                    title = "诊断",
+                    subtitle = "测试期间用来看内存和清缓存；日常使用可以不管",
+                    accent = Ink.Amber,
+                ) {
+                    TvSwitch(
+                        label = "显示内存浮层",
+                        hint = "屏幕右上角实时显示 PSS / RSS / Native / Java",
+                        checked = prefs.showMemoryHud,
+                    ) { prefs.showMemoryHud = it }
+
+                    TvSwitch(
+                        label = "记录内存日志",
+                        hint = "每 5 秒写一条 logcat（tag=BawanMem），可事后拉完整时间线",
+                        checked = prefs.logMemory,
+                    ) { prefs.logMemory = it }
+
+                    Spacer(Modifier.height(10.sdp))
+                    Row {
+                        SmallButton("清空直播直连缓存") {
+                            com.chinut.bawantv.live.StreamCache.clearAll(context)
+                            toast(context, "已清空，下次换台会重新获取直连地址")
+                        }
+                    }
+                }
+            }
+
+
+            item {
+                SettingsCard(
+                    title = "关于焰火TV",
+                    subtitle = "为电视大屏与遥控器重新设计的播放器",
+                    accent = Ink.AccentBright,
+                ) {
+                    val about = listOf(
+                        "直播" to "内置央视频道表；也可填自定义 m3u 直播源。播放中上下键换台、左右键换源",
+                        "影视" to "内容全部来自低端影视，片库缓存在电视本地，断网也能浏览已缓存的片子",
+                        "输入" to "电视端自带虚拟键盘，遥控器字母键可直接输入（支持拼音首字母搜索）",
+                    )
+                    about.forEach { (k, v) ->
+                        Row(Modifier.padding(vertical = 5.sdp)) {
+                            Text(k, color = Ink.AccentBright, fontSize = Txt.Caption, modifier = Modifier.width(70.sdp))
+                            Text(v, color = Ink.TextTertiary, fontSize = Txt.Caption, lineHeight = 20.ssp)
+                        }
+                    }
+
+                    // ---------- 鸣谢 ----------
+                    //
+                    // 单独一块并加了标题色，是为了让它在"关于"页面里能被一眼看到 ——
+                    // 这些人是真的花了时间和设备在这上面，不该混在功能说明里。
+                    Spacer(Modifier.height(14.sdp))
+                    Text(
+                        "鸣谢",
+                        color = Ink.Amber,
+                        fontSize = Txt.Label,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(6.sdp))
+
+                    /**
+                     * (名字, 贡献)。
+                     *
+                     * 名字按提供者给的原文**原样保留**（含特殊字符与表情），
+                     * 不要做"规范化"——那是人家自己的标识。
+                     */
+                    val credits = listOf(
+                        "™ᴰ  ⃔ ᥬ💀ᩤ  ⃕ 兔" to "提供测试环境",
+                        "夙丶夜" to "提供开发建议",
+                        "Bawan_xw" to "提供软件初期规则命名",
+                    )
+                    credits.forEach { (who, what) ->
+                        Row(
+                            Modifier.padding(vertical = 4.sdp),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth(st.progress.coerceIn(0f, 1f))
-                                    .height(6.sdp)
-                                    .background(Ink.AccentBright)
+                            Text(
+                                "·",
+                                color = Ink.TextFaint,
+                                fontSize = Txt.Caption,
+                                modifier = Modifier.width(14.sdp),
+                            )
+                            Text(
+                                who,
+                                color = Color.White,
+                                fontSize = Txt.Caption,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.width(190.sdp),
+                            )
+                            Text(
+                                what,
+                                color = Ink.TextTertiary,
+                                fontSize = Txt.Caption,
+                                lineHeight = 20.ssp,
+                                modifier = Modifier.weight(1f),
                             )
                         }
                     }
 
-                    is UpdateState.Ready -> {
-                        StatusLine("下载完成 ${st.info.sizeText}，点下面安装", Ink.Green)
-                        Spacer(Modifier.height(8.sdp))
-                        SmallButton("立即安装") { Updater.install(context, st.file) }
-                    }
-
-                    // ---------- 空闲：说明当前没有可下的新版 ----------
-                    //
-                    // 这里原来什么都不显示，于是"下载并安装"这个按钮**只在真有新版时
-                    // 才会出现** —— 用户在当前版本下翻遍设置也找不到它，
-                    // 反馈就是"现版本的下载与安装点选不到"。
-                    //
-                    // 现在 Idle 状态也给一个常驻按钮：检查完之后如果确实有新版，
-                    // 就接着下载并调起安装，省得用户再点一次。
-                    UpdateState.Idle -> {
-                        if (checkedAndCurrent) {
-                            StatusLine("已是最新版本，无需下载", Ink.Green)
-                        } else {
-                            StatusLine("点下面的按钮检查并下载新版本", Ink.TextTertiary)
-                        }
-                        Spacer(Modifier.height(8.sdp))
-                        SmallButton("检查更新并下载") {
-                            scope.launch {
-                                val info = runCatching {
-                                    withContext(Dispatchers.IO) { Updater.check(context) }
-                                }.getOrNull()
-                                if (info == null) {
-                                    checkedAndCurrent = true
-                                    toast(context, "已经是最新版本")
-                                } else {
-                                    checkedAndCurrent = false
-                                    val f = withContext(Dispatchers.IO) {
-                                        Updater.download(context, info)
-                                    }
-                                    if (f != null) Updater.install(context, f)
-                                }
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(6.sdp))
-                TvSwitch(
-                    label = "启动时自动检查更新",
-                    hint = "打开 App 后台静默检查",
-                    checked = prefs.autoCheckUpdate,
-                ) { prefs.autoCheckUpdate = it }
-            }
-        }
-
-        // ==================== 关于 ====================
-        // ==================== 诊断（测试用） ====================
-        item {
-            SettingsCard(
-                title = "诊断",
-                subtitle = "测试期间用来看内存和清缓存；日常使用可以不管",
-                accent = Ink.Amber,
-            ) {
-                TvSwitch(
-                    label = "显示内存浮层",
-                    hint = "屏幕右上角实时显示 PSS / RSS / Native / Java",
-                    checked = prefs.showMemoryHud,
-                ) { prefs.showMemoryHud = it }
-
-                TvSwitch(
-                    label = "记录内存日志",
-                    hint = "每 5 秒写一条 logcat（tag=BawanMem），可事后拉完整时间线",
-                    checked = prefs.logMemory,
-                ) { prefs.logMemory = it }
-
-                Spacer(Modifier.height(10.sdp))
-                Row {
-                    SmallButton("清空直播直连缓存") {
-                        com.chinut.bawantv.live.StreamCache.clearAll(context)
-                        toast(context, "已清空，下次换台会重新获取直连地址")
-                    }
+                    Spacer(Modifier.height(14.sdp))
+                    Text(
+                        "免责声明：本应用只做播放器与界面聚合，不存储、不传播任何影视资源。\n" +
+                            "直播源与在线影视地址均来自第三方公开接口，仅限个人学习研究使用，" +
+                            "请勿用于任何商业用途。",
+                        color = Ink.TextFaint,
+                        fontSize = Txt.Tiny,
+                        lineHeight = 18.ssp,
+                    )
                 }
             }
-        }
 
-
-        item {
-            SettingsCard(
-                title = "关于焰火TV",
-                subtitle = "为电视大屏与遥控器重新设计的播放器",
-                accent = Ink.AccentBright,
-            ) {
-                val about = listOf(
-                    "直播" to "内置央视频道表；也可填自定义 m3u 直播源。播放中上下键换台、左右键换源",
-                    "影视" to "内容全部来自低端影视，片库缓存在电视本地，断网也能浏览已缓存的片子",
-                    "输入" to "电视端自带虚拟键盘，遥控器字母键可直接输入（支持拼音首字母搜索）",
-                )
-                about.forEach { (k, v) ->
-                    Row(Modifier.padding(vertical = 5.sdp)) {
-                        Text(k, color = Ink.AccentBright, fontSize = Txt.Caption, modifier = Modifier.width(70.sdp))
-                        Text(v, color = Ink.TextTertiary, fontSize = Txt.Caption, lineHeight = 20.ssp)
-                    }
-                }
-
-                // ---------- 鸣谢 ----------
-                //
-                // 单独一块并加了标题色，是为了让它在"关于"页面里能被一眼看到 ——
-                // 这些人是真的花了时间和设备在这上面，不该混在功能说明里。
-                Spacer(Modifier.height(14.sdp))
-                Text(
-                    "鸣谢",
-                    color = Ink.Amber,
-                    fontSize = Txt.Label,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(6.sdp))
-
-                /**
-                 * (名字, 贡献)。
-                 *
-                 * 名字按提供者给的原文**原样保留**（含特殊字符与表情），
-                 * 不要做"规范化"——那是人家自己的标识。
-                 */
-                val credits = listOf(
-                    "™ᴰ  ⃔ ᥬ💀ᩤ  ⃕ 兔" to "提供测试环境",
-                    "夙丶夜" to "提供开发建议",
-                    "Bawan_xw" to "提供软件初期规则命名",
-                )
-                credits.forEach { (who, what) ->
-                    Row(
-                        Modifier.padding(vertical = 4.sdp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Text(
-                            "·",
-                            color = Ink.TextFaint,
-                            fontSize = Txt.Caption,
-                            modifier = Modifier.width(14.sdp),
-                        )
-                        Text(
-                            who,
-                            color = Color.White,
-                            fontSize = Txt.Caption,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.width(190.sdp),
-                        )
-                        Text(
-                            what,
-                            color = Ink.TextTertiary,
-                            fontSize = Txt.Caption,
-                            lineHeight = 20.ssp,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(14.sdp))
-                Text(
-                    "免责声明：本应用只做播放器与界面聚合，不存储、不传播任何影视资源。\n" +
-                        "直播源与在线影视地址均来自第三方公开接口，仅限个人学习研究使用，" +
-                        "请勿用于任何商业用途。",
-                    color = Ink.TextFaint,
-                    fontSize = Txt.Tiny,
-                    lineHeight = 18.ssp,
-                )
+            item {
+                // 兜底留白
+                Box(Modifier.width(1.sdp).height(1.sdp))
             }
         }
-
-        item {
-            // 兜底留白
-            Box(Modifier.width(1.sdp).height(1.sdp))
-        }
-    }
-
-    // ---------- 家长密码弹窗 ----------
-    when (pinStage) {
-        PinStage.SetFirst -> ParentalPinDialog(
-            title = if (ParentalControl.hasPin) "设置新的家长密码" else "设置家长密码",
-            onCancel = { pinStage = null },
-            verify = { input ->
-                // 第一次输入只暂存，不算"通过"，所以永远返回 false 并切到确认阶段
-                pinFirst = input
-                pinStage = PinStage.SetConfirm
-                false
-            },
-            onDone = { },
-        )
-
-        PinStage.SetConfirm -> ParentalPinDialog(
-            title = "请再输入一次确认",
-            onCancel = { pinStage = null },
-            verify = { input ->
-                if (input == pinFirst) {
-                    ParentalControl.setPin(input)
-                    ParentalControl.setEnabled(true)
-                    parentalOn = true
-                    pinStage = null
-                    true
-                } else {
-                    // 两次不一致：回到第一步重来
-                    pinFirst = ""
-                    pinStage = PinStage.SetFirst
+        // ---------- 家长密码弹窗 ----------
+        when (pinStage) {
+            PinStage.SetFirst -> ParentalPinDialog(
+                title = if (ParentalControl.hasPin) "设置新的家长密码" else "设置家长密码",
+                onCancel = { pinStage = null },
+                verify = { input ->
+                    // 第一次输入只暂存，不算"通过"，所以永远返回 false 并切到确认阶段
+                    pinFirst = input
+                    pinStage = PinStage.SetConfirm
                     false
-                }
-            },
-            onDone = { },
-        )
+                },
+                onDone = { },
+            )
 
-        PinStage.Verify -> ParentalPinDialog(
-            title = if (pendingEnable) "开启未成年人保护" else "关闭未成年人保护",
-            onCancel = { pinStage = null },
-            verify = { input ->
-                if (ParentalControl.unlock(input)) {
-                    ParentalControl.setEnabled(pendingEnable)
-                    parentalOn = pendingEnable
-                    pinStage = null
-                    true
-                } else {
-                    false
-                }
-            },
-            onDone = { },
-        )
+            PinStage.SetConfirm -> ParentalPinDialog(
+                title = "请再输入一次确认",
+                onCancel = { pinStage = null },
+                verify = { input ->
+                    if (input == pinFirst) {
+                        ParentalControl.setPin(input)
+                        ParentalControl.setEnabled(true)
+                        parentalOn = true
+                        pinStage = null
+                        true
+                    } else {
+                        // 两次不一致：回到第一步重来
+                        pinFirst = ""
+                        pinStage = PinStage.SetFirst
+                        false
+                    }
+                },
+                onDone = { },
+            )
 
-        null -> Unit
+            PinStage.Verify -> ParentalPinDialog(
+                title = if (pendingEnable) "开启未成年人保护" else "关闭未成年人保护",
+                onCancel = { pinStage = null },
+                verify = { input ->
+                    if (ParentalControl.unlock(input)) {
+                        ParentalControl.setEnabled(pendingEnable)
+                        parentalOn = pendingEnable
+                        pinStage = null
+                        true
+                    } else {
+                        false
+                    }
+                },
+                onDone = { },
+            )
+
+            null -> Unit
+        }
+
+        // ---------- 输入弹窗（TV 键盘） ----------
+        editing?.let { target ->
+            TvKeyboardDialog(
+                title = target.title,
+                initial = target.current(prefs),
+                onDismiss = { editing = null },
+                onConfirm = { value ->
+                    target.apply(prefs, value)
+                    editing = null
+                },
+            )
+        }
+
+        // revision 只是为了让上面的读取随设置变化重组
+        @Suppress("UNUSED_EXPRESSION")
+        revision
     }
-
-    // ---------- 输入弹窗（TV 键盘） ----------
-    editing?.let { target ->
-        TvKeyboardDialog(
-            title = target.title,
-            initial = target.current(prefs),
-            onDismiss = { editing = null },
-            onConfirm = { value ->
-                target.apply(prefs, value)
-                editing = null
-            },
-        )
-    }
-
-    // revision 只是为了让上面的读取随设置变化重组
-    @Suppress("UNUSED_EXPRESSION")
-    revision
 }
 
 /**
@@ -917,13 +924,22 @@ private fun StatusLine(text: String, color: Color) {
 private fun QrPanel(url: String, onClose: () -> Unit) {
     val bitmap = remember(url) { Qr.bitmap(url, 560) }
 
-    // 关键：这是个全屏 Dialog，必须自己处理返回键，否则按返回会一路穿透到
+    // 关键：这是个全屏浮层，必须自己处理返回键，否则按返回会一路穿透到
     // 根 BackHandler（被当成"回首页"），用户看起来就像"卡在二维码里出不来"。
     BackHandler(enabled = true) { onClose() }
 
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    // ---------- 为什么不用 Compose 的 Dialog ----------
+    //
+    // Dialog 会开一个**独立窗口接管按键**，MainActivity.dispatchKeyEvent 收不到 ——
+    // 而本应用整套遥控器操作（方向键 / 确定键 / 返回键）全靠那个 dispatchKeyEvent
+    // 转发给自定义的 TvFocusManager。按键进不来，弹窗里的控件就永远点不到。
+    //
+    // 更新框已经踩过这个坑（"点下载并安装没反应"），这里是同一类问题。
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.62f)),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             Modifier
