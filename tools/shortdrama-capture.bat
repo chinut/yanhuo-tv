@@ -5,11 +5,19 @@ setlocal enabledelayedexpansion
 REM =====================================================================
 REM  Short-drama app packet capture launcher
 REM
+REM  This file may be copied anywhere (e.g. the Desktop) and still work:
+REM  the plugin path below is ABSOLUTE, not relative to this .bat.
+REM
 REM  NOTE: keep this file ASCII-only outside of echo lines.
 REM  cmd.exe parses .bat byte-by-byte using the OEM codepage, so UTF-8
-REM  Chinese inside REM comments gets misinterpreted as commands
-REM  (symptom: "'xx' is not recognized as an internal or external command").
+REM  Chinese inside REM comments gets run as commands.
+REM  Also: the file MUST use CRLF line endings, or cmd mis-parses lines.
 REM =====================================================================
+
+set "SCRIPT=G:\android\AndroidTV\tools\shortdrama_capture.py"
+set "OUTDIR=G:\android\AndroidTV\captures"
+set "PY="
+set "MITM="
 
 echo.
 echo ========================================================================
@@ -17,9 +25,16 @@ echo   短剧 App 抓包工具
 echo ========================================================================
 echo.
 
-set "SCRIPT=%~dp0shortdrama_capture.py"
-set "PY="
-set "MITM="
+REM ---------- verify the plugin actually exists ----------
+if not exist "%SCRIPT%" (
+    echo   找不到抓包插件：
+    echo       %SCRIPT%
+    echo.
+    echo   如果你把项目挪过位置，请改本文件里的 SCRIPT 变量。
+    echo.
+    pause
+    exit /b 1
+)
 
 REM ---------- locate Python ----------
 set "DSHPY=C:\Users\Administrator\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe"
@@ -68,8 +83,6 @@ if errorlevel 1 (
 )
 
 REM ---------- locate mitmdump.exe ----------
-REM Prefer mitmdump over mitmproxy: headless, more stable for long captures,
-REM and the interactive console UI garbles easily in the Windows terminal.
 for %%D in ("%PY%") do set "PYDIR=%%~dpD"
 if exist "%PYDIR%Scripts\mitmdump.exe" set "MITM=%PYDIR%Scripts\mitmdump.exe"
 
@@ -89,14 +102,16 @@ if not defined MITM (
 echo   抓包程序: %MITM%
 echo.
 
+REM ---------- make sure the output dir exists ----------
+if not exist "%OUTDIR%" mkdir "%OUTDIR%"
+
 REM ---------- start capture ----------
-REM The usage instructions are printed by the addon's running() hook;
-REM do not echo them here or they will appear twice.
+REM Usage instructions are printed by the plugin itself when it loads.
 "%MITM%" -s "%SCRIPT%" --listen-port 8088
 
 echo.
 echo   抓包已停止。
-echo   结果保存在： %~dp0..\captures\requests.log
+echo   结果保存在： %OUTDIR%\requests.log
 echo.
 echo   把那个文件发我，我就能分析出短剧接口。
 echo.
