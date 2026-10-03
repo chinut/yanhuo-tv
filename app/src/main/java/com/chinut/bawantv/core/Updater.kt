@@ -56,11 +56,15 @@ sealed interface UpdateState {
 object Updater {
 
     // ==================== 仓库配置 ====================
+    //
+    // ⚠️ 仓库名必须和实际发布的仓库一致，否则检查更新永远 404。
+    // 这里曾经写成 "bawan-tv"（项目早期的名字），而实际仓库是 "yanhuo-tv"，
+    // 结果两个源都返回 404 —— 界面一直提示"两个更新源都不可达"。
     private const val GITEE_OWNER = "chinut"
-    private const val GITEE_REPO = "bawan-tv"
+    private const val GITEE_REPO = "yanhuo-tv"
 
     private const val GITHUB_OWNER = "chinut"
-    private const val GITHUB_REPO = "bawan-tv"
+    private const val GITHUB_REPO = "yanhuo-tv"
 
     private data class Source(
         val name: String,
