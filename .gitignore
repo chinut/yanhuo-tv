@@ -37,3 +37,7 @@ build/pytest/
 
 # 抓包结果（含账号级别的流量，不进仓库）
 captures/
+
+# Python 缓存
+__pycache__/
+*.pyc
