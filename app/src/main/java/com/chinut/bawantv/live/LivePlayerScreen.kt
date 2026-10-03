@@ -1082,11 +1082,30 @@ fun LivePlayerScreen(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         useController = false
-                        // 等比显示（不留黑边的责任交给页面本身，不要在这里硬拉伸）。
+                        // ---------- 用 TextureView，不用默认的 SurfaceView ----------
                         //
-                        // PlayerView 默认是 RESIZE_MODE_FIT：视频宽高比和屏幕不一致时
-                        // 会等比缩放并**留黑边**（真机上表现为"下方和右边有黑边"）。
-                        // 电视看直播就该铺满整屏，所以用 FILL。
+                        // 用户报「花屏」。实测截图：只有顶部一条在更新，
+                        // 下面是一大片**陈旧残影**（不是黑边，是旧帧没擦掉）。
+                        //
+                        // 这是 SurfaceView 的锅 —— 它是独立图层、由 SurfaceFlinger
+                        // 单独合成，模拟器和国产电视的定制 ROM 在"裁剪/缩放/被 UI 覆盖"
+                        // 时经常合成出错。TextureView 走普通 View 绘制流程，
+                        // 和 Compose UI 一起合成，不会有这个问题。
+                        //
+                        // 代价是多一次 GPU 拷贝，换来画面能看 —— 对老电视完全值得。
+                        // ---------- 规避花屏 ----------
+                        //
+                        // 用户报「花屏」。实测截图特征很清楚：
+                        //   · 只有**顶部一条**在更新
+                        //   · 下面是一大片**陈旧残影**（不是黑边，是旧帧没擦掉）
+                        //
+                        // SurfaceView 是独立图层、由 SurfaceFlinger 单独合成。
+                        // 在 Compose 里、以及模拟器/国产电视的定制 ROM 上，
+                        // 缩放和裁剪时经常合成出错 —— 这就是花屏的来源。
+                        //
+                        // 两手都上：
+                        //   1. Media3 自带的 Compose 合成修正开关（官方就是为这个场景加的）
+                        //   2. 把渲染 View 换成 TextureView（见下面 player 赋值之后的调用）
                         resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                         setShutterBackgroundColor(android.graphics.Color.BLACK)
@@ -1096,6 +1115,9 @@ fun LivePlayerScreen(
                         )
                         this.player = player
                         keepScreenOn = true
+                        // player 就绪了才能切渲染 View（之前放在赋值前，日志报
+                        // "player 还没就绪，TextureView 未绑定"，等于没生效）
+                        applySurfaceWorkaround()
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -1723,3 +1745,65 @@ private const val WEB_VISIBLE_FALLBACK_MS = 12_000L
  * 而不是干等一张站点的占位海报，以为软件坏了。
  */
 private const val WEB_SLOW_HINT_MS = 10_000L
+
+/**
+ * 规避「花屏」（画面撕裂 / 残影 / 只刷新一部分）。
+ *
+ * ## 现象
+ *
+ * 用户报花屏，实测截图：**只有顶部一条在更新，下面是一大片陈旧残影**
+ * （不是黑边 —— 是旧帧没被擦掉）。
+ *
+ * ## 原因
+ *
+ * Media3 的 PlayerView 默认用 **SurfaceView** 渲染。SurfaceView 是**独立图层**，
+ * 由 SurfaceFlinger 单独合成，在「缩放 / 裁剪 / 位于 Compose 布局内」这些场景下
+ * 很容易合成出错 —— 模拟器、以及国产电视的定制 ROM 尤其明显。
+ * 表现就是画面撕裂、残影、只刷新一部分。
+ *
+ * TextureView 走普通 View 绘制流程，和 Compose UI 一起合成，没有这个问题。
+ *
+ * ## 做法
+ *
+ * 1. 打开 Media3 自带的 `setEnableComposeSurfaceSyncWorkaround(true)`
+ *    —— 官方提供这个开关就是为"在 Compose 里用 SurfaceView"这个场景。
+ * 2. 把 PlayerView 里的 SurfaceView 换成 TextureView：
+ *    先把 PlayerView 自己切到 TextureView 路径，再把新 View 挂进去。
+ *
+ * 代价是多一次 GPU 拷贝，换来画面正常 —— 对老电视完全值得。
+ */
+private fun androidx.media3.ui.PlayerView.applySurfaceWorkaround() {
+    runCatching { setEnableComposeSurfaceSyncWorkaround(true) }
+        .onFailure { android.util.Log.w(TAG_LIVE, "Compose 合成修正开关不可用：$it") }
+
+    // 只在真正需要时切一次，避免 AndroidView 多次 update 时重复替换
+    if (getVideoSurfaceView() is android.view.TextureView) {
+        android.util.Log.i(TAG_LIVE, "渲染 View 已是 TextureView，跳过")
+        return
+    }
+
+    runCatching {
+        val old = getVideoSurfaceView()
+        val parent = old?.parent as? android.view.ViewGroup
+        if (old == null || parent == null) {
+            android.util.Log.w(TAG_LIVE, "拿不到视频 View，沿用默认渲染")
+            return@runCatching
+        }
+        val index = parent.indexOfChild(old)
+        val tv = android.view.TextureView(context).apply {
+            layoutParams = old.layoutParams
+        }
+        parent.removeViewAt(index)
+        parent.addView(tv, index, old.layoutParams)
+        // 让播放器把画面输出到这个 TextureView
+        val player = this.player
+        if (player != null) {
+            player.setVideoTextureView(tv)
+            android.util.Log.i(TAG_LIVE, "视频渲染已切到 TextureView")
+        } else {
+            android.util.Log.w(TAG_LIVE, "player 还没就绪，TextureView 未绑定")
+        }
+    }.onFailure {
+        android.util.Log.w(TAG_LIVE, "TextureView 切换失败，沿用 SurfaceView：$it")
+    }
+}
