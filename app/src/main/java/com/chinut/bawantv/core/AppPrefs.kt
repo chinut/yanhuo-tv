@@ -135,6 +135,17 @@ class AppPrefs(context: Context) {
         set(v) = sp.edit().putBoolean(KEY_MEM_HUD, v).apply().also { touch() }
 
     /**
+     * 直播清晰度：0=自动（按设备能力）1=省流 2=标清 3=高清。
+     *
+     * 为什么给手动选项：自动判定再准也猜不透每一台电视。
+     * 弱解码器的机型上，用户自己降到"省流"就能流畅 ——
+     * 这比让他等我们改代码现实得多。
+     */
+    var liveQuality: Int
+        get() = sp.getInt(KEY_LIVE_QUALITY, 0)
+        set(v) = sp.edit().putInt(KEY_LIVE_QUALITY, v).apply().also { touch() }
+
+    /**
      * 周期性把内存写进 logcat（tag = BawanMem，每 5 秒一条）。
      *
      * 比浮层强的地方：能事后拉出完整时间线，看出是哪个操作把内存顶上去了。
@@ -317,5 +328,6 @@ class AppPrefs(context: Context) {
         private const val KEY_SHOW_HUD = "show_hud"
 private const val KEY_MEM_HUD = "mem_hud"
 private const val KEY_MEM_LOG = "mem_log"
+private const val KEY_LIVE_QUALITY = "live_quality"
     }
 }

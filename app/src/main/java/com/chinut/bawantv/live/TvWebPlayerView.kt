@@ -110,6 +110,9 @@ class TvWebPlayerView(context: Context) : WebView(context) {
 
     private var pageLoaded = false
 
+    /** 连续探测到"已播过但当前是暂停"的次数（看门狗用）。 */
+    private var pausedStrikes = 0
+
     init {
         layoutParams = ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -407,20 +410,52 @@ class TvWebPlayerView(context: Context) : WebView(context) {
             override fun run() {
                 // 代际过期（已经切到别的台/别的源）→ 丢弃，避免在新频道上误判
                 if (myGeneration != generation) return
-                if (health == Health.Playing) return
                 if (!pageLoaded) {
                     postDelayed(this, HEALTH_INTERVAL_MS)
                     return
                 }
                 evaluateJavascript(PROBE_JS) { r ->
                     if (myGeneration != generation) return@evaluateJavascript
-                    if (r?.contains("true") == true) {
+                    val text = r?.toString().orEmpty()
+                    // 新格式形如 "p=false t=123 r=4 w=1280 b=8 n=2 e=0"
+                    // 判定"确实在播"：没暂停、而且有画面尺寸或时间在走
+                    val paused = Regex("""p=(\w+)""").find(text)?.groupValues?.get(1) == "true"
+                    val t = Regex("""t=(\d+)""").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    val w = Regex("""w=(\d+)""").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    val ok = !paused && (w > 0 || t > 0)
+                    // 详细状态也打出来 —— "画面冻住"到底是
+                    // 被暂停了、缓冲空了、还是解码停了，看这行就知道。
+                    android.util.Log.i(
+                        "BawanWebStat",
+                        "probe=$text playing=${health == Health.Playing} useWebProbe=$ok",
+                    )
+                    if (ok && health != Health.Playing) {
                         health = Health.Playing
                         android.util.Log.i(TAG, "网页播放已出画面")
                         onPlaying()
-                        return@evaluateJavascript
                     }
-                    // 没探到就接着探 —— 页面自己早晚会开始播，不催它
+
+                    // ---------- 看门狗 ----------
+                    //
+                    // 曾经播过、现在却停住了 → 说明不是"还没起播"，而是"播着播着停了"。
+                    // 实测画面冻住的直接原因就是 video 被暂停（p=true）而无人恢复。
+                    //
+                    // 连续两次探测都停着才动手，避免和站点自身的短暂缓冲打架。
+                    if (hasFirstFrame && paused) {
+                        pausedStrikes++
+                        if (pausedStrikes >= 2) {
+                            pausedStrikes = 0
+                            android.util.Log.w(TAG, "网页视频停住了，自动恢复播放：$text")
+                            evaluateJavascript(RESUME_JS, null)
+                        }
+                    } else {
+                        pausedStrikes = 0
+                    }
+                    // ⚠️ 这里**不再 return**。
+                    //
+                    // 原来一探测到 Playing 就停止探测，于是"出画面之后又冻住"
+                    // 完全监控不到（用户看到的正是这个）。现在持续探测，
+                    // 既能留下状态轨迹，也保证 health 能反映真实情况。
                     postDelayed(this, HEALTH_INTERVAL_MS)
                 }
             }
@@ -640,20 +675,57 @@ class TvWebPlayerView(context: Context) : WebView(context) {
          * 判据刻意做得**宽**：只要「没暂停」且「已经有画面尺寸 或 时间在走」就算在播。
          * 之前要求 `readyState>=2`，把一堆明明在播的源判成了失败。
          */
-        private const val PROBE_JS = """
+        /**
+ * 看门狗：把**停住的** video 重新拉起来。
+ *
+ * 只在"已经确认播过"之后才启用 —— 页面还在初始化时不能抢着 play()，
+ * 那会和站点自己的播放逻辑打架（之前"卡成 PPT"有一部分就是反复 play 造成的）。
+ *
+ * 实测画面冻住时的状态：
+ *     p=true t=8 r=4 w=1280 b=32 n=2 e=0
+ * 缓冲充足、解码正常，只是被暂停了。所以这里只需要 play()。
+ */
+private const val RESUME_JS = """
+    (function(){
+      try{
+        var vs=document.querySelectorAll('video');
+        for(var i=0;i<vs.length;i++){
+          var v=vs[i];
+          if(!v) continue;
+          if(v.paused && v.readyState>=2 && v.videoWidth>0){
+            v.muted=false;
+            var pr=v.play();
+            if(pr&&pr.catch) pr.catch(function(){});
+            return 'resumed';
+          }
+        }
+      }catch(e){}
+      return 'nothing';
+    })();
+    """
+
+private const val PROBE_JS = """
         (function(){
           try{
             var vs=document.querySelectorAll('video');
-            for(var i=0;i<vs.length;i++){
-              var v=vs[i];
-              if(!v) continue;
-              if(!v.paused && (v.currentTime>0 || v.videoWidth>0)) return 'true';
-              /* 有些播放器是静音自动播放起步、或 paused 标志没及时更新，
-                 只要已经有画面尺寸也认为"出画面了" */
-              if(v.videoWidth>0 && v.readyState>=2) return 'true';
-            }
-          }catch(e){}
-          return 'false';
+            if(!vs.length) return 'novideo';
+            var v=vs[0];
+            if(!v) return 'novideo';
+            /* 返回**详细信息**而不是 true/false：
+               画面冻住时，靠这些字段能区分是被暂停了、缓冲空了、还是解码停了。
+                 p  paused          —— true 说明网页播放器被暂停了（我们注入脚本动过它）
+                 t  currentTime     —— 是否在推进
+                 r  readyState      —— 2=有当前帧数据 3=可播 4=够播一段
+                 w  videoWidth
+                 b  bufferedAhead   —— 当前播放点之后还有多少秒缓冲
+                 n  networkState    —— 2=正在下载 3=没数据了
+                 e  errorCode       —— 非 null 说明解码/网络出错 */
+            var ahead=0;
+            try{ if(v.buffered && v.buffered.length){ ahead=Math.round(v.buffered.end(v.buffered.length-1)-v.currentTime); } }catch(e2){}
+            return 'p='+v.paused+' t='+Math.round(v.currentTime)+' r='+v.readyState+
+                   ' w='+v.videoWidth+' b='+ahead+' n='+v.networkState+
+                   ' e='+(v.error?v.error.code:'0');
+          }catch(e){ return 'err'; }
         })();
         """
 

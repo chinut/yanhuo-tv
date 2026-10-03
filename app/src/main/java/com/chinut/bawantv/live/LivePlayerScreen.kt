@@ -457,8 +457,17 @@ fun LivePlayerScreen(
                         // 结果大量 Android 7/8 的四核弱电视躲过判断、被喂 720p，
                         // 解码跟不上就成了"卡"甚至"黑屏"（实测日志显示硬解
                         // 不报错、只是永远不出画面 —— 就是码率吃不下）。
-                        val (w, h, bitrate) = com.chinut.bawantv.live.DeviceTier
-                            .videoLimit(com.chinut.bawantv.live.DeviceTier.of(context))
+                        // 手动设置优先；没设（0）才走自动判定
+                        val manual = com.chinut.bawantv.live.DeviceTier
+                            .manualLimit(prefs.liveQuality)
+                        val (w, h, bitrate) = manual
+                            ?: com.chinut.bawantv.live.DeviceTier
+                                .videoLimit(com.chinut.bawantv.live.DeviceTier.of(context))
+                        android.util.Log.i(
+                            TAG_LIVE,
+                            "直播清晰度上限 ${w}x${h}@${bitrate / 1000}k " +
+                                "（手动=${prefs.liveQuality}）",
+                        )
                         setMaxVideoSize(w, h)
                         setMaxVideoBitrate(bitrate)
                     }
@@ -576,6 +585,43 @@ fun LivePlayerScreen(
     // 网页路线：进页面时给一段加载提示，之后交给网页自己
 
     // 频道 / 重试令牌变化 → 切流
+    // ---------- 直播播放状态诊断 ----------
+    //
+    // 为什么需要：用户反馈"画面彻底冻住"，而日志只告诉我
+    // "onRenderedFirstFrame 从未触发" —— 这不足以定位。
+    //
+    // 三种可能的表现完全一样（画面不动），但原因和处理方式完全不同：
+    //   1. 流没数据        → position 不推进，buffered 也不涨。要换源。
+    //   2. 有数据但没出帧   → buffered 在涨、position 可能也在走，
+    //                        但 renderedFirstFrame 始终为 false。渲染层问题。
+    //   3. 位置在推进      → 播放器是好的，是屏幕没刷新（合成问题）。
+    //
+    // 每条都带 videoFormat 的宽高码率，能直接看出跑在哪一档。
+    LaunchedEffect(index, sourceIndex) {
+        while (true) {
+            kotlinx.coroutines.delay(3_000)
+            runCatching {
+                val st = when (player.playbackState) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "?"
+                }
+                val fmt = player.videoFormat
+                val fmtText = if (fmt == null) "null" else
+                    "${fmt.width}x${fmt.height}@${(fmt.bitrate ?: 0) / 1000}k"
+                android.util.Log.i(
+                    "BawanLiveStat",
+                    "state=$st playing=${player.isPlaying} pos=${player.currentPosition} " +
+                        "buf=${player.bufferedPosition} dur=${player.duration} " +
+                        "video=$fmtText err=${player.playerError?.errorCodeName ?: "none"} " +
+                        "useWeb=$useWeb native=$nativeActive sawFrame=$sawRealFrame",
+                )
+            }
+        }
+    }
+
     LaunchedEffect(index, retryToken) {
         val ch = playlist.getOrNull(index) ?: return@LaunchedEffect
         // 当前源可能不是直连流（例如电视台网页），先归一化：

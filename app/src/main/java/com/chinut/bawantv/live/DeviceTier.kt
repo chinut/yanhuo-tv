@@ -113,6 +113,21 @@ object DeviceTier {
      *
      * @return (宽, 高, 码率)
      */
+    /**
+     * 按**手动设置**给出上限。0 返回 null 表示"走自动判定"。
+     *
+     * 档位对应关系刻意做得保守：
+     *   省流 → LOW（640x360）
+     *   标清 → MID（854x480）
+     *   高清 → HIGH（1280x720）
+     */
+    fun manualLimit(quality: Int): Triple<Int, Int, Int>? = when (quality) {
+        1 -> videoLimit(Tier.LOW)
+        2 -> videoLimit(Tier.MID)
+        3 -> videoLimit(Tier.HIGH)
+        else -> null
+    }
+
     fun videoLimit(tier: Tier): Triple<Int, Int, Int> = when (tier) {
         // 只留最低档：640x360 / 600kbps 是央视流里最省的一档
         Tier.LOW -> Triple(640, 360, 700_000)

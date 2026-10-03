@@ -309,6 +309,42 @@ fun SettingsScreen(
                     hint = "画面花屏/绿屏时关掉试试",
                     checked = prefs.hardwareDecode,
                 ) { prefs.hardwareDecode = it }
+
+                // ---------- 播放清晰度 ----------
+                //
+                // 为什么要给手动档：自动判定再准也猜不透每一台电视。
+                // 老电视解码弱的时候，用户自己降到「省流」就能流畅 ——
+                // 这比让他等我们改代码现实得多。确定键循环切换，遥控器好按。
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.sdp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "播放清晰度",
+                            color = Ink.TextSecondary,
+                            fontSize = Txt.Label,
+                        )
+                        Text(
+                            "画面卡顿/一直转圈就往下调一档；确定键循环切换",
+                            color = Ink.TextFaint,
+                            fontSize = Txt.Tiny,
+                        )
+                    }
+                    Spacer(Modifier.width(14.sdp))
+                    SmallButton(
+                        listOf("自动", "省流 360p", "标清 480p", "高清 720p")
+                            .getOrElse(prefs.liveQuality) { "自动" },
+                    ) {
+                        prefs.liveQuality = (prefs.liveQuality + 1) % 4
+                        toast(
+                            context,
+                            "直播清晰度：" +
+                                listOf("自动", "省流 360p", "标清 480p", "高清 720p")
+                                    .getOrElse(prefs.liveQuality) { "自动" },
+                        )
+                    }
+                }
             }
         }
 
