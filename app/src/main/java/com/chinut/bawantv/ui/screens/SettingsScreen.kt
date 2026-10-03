@@ -93,6 +93,36 @@ fun SettingsScreen(
     var checkedAndCurrent by remember { mutableStateOf(false) }
 
     var editing by remember { mutableStateOf<EditTarget?>(null) }
+
+    // ---------- 导入 m3u 文件 ----------
+    //
+    // 为什么需要：用户的 IPTV 源往往是**文件**（运营商给的、朋友发来的），
+    // 让他在电视上用遥控器敲一个长网址不现实。
+    //
+    // 用系统的文件选择器（SAF）—— 它是独立窗口，但那是系统自己的界面，
+    // 用户在里面的操作由系统处理，选完回来我们才接管。所以没有
+    // "Compose Dialog 吞按键"那个问题。
+    var importMsg by remember { mutableStateOf("") }
+    var importedCount by remember {
+        mutableIntStateOf(
+            if (com.chinut.bawantv.live.LiveCatalog.hasImported(context)) 1 else 0
+        )
+    }
+    val pickM3u = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts
+            .OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val n = com.chinut.bawantv.live.LiveCatalog.importFrom(context, uri)
+        if (n > 0) {
+            importedCount = n
+            importMsg = "已导入 $n 个频道，重启直播后生效"
+            toast(context, "导入成功：$n 个频道")
+        } else {
+            importMsg = "导入失败：这个文件里没有识别到频道"
+            toast(context, "导入失败，请确认是 m3u / txt 频道表")
+        }
+    }
     var showQr by remember { mutableStateOf(false) }
     var resolvedDomain by remember { mutableStateOf(Ddys.activeBase) }
 
@@ -314,6 +344,55 @@ fun SettingsScreen(
                         onEditRequest = { editing = EditTarget.LiveSource },
                         maxLines = 2,
                     )
+                    Spacer(Modifier.height(8.sdp))
+
+                    // ---------- 导入 m3u 文件 ----------
+                    //
+                    // 比手输网址现实得多：运营商给的 IPTV 源就是文件。
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "导入直播源文件",
+                                color = Ink.TextSecondary,
+                                fontSize = Txt.Label,
+                            )
+                            Text(
+                                if (importedCount > 0) {
+                                    "已导入 $importedCount 个频道（比上面的网址优先）"
+                                } else {
+                                    "选一个 m3u / txt 文件（运营商的 IPTV 源）"
+                                },
+                                color = if (importedCount > 0) Ink.Green else Ink.TextFaint,
+                                fontSize = Txt.Tiny,
+                            )
+                        }
+                        Spacer(Modifier.width(14.sdp))
+                        SmallButton(if (importedCount > 0) "重新导入" else "选择文件") {
+                            pickM3u.launch(
+                                arrayOf(
+                                    "application/vnd.apple.mpegurl",
+                                    "audio/x-mpegurl",
+                                    "application/x-mpegURL",
+                                    "text/plain",
+                                    "*/*",
+                                )
+                            )
+                        }
+                        if (importedCount > 0) {
+                            Spacer(Modifier.width(10.sdp))
+                            SmallButton("清除") {
+                                com.chinut.bawantv.live.LiveCatalog.clearImported(context)
+                                importedCount = 0
+                                importMsg = "已清除导入的源"
+                                toast(context, "已清除")
+                            }
+                        }
+                    }
+                    if (importMsg.isNotBlank()) {
+                        Spacer(Modifier.height(6.sdp))
+                        Text(importMsg, color = Ink.Amber, fontSize = Txt.Tiny)
+                    }
+
                     Spacer(Modifier.height(6.sdp))
                     TvSwitch(
                         label = "开机自动播放上次频道",

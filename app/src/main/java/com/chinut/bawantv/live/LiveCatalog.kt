@@ -33,6 +33,8 @@ data class LiveGroup(
  */
 object LiveCatalog {
 
+    private const val TAG = "BawanLiveCatalog"
+
     private const val BUILTIN_ASSET = "live/cctv.m3u"
 
     @Volatile
@@ -93,12 +95,88 @@ object LiveCatalog {
      *   · 连续失败时自动换下一个源
      */
 
+    // ==================== 用户导入的本地 m3u ====================
+    //
+    // 为什么要有这个：用户的 IPTV 源往往是**文件**（运营商给的、
+    // 或朋友发来的），让他在电视上用遥控器敲一个长网址不现实。
+    //
+    // 文件复制到 App 私有目录，而不是直接用 content:// URI ——
+    // 因为 SAF 给的临时授权在重启后可能失效，那样用户会发现
+    // "昨天还好好的源今天没了"。
+
+    /** 导入文件的存放位置（App 私有目录）。 */
+    fun importedFile(context: Context): java.io.File =
+        java.io.File(context.filesDir, "custom_live.m3u")
+
+    fun hasImported(context: Context): Boolean =
+        importedFile(context).let { it.exists() && it.length() > 0 }
+
+    /**
+     * 把用户选中的文件复制进来。
+     *
+     * @return 成功时返回频道条数；失败返回 -1
+     */
+    fun importFrom(context: Context, uri: android.net.Uri): Int {
+        return try {
+            val text = context.contentResolver.openInputStream(uri)
+                ?.use { it.readBytes().toString(Charsets.UTF_8) }
+                ?: return -1
+            if (text.isBlank()) return -1
+            // 先解析一遍，确认真的是频道表（避免用户选错文件后
+            // 频道列表整个变空，还找不到原因）
+            val groups = parse(text)
+            val n = groups.sumOf { it.channels.size }
+            if (n == 0) {
+                android.util.Log.w(TAG, "导入失败：文件里没解析出频道")
+                return -1
+            }
+            importedFile(context).writeText(text, Charsets.UTF_8)
+            android.util.Log.i(TAG, "导入成功：$n 个频道 → ${importedFile(context).name}")
+            n
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "导入异常：${e.javaClass.simpleName} ${e.message}")
+            -1
+        }
+    }
+
+    fun clearImported(context: Context) {
+        runCatching { importedFile(context).delete() }
+    }
+
     /**
      * 最终频道表：内置频道 + 用户自定义源（如果有）。
      * 自定义源单独成一类，放在最前面，避免和内置的混在一起。
+     *
+     * 顺序：**本地导入的文件优先**，其次才是自定义网址。
+     * 两者都给的话，本地文件赢 —— 因为它更可能是用户特意准备的。
      */
     suspend fun load(context: Context, customSourceUrl: String): List<LiveGroup> {
         val builtin = builtin(context)
+
+        // 1) 本地导入的文件
+        if (hasImported(context)) {
+            val text = runCatching {
+                importedFile(context).readText(Charsets.UTF_8)
+            }.getOrNull()
+            if (!text.isNullOrBlank()) {
+                val custom = parse(text)
+                if (custom.isNotEmpty()) {
+                    val merged = ArrayList<LiveGroup>(custom.size + builtin.size)
+                    custom.forEach { g ->
+                        merged.add(g.copy(name = "我的源 · ${g.name}"))
+                    }
+                    merged.addAll(builtin)
+                    android.util.Log.i(
+                        TAG,
+                        "用本地导入的源：${custom.sumOf { it.channels.size }} 个频道",
+                    )
+                    return mergeAlternates(merged)
+                }
+            }
+            android.util.Log.w(TAG, "本地导入的文件解析不出频道，退回内置")
+        }
+
+        // 2) 自定义网址
         val url = customSourceUrl.trim()
         if (url.isEmpty()) return builtin
 
