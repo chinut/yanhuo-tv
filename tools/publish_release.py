@@ -207,8 +207,19 @@ def main():
     ap.add_argument('--code', type=int, required=True)
     ap.add_argument('--version-name', required=True)
     ap.add_argument('--notes', default='')
+    # 从文件读说明文字。
+    #
+    # 为什么不直接用 --notes：说明里常含 markdown 表格（行首是 "|"）和反引号，
+    # 经 shell 传递时会被当成管道/命令替换拆开，实测报
+    # "unrecognized arguments: 2dp 细线——"。走文件就完全绕开转义问题。
+    ap.add_argument('--notes-file', default='')
     ap.add_argument('--sha', default='')
     a = ap.parse_args()
+
+    if a.notes_file:
+        import io as _io
+        with _io.open(a.notes_file, encoding='utf-8') as _f:
+            a.notes = _f.read()
 
     size_mb = round(os.path.getsize(a.apk) / 1048576, 1)
     body = build_body(a.code, a.version_name, os.path.basename(a.apk), a.sha,

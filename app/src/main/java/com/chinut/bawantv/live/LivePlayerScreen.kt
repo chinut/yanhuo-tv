@@ -126,6 +126,10 @@ fun LivePlayerScreen(
     var index by remember {
         mutableIntStateOf(playlist.indexOfFirst { it.url == initialChannel.url }.coerceAtLeast(0))
     }
+    /** 直连地址缓存用的 key：频道 + 源下标（不同源的地址不一样）。 */
+    fun cacheKeyOf(ch: LiveChannel, srcIndex: Int): String =
+        LiveCatalog.normalizeName(ch.name) + "#" + srcIndex
+
     /** 频道在当前分组里的稳定标识（用于「记住能播的源」）。 */
     fun channelKeyOf(ch: LiveChannel): String = LiveCatalog.normalizeName(ch.name)
 
@@ -200,11 +204,61 @@ fun LivePlayerScreen(
      */
     var siteFullscreenView by remember(webUrl) { mutableStateOf<android.view.View?>(null) }
 
-    /** 当前频道是否要走「浏览器引擎」路线。 */
-    val useWeb = remember(webUrl) { LiveCatalog.isWebPage(webUrl) }
+    /**
+     * 该频道是否已经有可用的**直连地址**缓存。
+     *
+     * 有的话就完全不需要 WebView 了 —— 直接把这个地址交给 ExoPlayer。
+     * 这是电视上"能不能流畅播"的关键：Chromium 在电视上要吃掉
+     * 60~100MB 内存和大量 CPU，把它省掉，ExoPlayer 才有资源把缓冲做厚。
+     *
+     * 第一次打开某个频道仍然要走网页截获（没有别的办法拿到地址），
+     * 截获成功后就永久记下来，从第二次起就是秒开。
+     */
+    val cachedStreamUrl = remember(current.url, sourceIndex) {
+        StreamCache.get(context, cacheKeyOf(current, sourceIndex))
+    }
+
+    /** 当前频道是否要走「浏览器引擎」路线。有直连缓存就不用走。 */
+    val useWeb = remember(webUrl, cachedStreamUrl) {
+        cachedStreamUrl == null && LiveCatalog.isWebPage(webUrl)
+    }
 
     /** 网页路线的 WebView 实例。 */
     var webView by remember { mutableStateOf<TvWebPlayerView?>(null) }
+
+    /**
+     * WebView 是否已经释放掉了。
+     *
+     * 硬解播稳之后我们就销毁 WebView（省下 60~100MB 内存和大量 CPU），
+     * 但要保证**只销毁一次**，并且之后再也不要往它上面挂东西。
+     */
+    var webReleased by remember(webUrl) { mutableStateOf(false) }
+
+    /**
+     * 销毁 WebView，把 Chromium 占的资源还给系统。
+     *
+     * 顺序有讲究（漏掉任何一步都可能泄漏或崩溃）：
+     *   1. stopLoading —— 停掉还在飞的网络请求（不然它还在拉视频分片）
+     *   2. 载入 about:blank —— 让页面先卸载，释放 DOM / 解码器
+     *   3. 移除 JS 桥 —— 避免回调打到已经销毁的实例上
+     *   4. 从父容器摘掉 —— 还在视图树里的话 destroy() 之后会被重新绘制
+     *   5. destroy() —— 真正释放
+     */
+    fun releaseWebView() {
+        val wv = webView ?: return
+        android.util.Log.i(TAG_LIVE, "硬解已稳定，销毁 WebView 释放内存")
+        runCatching {
+            wv.onFirstFrame = null
+            wv.fullscreenCallback = null
+            wv.fullscreenExit = null
+            wv.stopLoading()
+            wv.loadUrl("about:blank")
+            wv.clearHistory()
+            (wv.parent as? android.view.ViewGroup)?.removeView(wv)
+            wv.destroy()
+        }.onFailure { android.util.Log.w(TAG_LIVE, "销毁 WebView 失败：${it.message}") }
+        webView = null
+    }
 
     /**
      * 从网页里捕获到的媒体流地址。
@@ -345,22 +399,23 @@ fun LivePlayerScreen(
         // 现在的做法：给一个**与设备能力相称的上限**，然后交给自适应。
         // 解码/带宽跟不上时它会自发停在能扛的档位，够用的时候才会升上去。
         // 这比"一刀切锁最高"或"一刀切锁最低"都稳。
-        val isLowEnd = android.os.Build.VERSION.SDK_INT < 24 &&
-            !android.os.Build.SUPPORTED_ABIS.any { it.contains("64") }
+        val isLowEnd = com.chinut.bawantv.live.DeviceTier.isLowEnd(context)
 
         val trackSelector = androidx.media3.exoplayer.trackselection
             .DefaultTrackSelector(context).apply {
                 parameters = parameters.buildUpon()
                     .apply {
-                        if (isLowEnd) {
-                            // 32 位 Android 5.x/6.0 电视：显式排除 720p/576p 两档
-                            setMaxVideoSize(854, 480)
-                            setMaxVideoBitrate(1_000_000)
-                        } else {
-                            // 其余设备：允许到 720p，但由自适应决定什么时候上去
-                            setMaxVideoSize(1280, 720)
-                            setMaxVideoBitrate(2_000_000)
-                        }
+                        // 按**设备真实能力**给上限（核数 + 内存 + API + ABI），
+                        // 而不是"是不是 32 位老系统"。
+                        //
+                        // 踩过的坑：原来只判断 `SDK < 24 && 非64位`，
+                        // 结果大量 Android 7/8 的四核弱电视躲过判断、被喂 720p，
+                        // 解码跟不上就成了"卡"甚至"黑屏"（实测日志显示硬解
+                        // 不报错、只是永远不出画面 —— 就是码率吃不下）。
+                        val (w, h, bitrate) = com.chinut.bawantv.live.DeviceTier
+                            .videoLimit(com.chinut.bawantv.live.DeviceTier.of(context))
+                        setMaxVideoSize(w, h)
+                        setMaxVideoBitrate(bitrate)
                     }
                     .build()
             }
@@ -409,6 +464,20 @@ fun LivePlayerScreen(
      * 注意这里**不销毁 WebView**：留着它继续跑，万一原生解不了
      * （确实是加密专有流）还能回退到网页画面。
      */
+    // ---------- 有直连缓存：直接用，不碰 WebView ----------
+    LaunchedEffect(current.url, sourceIndex, cachedStreamUrl) {
+        val u = cachedStreamUrl ?: return@LaunchedEffect
+        android.util.Log.i(TAG_LIVE, "命中直连缓存，跳过网页直接硬解：$u")
+        runCatching {
+            player.setMediaSource(sourceFor(current, u))
+            player.prepare()
+            player.play()
+        }.onFailure {
+            android.util.Log.w(TAG_LIVE, "直连缓存起播失败，清除缓存下次重新截获：${it.message}")
+            StreamCache.forget(context, cacheKeyOf(current, sourceIndex))
+        }
+    }
+
     LaunchedEffect(nativeFallbackUrl) {
         val u = nativeFallbackUrl ?: return@LaunchedEffect
         android.util.Log.i(TAG_LIVE, "使用捕获到的流地址起播（硬解）：$u")
@@ -427,12 +496,31 @@ fun LivePlayerScreen(
         // 正确做法：**等硬解真的渲染出第一帧**再隐藏网页（见播放器监听里的
         // STATE_READY / onRenderedFirstFrame）。在那之前网页继续当保底画面。
         //
-        // 下面设一个超时：如果 N 秒内硬解没出画面，就认定它不行，
-        // 把网页恢复出来（并停掉硬解，免得白烧 CPU）。
+        // 下面设一个超时：如果 N 秒内硬解没出画面，就把网页恢复出来。
+        //
+        // ⚠️ 这里原来是**盲砍**：不管硬解是在报错还是只是慢，到点就放弃。
+        // 后果是"再等两秒就能出画面的"也被砍掉，退回那个在电视上根本跑不动的
+        // WebView —— 老电视"直接播不出来"，有一部分就是这么来的。
+        //
+        // 现在分两种情况：
+        //   · playerError 非空   → 真的解不了，直接放弃，不用等满超时
+        //   · 还在 prepare/buffer → 只是慢，再给一轮时间
         nativeActive = false
         kotlinx.coroutines.delay(NATIVE_READY_TIMEOUT_MS)
         if (!nativeActive) {
-            android.util.Log.w(TAG_LIVE, "硬解 $NATIVE_READY_TIMEOUT_MS ms 内未出画面，退回网页播放")
+            val failedHard = runCatching { player.playerError != null }.getOrDefault(false)
+            if (failedHard) {
+                android.util.Log.w(TAG_LIVE, "硬解确实报错，退回网页播放")
+            } else {
+                android.util.Log.i(
+                    TAG_LIVE,
+                    "硬解 ${NATIVE_READY_TIMEOUT_MS}ms 没出画面但也没报错，再等 ${NATIVE_EXTRA_WAIT_MS}ms",
+                )
+                kotlinx.coroutines.delay(NATIVE_EXTRA_WAIT_MS)
+            }
+        }
+        if (!nativeActive) {
+            android.util.Log.w(TAG_LIVE, "硬解最终未出画面，退回网页播放")
             runCatching {
                 player.stop()
                 webView?.let { wv -> wv.visibility = android.view.View.VISIBLE }
@@ -497,25 +585,44 @@ fun LivePlayerScreen(
                 // 我踩过这个坑，真机反馈就是"直播不出画面"。
                 super.onRenderedFirstFrame()
                 if (useWeb) {
-                    android.util.Log.i(TAG_LIVE, "硬解已出画面，隐藏网页路线")
+                    android.util.Log.i(TAG_LIVE, "硬解已出画面，停掉网页路线")
                     nativeActive = true
-                    runCatching {
-                        webView?.let { wv ->
-                            wv.onFirstFrame = null
-                            // 停掉网页里的 video：两路同时解码既费 CPU 又会叠影
+                    // 把这次成功的直连地址记下来 —— 以后打开这个频道就不用再走网页了
+                    nativeFallbackUrl?.let { StreamCache.put(context, cacheKeyOf(current, sourceIndex), it) }
+                    webView?.let { wv ->
+                        wv.onFirstFrame = null
+                        // 停掉网页里的 video：两路同时解码既费 CPU 又会叠影
+                        runCatching {
                             wv.evaluateJavascript(
                                 "try{var vs=document.querySelectorAll('video');" +
                                     "for(var i=0;i<vs.length;i++){vs[i].pause();}}catch(e){}",
                                 null,
                             )
-                            wv.visibility = android.view.View.GONE
                         }
+                        wv.visibility = android.view.View.GONE
                     }
                 }
             }
 
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
+
+                // ---------- 硬解稳定后释放 WebView ----------
+                //
+                // 这里原来只是把 WebView 设成 GONE("隐藏")，**没有销毁**。
+                // 后果是直播期间 Chromium 一直活着：DOM 还在渲染、JS 定时器还在跑、
+                // 页面还在占着 60~100MB 内存 —— 和 ExoPlayer 抢 CPU 和内存。
+                //
+                // 这正是"新电视也卡、十几年的电视直接播不动"的主因：
+                // 不是解码能力不够，是一半资源被白白占着。
+                //
+                // 现在：硬解进入 READY（真的稳定了）就彻底销毁 WebView。
+                // 只有等它播稳了才销毁，是因为硬解也可能中途失败，
+                // 那时还需要网页路线兜底。
+                if (state == Player.STATE_READY && useWeb && nativeActive && !webReleased) {
+                    webReleased = true
+                    releaseWebView()
+                }
                 // 真正播起来了 → 把之前的失败提示清掉。
                 // 之前不这么做，导致"已经恢复正常播放了，黑幕还挂在那里"。
                 if (state == Player.STATE_READY) {
@@ -536,6 +643,15 @@ fun LivePlayerScreen(
                 //
                 // 所以：**网页频道的 ExoPlayer 错误直接丢掉**，不要动任何状态。
                 if (useWeb) {
+                    // 但要**记下来**。原来这里直接 return，连日志都没有，
+                    // 于是"硬解到底为什么没出画面"完全无从判断 ——
+                    // 是解码器不支持？还是只是起播慢？排查全靠猜。
+                    android.util.Log.w(
+                        TAG_LIVE,
+                        "硬解报错（网页路线，忽略并继续用网页兜底）：" +
+                            "${error.errorCodeName} / ${error.cause?.javaClass?.simpleName}" +
+                            " / ${error.message?.take(160)}",
+                    )
                     return
                 }
                 // ---------- 不做自动换源 ----------
@@ -1379,7 +1495,15 @@ internal fun BufferingDot(progress: Float) {
  * 太长则用户盯着黑屏等 —— 12 秒是个折中：
  * 网页画面一直当保底，所以这段等待用户并不是在看黑屏。
  */
-private const val NATIVE_READY_TIMEOUT_MS = 12_000L
+private const val NATIVE_READY_TIMEOUT_MS = 15_000L
+
+/**
+ * 第一轮超时后如果硬解**没报错**（只是还没起起来），再等这么久。
+ *
+ * 为什么要多等：慢速网络和弱解码器上"起播慢"很常见，
+ * 而退回网页在电视上往往更糟（Chromium 跑不动）。多等十几秒更划算。
+ */
+private const val NATIVE_EXTRA_WAIT_MS = 12_000L
 
 
 /**
