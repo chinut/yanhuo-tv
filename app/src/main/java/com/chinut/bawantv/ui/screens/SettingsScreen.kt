@@ -543,6 +543,36 @@ fun SettingsScreen(
         }
 
         // ==================== 关于 ====================
+        // ==================== 诊断（测试用） ====================
+        item {
+            SettingsCard(
+                title = "诊断",
+                subtitle = "测试期间用来看内存和清缓存；日常使用可以不管",
+                accent = Ink.Amber,
+            ) {
+                TvSwitch(
+                    label = "显示内存浮层",
+                    hint = "屏幕右上角实时显示 PSS / RSS / Native / Java",
+                    checked = prefs.showMemoryHud,
+                ) { prefs.showMemoryHud = it }
+
+                TvSwitch(
+                    label = "记录内存日志",
+                    hint = "每 5 秒写一条 logcat（tag=BawanMem），可事后拉完整时间线",
+                    checked = prefs.logMemory,
+                ) { prefs.logMemory = it }
+
+                Spacer(Modifier.height(10.sdp))
+                Row {
+                    SmallButton("清空直播直连缓存") {
+                        com.chinut.bawantv.live.StreamCache.clearAll(context)
+                        toast(context, "已清空，下次换台会重新获取直连地址")
+                    }
+                }
+            }
+        }
+
+
         item {
             SettingsCard(
                 title = "关于焰火TV",

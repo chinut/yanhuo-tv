@@ -512,6 +512,34 @@ fun BawanRoot(
             }
             }   // ← 关掉「播放中不组合主界面」的 if
 
+
+            // ---------- 内存监控浮层（测试用） ----------
+            //
+            // 放在最上层，但它只是个 Box + 文字，**完全不参与焦点**
+            // （详见 MemoryHud 注释：一旦可聚焦就会打乱几何导航的落点）。
+            androidx.compose.foundation.layout.Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = androidx.compose.ui.Alignment.TopEnd,
+            ) {
+                MemoryHud(enabled = prefs.showMemoryHud)
+            }
+
+            // ---------- 周期性内存日志 ----------
+            //
+            // 浮层只能看"此刻"，日志能事后拉出**完整时间线** ——
+            // 这是定位"哪个操作把内存顶上去了"的关键。
+            // 拉取： adb logcat -s BawanMem:I
+            if (prefs.logMemory) {
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        runCatching {
+                            val s = com.chinut.bawantv.core.MemProbe.sample(context)
+                            android.util.Log.i("BawanMem", s.logLine("采样"))
+                        }
+                        kotlinx.coroutines.delay(com.chinut.bawantv.core.MemProbe.LOG_INTERVAL_MS)
+                    }
+                }
+            }
             // ---------- 直播全屏播放浮层 ----------
             livePlaying?.let { channel ->
                 Text(

@@ -125,6 +125,24 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_SHOW_HUD, true)
         set(v) = sp.edit().putBoolean(KEY_SHOW_HUD, v).apply().also { touch() }
 
+    /**
+     * 内存监控浮层。
+     *
+     * 测试用：屏幕上实时显示 PSS / RSS / Native / Java。默认关，日常使用不该看到它。
+     */
+    var showMemoryHud: Boolean
+        get() = sp.getBoolean(KEY_MEM_HUD, false)
+        set(v) = sp.edit().putBoolean(KEY_MEM_HUD, v).apply().also { touch() }
+
+    /**
+     * 周期性把内存写进 logcat（tag = BawanMem，每 5 秒一条）。
+     *
+     * 比浮层强的地方：能事后拉出完整时间线，看出是哪个操作把内存顶上去了。
+     */
+    var logMemory: Boolean
+        get() = sp.getBoolean(KEY_MEM_LOG, false)
+        set(v) = sp.edit().putBoolean(KEY_MEM_LOG, v).apply().also { touch() }
+
     // ==================== 每个频道记住「能播的那个源」 ====================
 
     /**
@@ -297,5 +315,7 @@ class AppPrefs(context: Context) {
         private const val KEY_HOME_CACHE = "home_movie_cache"
         private const val KEY_HW_DECODE = "hw_decode"
         private const val KEY_SHOW_HUD = "show_hud"
+private const val KEY_MEM_HUD = "mem_hud"
+private const val KEY_MEM_LOG = "mem_log"
     }
 }
