@@ -191,6 +191,15 @@ fun LivePlayerScreen(
     /** 是否已经在走 ExoPlayer 硬解（此时网页要藏起来，避免两路同时渲染）。 */
     var nativeActive by remember(webUrl) { mutableStateOf(false) }
 
+    /**
+     * 站点进入全屏后交给我们的那个视频 View。
+     *
+     * 非空时说明正在"接管式全屏" —— 页面的其余部分不参与渲染，
+     * 只有这一个 View 铺满屏幕。这正是参考项目（土拨鼠浏览器）的做法，
+     * 比"注入 CSS 强撑 video 元素"省得多。
+     */
+    var siteFullscreenView by remember(webUrl) { mutableStateOf<android.view.View?>(null) }
+
     /** 当前频道是否要走「浏览器引擎」路线。 */
     val useWeb = remember(webUrl) { LiveCatalog.isWebPage(webUrl) }
 
@@ -233,6 +242,24 @@ fun LivePlayerScreen(
             webView?.visibility = android.view.View.VISIBLE
             buffering = false
         }
+    }
+
+    // ---------- 出画面后主动请求站点全屏 ----------
+    //
+    // 目标是走"接管 View"这条路（见 docs/直播卡顿-参考项目对比分析.md）：
+    // 整页不再参与渲染，只画那一个视频 View，最省 CPU。
+    //
+    // 站点不一定立刻响应，所以试两次：
+    //   · 出画面后 0.6 秒试一次（多数站点这时播放器已就绪）
+    //   · 再过 1.5 秒试第二次（有些站点的全屏按钮是延迟渲染的）
+    // 两次都不成也无所谓 —— 还有那套 CSS 清理兜底，画面照样铺满。
+    LaunchedEffect(webUrl, webFirstFrame, useWeb) {
+        if (!useWeb || !webFirstFrame) return@LaunchedEffect
+        if (siteFullscreenView != null) return@LaunchedEffect
+        kotlinx.coroutines.delay(600)
+        webView?.requestSiteFullscreen()
+        kotlinx.coroutines.delay(1_500)
+        if (siteFullscreenView == null) webView?.requestSiteFullscreen()
     }
 
     LaunchedEffect(webUrl, useWeb) {
@@ -292,29 +319,49 @@ fun LivePlayerScreen(
     val player = remember {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                        /* minBufferMs = */ 15_000,
-                        /* maxBufferMs = */ 60_000,
-                        /* bufferForPlaybackMs = */ 2_000,
-                        /* bufferForPlaybackAfterRebufferMs = */ 8_000,
+                        // 起播攒 6 秒就够（原来 15 秒太贪，老电视内存吃紧反而更容易抖动）
+                        /* minBufferMs = */ 6_000,
+                        /* maxBufferMs = */ 30_000,
+                        /* bufferForPlaybackMs = */ 1_500,
+                        /* bufferForPlaybackAfterRebufferMs = */ 4_000,
             )
             .build()
-        // ---------- 选轨策略：直接上最高码率 ----------
+
+        // ---------- 选轨策略：**保守起步，让自适应往上探** ----------
         //
-        // 真机反馈"直播又卡又不清"。查下来：抓到的流是**多码率 master playlist**：
-        //     1800000 / 1280x720   ← 最高
+        // 这里我改错过一次，值得写清楚。
+        //
+        // 抓到的央视流是多码率 master playlist：
+        //     1800000 / 1280x720
         //     1350000 / 1024x576
         //      900000 /  854x480
         //      600000 /  640x360
-        // ExoPlayer 的默认自适应会**从最低档起播**，再靠带宽估算往上爬。
-        // 电视上这个估算经常爬不上去，甚至来回降档 —— 表现就是糊 + 卡。
         //
-        // 直播不同于点播：**宁可偶尔缓冲，也不要一直糊**。
-        // 所以把初始档位直接设成最高，让自适应只在明显不行时才降。
+        // 我当时的想法是"直播宁可缓冲也别糊"，于是把上限放到 1920x1080 /
+        // 20Mbps，等于**强迫起播就走 720p**。结果真机反馈"试了很多个电视
+        // 都带不起来" —— 老电视的解码能力和 WiFi 吞吐根本吃不下 1.8Mbps，
+        // 于是不停缓冲，看起来就是"卡"。
+        //
+        // 现在的做法：给一个**与设备能力相称的上限**，然后交给自适应。
+        // 解码/带宽跟不上时它会自发停在能扛的档位，够用的时候才会升上去。
+        // 这比"一刀切锁最高"或"一刀切锁最低"都稳。
+        val isLowEnd = android.os.Build.VERSION.SDK_INT < 24 &&
+            !android.os.Build.SUPPORTED_ABIS.any { it.contains("64") }
+
         val trackSelector = androidx.media3.exoplayer.trackselection
             .DefaultTrackSelector(context).apply {
                 parameters = parameters.buildUpon()
-                    .setMaxVideoSize(1920, 1080)
-                    .setMaxVideoBitrate(20_000_000)
+                    .apply {
+                        if (isLowEnd) {
+                            // 32 位 Android 5.x/6.0 电视：显式排除 720p/576p 两档
+                            setMaxVideoSize(854, 480)
+                            setMaxVideoBitrate(1_000_000)
+                        } else {
+                            // 其余设备：允许到 720p，但由自适应决定什么时候上去
+                            setMaxVideoSize(1280, 720)
+                            setMaxVideoBitrate(2_000_000)
+                        }
+                    }
                     .build()
             }
 
@@ -760,6 +807,13 @@ fun LivePlayerScreen(
                                 nativeFallbackUrl = url
                             }
                         }
+                        // 站点请求全屏 → 接管它给的那个 View
+                        view.fullscreenCallback = { v, _ ->
+                            siteFullscreenView = v
+                        }
+                        view.fullscreenExit = {
+                            siteFullscreenView = null
+                        }
                         // 真的出画面了才让用户看到（之前只显示我们的转圈）
                         view.onFirstFrame = {
                             webFirstFrame = true
@@ -889,6 +943,43 @@ fun LivePlayerScreen(
                 onPick = { tuneTo(it) },
             )
         }
+
+    // ---------- 全屏视频容器 ----------
+    //
+    // 站点进入全屏后，它的视频 View 会挂在这里。
+    // 用 AndroidView 包一个 FrameLayout 当宿主 —— 因为 Compose 不能直接 addView，
+    // 而我们又必须把那个原生 View 放进来。
+    //
+    // 放在最上层：全屏时它盖住下面所有东西（包括网页本身）。
+    siteFullscreenView?.let { fv ->
+        AndroidView(
+            factory = { ctx ->
+                android.widget.FrameLayout(ctx).apply {
+                    layoutParams = android.view.ViewGroup.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    )
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                }
+            },
+            update = { host ->
+                // 把站点给的 View 挂进来（先摘掉旧的，避免重复添加）
+                val parent = fv.parent
+                if (parent is android.view.ViewGroup) parent.removeView(fv)
+                if (host.childCount == 0) {
+                    host.addView(
+                        fv,
+                        android.view.ViewGroup.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        ),
+                    )
+                    android.util.Log.i(TAG_LIVE, "已接管站点全屏 View，页面其余部分不再渲染")
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 
     // ---------- 清晰度 / 线路选择面板 ----------
     //

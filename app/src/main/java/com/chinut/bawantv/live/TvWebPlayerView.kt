@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.view.ViewGroup
+import android.view.View
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -268,7 +269,74 @@ class TvWebPlayerView(context: Context) : WebView(context) {
                 android.util.Log.d(TAG, "[web] ${msg?.message()}")
                 return true
             }
+
+            /**
+             * 站点播放器请求进入全屏。
+             *
+             * 这是**参考同类项目的做法**：不要去注入 CSS 强撑 `<video>`，
+             * 而是让站点自己进全屏，然后把它交出来的那个 View 直接接管铺满。
+             *
+             * 两者差别很大：
+             *   · 接管 View  —— 只有这一个 View 参与渲染，页面其余部分不画
+             *   · 注入 CSS   —— 整页照常渲染，只是被 CSS 藏起来了，CPU 白烧
+             */
+            override fun onShowCustomView(view: View?, callback: WebChromeClient.CustomViewCallback?) {
+                if (view == null) return
+                android.util.Log.i(TAG, "站点请求全屏，接管视频 View")
+                fullscreenCallback?.invoke(view, callback)
+            }
+
+            override fun onHideCustomView() {
+                android.util.Log.i(TAG, "站点退出全屏")
+                fullscreenExit?.invoke()
+            }
         }
+    }
+
+    /**
+     * 站点请求全屏时的回调：(要接管的视频 View, 用于退回的回调)。
+     *
+     * 由外层提供容器并 addView —— 因为本类是 WebView 的子类，
+     * 自己不能容纳子 View。
+     */
+    var fullscreenCallback: ((View, WebChromeClient.CustomViewCallback?) -> Unit)? = null
+
+    /** 站点退出全屏。 */
+    var fullscreenExit: (() -> Unit)? = null
+
+    /**
+     * 让站点播放器进入全屏（如果它支持）。
+     *
+     * 优先调站点的全屏 API，其次对 `<video>` 请求全屏。
+     * 成功后站点会走 [WebChromeClient.onShowCustomView]，我们把那个 View 接管过来。
+     *
+     * @return true 表示已经发起了全屏请求
+     */
+    fun requestSiteFullscreen(): Boolean {
+        val js = """
+        (function(){
+          try{
+            /* 1) 站点自己的全屏按钮/接口 */
+            var sels = ['[class*=fullscreen]','[class*=full-screen]','[class*=fullScreen]',
+                        '[aria-label*=全屏]','[title*=全屏]','[class*=quanping]'];
+            for (var i=0;i<sels.length;i++){
+              var el = document.querySelector(sels[i]);
+              if (el) { el.click(); return 'site'; }
+            }
+            /* 2) 退而求其次：对 video 本身请求全屏 */
+            var vs = document.querySelectorAll('video');
+            for (var j=0;j<vs.length;j++){
+              var v = vs[j];
+              var fn = v.requestFullscreen || v.webkitRequestFullscreen ||
+                       v.webkitEnterFullscreen || v.mozRequestFullScreen;
+              if (fn) { fn.call(v); return 'video'; }
+            }
+          }catch(e){}
+          return 'none';
+        })();
+        """.trimIndent()
+        evaluateJavascript(js, null)
+        return true
     }
 
     /** 播放健康状态，供外层决定是否切换备用源。 */
