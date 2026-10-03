@@ -1,5 +1,7 @@
 package com.chinut.bawantv.ui.screens
 
+import com.chinut.bawantv.unified.DdysSource
+import com.chinut.bawantv.unified.VideoSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -106,6 +108,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun UnifiedVideoScreen(
     entryKey: Any,
+    /**
+     * 数据源。默认低端影视（影视板块）；
+     * 短剧板块传 [com.chinut.bawantv.unified.HongguoSource]。
+     *
+     * 抽出这一层是为了让短剧**复用本页**（海报墙 / 详情 / 选集 / 播放），
+     * 而不是复制一份 1300 多行的界面。电视内存紧，多一套界面等于
+     * 多一份图片缓存和组合开销。
+     */
+    source: com.chinut.bawantv.unified.VideoSource =
+        com.chinut.bawantv.unified.DdysSource,
     /** 首页推荐墙点进来的作品：进来直接开详情 */
     pendingMovie: UnifiedMovie? = null,
     onPendingConsumed: () -> Unit = {},
@@ -235,18 +247,21 @@ fun UnifiedVideoScreen(
     suspend fun loadFromLibrary() {
         loading = true
         error = null
-        val cached = runCatching { LibraryStore.load() }.getOrDefault(emptyList())
+        val cached = runCatching { source.cached() }.getOrDefault(emptyList())
         if (cached.isNotEmpty()) {
-            typeOptions = runCatching { LibraryStore.typeNames() }.getOrDefault(emptyList())
+            typeOptions = runCatching { source.typeNames() }.getOrDefault(emptyList())
             movies = applyFilters(cached)
             loading = false          // 立刻出画面，不等网络
         }
         // 后台补货：一次抓多页，边抓边更新界面
         syncing = 1
         val fresh = runCatching {
-            LibraryStore.refresh(pagesPerType = 5) { done, total, count ->
+            source.refresh { done, total, count ->
                 syncDone = done
-                android.util.Log.i("BawanLibrary", "补货 $done/$total 累计 $count 条")
+                android.util.Log.i(
+                    "BawanLibrary",
+                    "${source.id} 补货 $done/$total 累计 $count 条",
+                )
             }
         }.getOrElse {
             error = it.message
@@ -254,17 +269,17 @@ fun UnifiedVideoScreen(
         }
         syncing = 0
         if (fresh.isNotEmpty()) {
-            typeOptions = runCatching { LibraryStore.typeNames() }.getOrDefault(emptyList())
+            typeOptions = runCatching { source.typeNames() }.getOrDefault(emptyList())
             movies = applyFilters(fresh)
         }
         loading = false
     }
 
-    LaunchedEffect(Unit) { loadFromLibrary() }
+    LaunchedEffect(source) { loadFromLibrary() }
 
     // 筛选条件变了就地重算，不用重新联网
     LaunchedEffect(keyword, typeFilter) {
-        val cached = runCatching { LibraryStore.load() }.getOrDefault(emptyList())
+        val cached = runCatching { source.cached() }.getOrDefault(emptyList())
         if (cached.isNotEmpty()) movies = applyFilters(cached)
     }
 
@@ -308,6 +323,7 @@ fun UnifiedVideoScreen(
     if (detail != null) {
         UnifiedDetailScreen(
             movie = detail,
+            source = source,
             onBack = { setDetailOf(null) },
             debugAutoPlay = debugAutoPlay,
             onDebugAutoPlayConsumed = onDebugAutoPlayConsumed,
@@ -482,11 +498,11 @@ fun UnifiedVideoScreen(
         // 结构说明：低端影视是**基础库**，所以这里第一眼看到的是
         // "库里有什么"（数量），而不是各源的聚合状态。
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("影视", color = Color.White, fontSize = Txt.Section, fontWeight = FontWeight.Bold)
+            Text(source.displayName, color = Color.White, fontSize = Txt.Section, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(14.sdp))
             Text(
-                if (syncing > 0) "低端影视库 ${movies.size} 部 · 补货中 ${syncDone}/20"
-                else "低端影视库 ${movies.size} 部",
+                if (syncing > 0) "${movies.size} 部 · 加载中"
+                else "${movies.size} 部",
                 color = if (syncing > 0) Ink.Amber else Ink.TextFaint,
                 fontSize = Txt.Caption,
             )
@@ -526,7 +542,7 @@ fun UnifiedVideoScreen(
         if (movies.isEmpty()) {
             SectionEmpty(
                 error?.let { "影视库准备失败：$it\n可按「刷新片库」重试" }
-                    ?: "影视库还是空的\n按「刷新片库」从低端影视拉取片单"
+                    ?: "片库还是空的\n按「三横键」换个分类试试"
             )
             return@Column
         }
@@ -820,6 +836,8 @@ private fun UnifiedCard(
 @Composable
 private fun UnifiedDetailScreen(
     movie: UnifiedMovie,
+    /** 数据源。由 UnifiedVideoScreen 透传 —— 短剧要用红果，影视用低端影视。 */
+    source: com.chinut.bawantv.unified.VideoSource,
     onBack: () -> Unit,
     onPlay: (UnifiedMovie, UnifiedSource, List<Episode>, Int) -> Unit,
     /** 调试：数据就绪后自动起播第一集（自动化验证播放页用）。 */
@@ -867,7 +885,7 @@ private fun UnifiedDetailScreen(
         val delays = listOf(0L, 1_000L, 2_000L, 4_000L)
         for ((attempt, waitMs) in delays.withIndex()) {
             if (waitMs > 0) kotlinx.coroutines.delay(waitMs)
-            val got = runCatching { MovieAggregator.loadSources(movie) }.getOrNull()
+            val got = runCatching { source.loadSources(movie) }.getOrNull()
             if (got != null && got.any { it.episodes.isNotEmpty() }) {
                 best = got
                 android.util.Log.i(

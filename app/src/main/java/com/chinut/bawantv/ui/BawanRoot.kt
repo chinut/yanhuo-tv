@@ -426,12 +426,55 @@ fun BawanRoot(
 
                             // ---------- 短剧 ----------
                             //
-                            // 复用影视那套界面（海报墙 / 详情 / 剧集 / 播放），
-                            // 只是数据源不同 —— 短剧和影视在交互上是同一件事，
+                            // **直接复用影视那套界面**，只换数据源 ——
+                            // 短剧和影视在交互上是同一件事（海报墙 → 详情 → 选集 → 播放），
                             // 没必要写两套 UI，也更省内存。
+                            //
+                            // 数据源 [HongguoSource] 会把红果的分集包成 UnifiedSource：
+                            //   · 保住全部分集数（用户能看到"共 72 集"）
+                            //   · 只为**免费集**取播放地址（实测 3 集；
+                            //     超出的站点返回 404，是正常的付费墙，不是故障）
                             TopSection.ShortDrama -> com.chinut.bawantv.ui.screens
-                                .ShortDramaScreen(
+                                .UnifiedVideoScreen(
                                     entryKey = FocusKeys.entry(TopSection.ShortDrama.route),
+                                    source = com.chinut.bawantv.unified.HongguoSource,
+                                    pendingMovie = pendingUnified,
+                                    onPendingConsumed = { pendingUnified = null },
+                                    onDetailChanged = { inVodDetail = it },
+                                    externalDetail = vodDetail,
+                                    onExternalDetailChanged = {
+                                        vodDetail = it
+                                        inVodDetail = it != null
+                                    },
+                                    externalGridIndex = vodGridIndex,
+                                    externalGridOffset = vodGridOffset,
+                                    onExternalGridScroll = { i, o ->
+                                        vodGridIndex = i
+                                        vodGridOffset = o
+                                    },
+                                    externalFocusMovieId = vodFocusMovieId,
+                                    onExternalFocusMovie = { vodFocusMovieId = it },
+                                    onBack = {
+                                        section = TopSection.Home
+                                        focusEpoch++
+                                    },
+                                    onPlay = { movie, source, eps, i ->
+                                        // 短剧的剧集地址是直接 mp4/hls，同样不需要解析接口。
+                                        // url 为空的集是"未取到地址"（免费集之外），
+                                        // 播放器遇到空地址会给友好提示而不是崩。
+                                        playVod = com.chinut.bawantv.unified.PlayRequest(
+                                            episodes = eps.map {
+                                                com.chinut.bawantv.unified.Episode(
+                                                    name = it.name,
+                                                    url = it.url,
+                                                )
+                                            },
+                                            index = i,
+                                            title = movie.title,
+                                            vodId = movie.id,
+                                            poster = movie.poster,
+                                        )
+                                    },
                                 )
 
                             TopSection.Live -> LiveScreen(
