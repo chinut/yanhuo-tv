@@ -414,11 +414,25 @@ fun BawanRoot(
                                 section = TopSection.Vod
                                 focusEpoch++
                             },
+                            onOpenShortDrama = {
+                                section = TopSection.ShortDrama
+                                focusEpoch++
+                            },
                             onOpenSettings = {
                                 section = TopSection.Settings
                                 focusEpoch++
                             },
                         )
+
+                            // ---------- 短剧 ----------
+                            //
+                            // 复用影视那套界面（海报墙 / 详情 / 剧集 / 播放），
+                            // 只是数据源不同 —— 短剧和影视在交互上是同一件事，
+                            // 没必要写两套 UI，也更省内存。
+                            TopSection.ShortDrama -> com.chinut.bawantv.ui.screens
+                                .ShortDramaScreen(
+                                    entryKey = FocusKeys.entry(TopSection.ShortDrama.route),
+                                )
 
                             TopSection.Live -> LiveScreen(
                                 debugAutoPlayFirst = debugLivePlay,

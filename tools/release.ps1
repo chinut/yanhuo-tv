@@ -72,6 +72,39 @@ if ($gradle -notmatch [regex]::Escape("versionName = `"$VersionName`"")) {
 }
 Write-Host '  版本号校验通过'
 
+# ---------- 1b) versionCode 必须递增 ----------
+#
+# ## 版本号命名规则（重要，别再弄错）
+#
+#   versionCode —— **只增不减的计数器**，每次发版 +1（35, 36, 37…）。
+#                  应用就是靠它判断"有没有新版本"。跳回去会导致
+#                  "永远提示已最新"或者反复弹更新框。
+#
+#   versionName —— 给人和市场看的名字。功能分档时改它：
+#                  1.0.x  第一代（直播 + 影视）
+#                  1.1.x  加入短剧/短视频后，**从 1.1.1 重新起头**
+#
+# 两者**互相独立**：versionName 可以从 1.0.34 跳到 1.1.1，
+# 但 versionCode 必须接着数（35 → 36）。
+#
+# 上次发布的 versionCode 从**上一个 git tag 的 gradle 文件**里读，
+# 不依赖任何手工记录 —— 手工记的东西迟早会忘。
+$prevCode = 0
+$prevName = ''
+$lastTag = (git tag --list 'v*' --sort=-v:refname 2>$null | Select-Object -First 1)
+if ($lastTag) {
+    $prevGradle = (git show "${lastTag}:app/build.gradle.kts" 2>$null) -join "`n"
+    if ($prevGradle -match 'versionCode\s*=\s*(\d+)') { $prevCode = [int]$Matches[1] }
+    if ($prevGradle -match 'versionName\s*=\s*"([^"]+)"') { $prevName = $Matches[1] }
+}
+Write-Host "  上次发布：$prevName (code $prevCode)  →  本次：$VersionName (code $VersionCode)"
+
+if ($prevCode -gt 0 -and $VersionCode -le $prevCode) {
+    Write-Host "  !! versionCode $VersionCode 没有大于上次的 $prevCode" -ForegroundColor Red
+    Write-Host '     versionCode 只能递增 —— 应用靠它判断升级，调小会让更新检测失效' -ForegroundColor Yellow
+    exit 1
+}
+
 # ---------- 2) 打包 ----------
 Write-Host '  构建 release…'
 $env:JAVA_HOME = 'E:\Program Files\Android\Android Studio\jbr'

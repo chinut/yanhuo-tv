@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.SmartDisplay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
@@ -131,6 +132,8 @@ fun ImmersiveHome(
     onOpenLive: (LiveChannel, List<LiveChannel>) -> Unit,
     /** 进入影视板块 */
     onOpenMovieWall: () -> Unit,
+    /** 进入短剧板块 */
+    onOpenShortDrama: () -> Unit,
     /** 进入设置 */
     onOpenSettings: () -> Unit,
 ) {
@@ -226,12 +229,18 @@ fun ImmersiveHome(
                 },
             )
 
-            // ---------- 右：影视 + 设置 ----------
+            // ---------- 右：影视 + 短剧 + 设置 ----------
+            //
+            // 三块等分高度。原来只有影视 + 设置两块，设置独占 116dp；
+            // 现在把设置压到三分之一，腾出来的空间给短剧。
+            //
+            // 注意间隔从 20dp 收到 14dp —— 三块比两块更需要省纵向空间，
+            // 否则影视那块的可用高度会被挤得放不下海报。
             Column(
                 Modifier
                     .width(400.sdp)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(20.sdp),
+                verticalArrangement = Arrangement.spacedBy(14.sdp),
             ) {
                 MovieEntry(
                     movies = movies,
@@ -239,8 +248,13 @@ fun ImmersiveHome(
                     onEnter = onOpenMovieWall,
                     manager = manager,
                 )
+                ShortDramaEntry(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    onEnter = onOpenShortDrama,
+                    manager = manager,
+                )
                 SettingsEntry(
-                    modifier = Modifier.height(116.sdp).fillMaxWidth(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                     onEnter = onOpenSettings,
                     manager = manager,
                 )
@@ -496,11 +510,11 @@ private fun MovieEntry(
 ) {
     val focus = rememberTvFocusState()
 
-    Box(
+    Row(
         modifier
             .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius))
             .shadow(
-                elevation = if (focus.focused) 30.sdp else 10.sdp,
+                elevation = if (focus.focused) 26.sdp else 8.sdp,
                 shape = RoundedCornerShape(Dim.BigRadius),
                 spotColor = Ink.Pink.copy(alpha = if (focus.focused) 0.65f else 0.16f),
             )
@@ -527,89 +541,123 @@ private fun MovieEntry(
                 // moveTo 找不到目标会直接返回 —— 按键被消费掉却什么也不发生，
                 // 结果就是「从影视按左键回不到左边的直播」。
                 // 留空即可，几何导航本来就能正确找到左边的直播块。
-            ),
+            )
+            .padding(horizontal = 24.sdp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 海报墙：**纯装饰**。整块按钮是唯一焦点，海报本身不参与选中，
-        // 否则遥控器要在几十张图里挪，非常难用。
-        //
-        // 布局：标题固定在顶部，海报只占标题以下的区域 ——
-        // 之前让海报铺满整块、再用底部渐变盖上去，结果下半部分被压得很暗，
-        // 看起来就是「一块空面板」。
-        if (movies.isNotEmpty()) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(
-                    start = 14.sdp, end = 14.sdp, top = 76.sdp, bottom = 14.sdp,
-                ),
-                horizontalArrangement = Arrangement.spacedBy(8.sdp),
-                verticalArrangement = Arrangement.spacedBy(8.sdp),
-                userScrollEnabled = false,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                items(movies, key = { "hp:" + it.id }) { m ->
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(2f / 3f)
-                            .clip(RoundedCornerShape(12.sdp))
-                            .background(Ink.Soft),
-                    ) {
-                        AsyncImage(
-                            model = m.poster,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            alpha = if (focus.focused) 1f else 0.85f,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-            }
-        }
-
-        // 标题固定在顶部，不盖住海报
-        Row(
+        Box(
             Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 18.sdp, top = 16.sdp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .size(42.sdp)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Ink.Pink.copy(alpha = 0.45f), Ink.Pink.copy(alpha = 0.15f))
-                        ),
-                        RoundedCornerShape(13.sdp),
+                .size(52.sdp)
+                .background(
+                    Brush.linearGradient(
+                        listOf(Ink.Pink.copy(alpha = 0.34f), Ink.Pink.copy(alpha = 0.12f))
                     ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Default.Movie,
-                    contentDescription = null,
-                    tint = Ink.Pink,
-                    modifier = Modifier.size(23.sdp),
-                )
-            }
-            Spacer(Modifier.width(12.sdp))
-            Column {
-                Text(
-                    "影视",
-                    color = Color.White,
-                    fontSize = 28.ssp,
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    "聚合全部源的影视库",
-                    color = Ink.TextTertiary,
-                    fontSize = 12.ssp,
-                )
-            }
+                    RoundedCornerShape(16.sdp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Movie,
+                contentDescription = null,
+                tint = Ink.Pink,
+                modifier = Modifier.size(26.sdp),
+            )
+        }
+        Spacer(Modifier.width(18.sdp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "影视",
+                color = Color.White,
+                fontSize = Txt.Section,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                // 原来的副标题写死「聚合全部源的影视库」；现在把片库规模也带上，
+                // 用户一眼知道里面有多少内容（而且这和影视页顶栏的文案一致）
+                if (movies.isNotEmpty()) "影视库 ${movies.size} 部 · 电影 / 剧集 / 综艺"
+                else "电影 · 电视剧 · 综艺",
+                color = Ink.TextFaint,
+                fontSize = Txt.Caption,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 // ==================== 右下：设置入口（只要一个按钮） ====================
+
+@Composable
+private fun ShortDramaEntry(
+    modifier: Modifier,
+    onEnter: () -> Unit,
+    manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
+) {
+    val focus = rememberTvFocusState()
+
+    Row(
+        modifier
+            .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius))
+            .shadow(
+                elevation = if (focus.focused) 26.sdp else 8.sdp,
+                shape = RoundedCornerShape(Dim.BigRadius),
+                spotColor = Ink.Pink.copy(alpha = if (focus.focused) 0.65f else 0.16f),
+            )
+            .focusBorder(
+                visible = focus.focused,
+                cornerRadius = Dim.BigRadius,
+                color = Ink.Pink,
+                width = 4.sdp,
+            )
+            .tvFocusable(
+                focusState = focus,
+                shape = RoundedCornerShape(Dim.BigRadius),
+                focusedScale = 1.0f,
+                glow = false,
+                borderWidth = 0.dp,
+                baseBackground = Color.Transparent,
+                focusedBackground = Color.Transparent,
+                onClick = onEnter,
+            )
+            .padding(horizontal = 24.sdp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(52.sdp)
+                .background(
+                    Brush.linearGradient(
+                        listOf(Ink.Pink.copy(alpha = 0.34f), Ink.Pink.copy(alpha = 0.12f))
+                    ),
+                    RoundedCornerShape(16.sdp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.SmartDisplay,
+                contentDescription = null,
+                tint = Ink.Pink,
+                modifier = Modifier.size(26.sdp),
+            )
+        }
+        Spacer(Modifier.width(18.sdp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "短剧",
+                color = Color.White,
+                fontSize = Txt.Section,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "竖屏短剧 · 一集接一集自动播",
+                color = Ink.TextFaint,
+                fontSize = Txt.Caption,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 @Composable
 private fun SettingsEntry(
