@@ -153,6 +153,29 @@ object LiveCatalog {
     suspend fun load(context: Context, customSourceUrl: String): List<LiveGroup> {
         val builtin = builtin(context)
 
+        // 0) 电视上扫描到的 IPTV 源（优先级最高）
+        //
+        // 为什么排最前：这些是**用用户自己那条宽带实测通过**的，
+        // 比内置的（在开发者电脑上测的）更可能真的能看。
+        if (IptvScanner.hasResult(context)) {
+            val text = runCatching {
+                IptvScanner.resultFile(context).readText(Charsets.UTF_8)
+            }.getOrNull()
+            if (!text.isNullOrBlank()) {
+                val scanned = parse(text)
+                if (scanned.isNotEmpty()) {
+                    val merged = ArrayList<LiveGroup>(scanned.size + builtin.size)
+                    scanned.forEach { g -> merged.add(g.copy(name = "扫描源 · ${g.name}")) }
+                    merged.addAll(builtin)
+                    android.util.Log.i(
+                        TAG,
+                        "用扫描到的源：${scanned.sumOf { it.channels.size }} 个频道",
+                    )
+                    return mergeAlternates(merged)
+                }
+            }
+        }
+
         // 1) 本地导入的文件
         if (hasImported(context)) {
             val text = runCatching {

@@ -107,6 +107,24 @@ fun SettingsScreen(
     // 用户在里面的操作由系统处理，选完回来我们才接管。所以没有
     // "Compose Dialog 吞按键"那个问题。
     var importMsg by remember { mutableStateOf("") }
+
+    // ---------- IPTV 自动扫描 ----------
+    //
+    // 在电视上扫，用的是**用户自己那条宽带** —— 这比在开发者电脑上测准得多。
+    //
+    // ⚠️ 电视上没有 ffmpeg，做不到真正的解码验证（电脑版能识破"花屏加密"，
+    // 这里不能）。所以界面上要如实说明"可能仍有少量看不了的源"。
+    var scanning by remember { mutableStateOf(false) }
+    var scanMsg by remember { mutableStateOf("") }
+    var scanDone by remember { mutableIntStateOf(0) }
+    var scanTotal by remember { mutableIntStateOf(0) }
+    var scanOk by remember { mutableIntStateOf(0) }
+    var scannedCount by remember {
+        mutableIntStateOf(
+            com.chinut.bawantv.live.IptvScanner.resultChannelCount(context)
+        )
+    }
+    val scanScope = rememberCoroutineScope()
     var importedCount by remember {
         mutableIntStateOf(
             if (com.chinut.bawantv.live.LiveCatalog.hasImported(context)) 1 else 0
@@ -209,8 +227,8 @@ fun SettingsScreen(
                 // 几何导航的"交叉轴错位 × 2.5"打分让它永远不是最优目标
                 // （实测按 15 次下键都落不到）。放最上面就绕开了这个问题。
                 SettingsCard(
-                    title = "导入直播源文件",
-                    subtitle = "选一个 m3u / txt 频道表（运营商给的 IPTV 源，或朋友发来的）",
+                    title = "直播源",
+                    subtitle = "自动扫描（用你家网络实测），或导入运营商给的 m3u 文件",
                     accent = Ink.Green,
                 ) {
                     TvRow(
@@ -237,6 +255,83 @@ fun SettingsScreen(
                             )
                         )
                     }
+                    // ---------- 自动扫描 IPTV 源 ----------
+                    TvRow(
+                        label = if (scanning) {
+                            "正在扫描… $scanDone/$scanTotal（可用 $scanOk）"
+                        } else if (scannedCount > 0) {
+                            "已扫到 $scannedCount 个可用频道"
+                        } else {
+                            "自动扫描 IPTV 源"
+                        },
+                        hint = if (scanning) {
+                            "用的是你家宽带，结果最准。大概几分钟，别关电视"
+                        } else if (scannedCount > 0) {
+                            "扫描源优先于内置频道表。可能仍有看不了的，按 ←→ 换源"
+                        } else {
+                            "从网上找直播源并逐个实测，可用的存到本地"
+                        },
+                        hintColor = when {
+                            scanning -> Ink.Amber
+                            scannedCount > 0 -> Ink.Green
+                            else -> Ink.TextFaint
+                        },
+                        actionText = if (scanning) "扫描中" else "开始扫描",
+                    ) {
+                        if (!scanning) {
+                            scanning = true
+                            scanMsg = ""
+                            scanDone = 0; scanTotal = 0; scanOk = 0
+                            scanScope.launch {
+                                val r = runCatching {
+                                    com.chinut.bawantv.live.IptvScanner.scan(
+                                        context = context,
+                                        maxPerChannel = 3,
+                                    ) { stage, done, total, ok, cur ->
+                                        scanDone = done
+                                        scanTotal = total
+                                        scanOk = ok
+                                        scanMsg = if (total > 0) "$stage $done/$total" else stage
+                                    }
+                                }.getOrElse {
+                                    com.chinut.bawantv.live.IptvScanner.Outcome(
+                                        0, 0, 0, false,
+                                        "扫描出错：${it.javaClass.simpleName}",
+                                    )
+                                }
+                                scanning = false
+                                scannedCount =
+                                    com.chinut.bawantv.live.IptvScanner
+                                        .resultChannelCount(context)
+                                scanMsg = if (r.saved) {
+                                    "扫到 ${r.channels} 个频道 / ${r.urls} 个地址，已保存"
+                                } else {
+                                    r.note.ifBlank { "没扫到可用的源" }
+                                }
+                                toast(
+                                    context,
+                                    if (r.saved) "扫到 ${r.channels} 个频道" else "没扫到可用的源",
+                                )
+                            }
+                        }
+                    }
+                    if (scanMsg.isNotBlank()) {
+                        Spacer(Modifier.height(6.sdp))
+                        Text(scanMsg, color = Ink.Amber, fontSize = Txt.Tiny)
+                    }
+                    if (scannedCount > 0 && !scanning) {
+                        TvRow(
+                            label = "清除扫描到的源",
+                            hint = "回到内置频道表",
+                            actionText = "清除",
+                        ) {
+                            com.chinut.bawantv.live.IptvScanner.clearResult(context)
+                            scannedCount = 0
+                            scanMsg = "已清除扫描结果"
+                            toast(context, "已清除")
+                        }
+                    }
+
                     if (importedCount > 0) {
                         TvRow(
                             label = "清除导入的源",
