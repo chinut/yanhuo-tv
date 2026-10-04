@@ -62,23 +62,18 @@ object PlayDiag {
     @Volatile var bitrateKbps: Int = 0
     @Volatile var width: Int = 0
     @Volatile var height: Int = 0
-    @Volatile var bufferedMs: Long = 0
-    @Volatile var positionMs: Long = 0
-
     /**
-     * 缓冲余量 = `bufferedPosition - currentPosition`。
+     * `Player.bufferedPosition` 的原始值。
      *
-     * **负数就是缓冲透支** —— 播放位置跑到已缓冲区间之外，
-     * 表现就是"卡一下又跟上"。
+     * ⚠️ **直播流上这是相对量，不是"缓冲到哪个绝对位置"** ——
+     * 实测见过 `-49978` 这种值。所以**不能用它做 `buf - pos`**：
+     * 我一开始就是这么算"缓冲余量"的，结果报告里出现
+     * 「缓冲余量 -13 秒 ⚠️ 透支 16 次」和「没检测到卡顿」自相矛盾。
      *
-     * 为什么单独记它：直播流的 `bufferedPosition` 本身不可信
-     * （实测出现过 `-49978` 这种值），余量才是能判断问题的量。
+     * 这里只原样记录供参考，判定一律不用它。
      */
-    @Volatile var bufferMarginMs: Long = 0
-
-    /** 缓冲透支过多少次（余量为负的采样次数）。 */
-    @Volatile var underrunCount: Int = 0
-        private set
+    @Volatile var bufferedRawMs: Long = 0
+    @Volatile var positionMs: Long = 0
 
     /** 本次播放累计卡顿次数。 */
     @Volatile var stallCount: Int = 0
@@ -130,14 +125,7 @@ object PlayDiag {
     ) {
         playerState = state
         positionMs = posMs
-        // ⚠️ bufMs 可能是**负数**！
-        //
-        // 实测抓到 `pos=19726 buf=-49978 dur=50000` —— 直播流里
-        // `bufferedPosition` 会给出相对量/负值，不能直接当"已缓冲到哪"。
-        // 真正有意义的是**余量 = buf - pos**：负数就是缓冲透支
-        // （播放位置跑到了已缓冲区间之外），这正是"每隔几秒卡一下"的机械原因。
-        bufferedMs = if (bufMs < 0) 0L else bufMs
-        bufferMarginMs = bufMs - posMs
+        bufferedRawMs = bufMs
         bitrateKbps = rateKbps
         width = w
         height = h
@@ -145,7 +133,7 @@ object PlayDiag {
         if (state == "BUFFERING" && prevState != "BUFFERING") {
             rebufferCount++
         }
-        if (bufferMarginMs < 0) underrunCount++
+
         // 播放中位置却不推进 = 卡了
         if (playing && posMs == prevPosMs) {
             stallCount++
@@ -175,18 +163,13 @@ object PlayDiag {
         sb.append(" · ").append(bitrateKbps).append(" kbps\n")
         sb.append("状态：").append(playerState)
         sb.append(" · 已播 ").append(upSec).append(" 秒\n")
-        sb.append("缓冲：").append(bufferedMs / 1000).append(" 秒\n")
+        // 只打原始值，并标注它不可用于判断（直播流上是相对量）
+        sb.append("缓冲原始值：").append(bufferedRawMs).append(" ms（直播流上为相对量，仅供参考）\n")
         sb.append('\n')
         sb.append("卡顿 ").append(stallCount).append(" 次")
         sb.append(" · 重缓冲 ").append(rebufferCount).append(" 次")
         if (stallCount > 0) {
             sb.append(" · 累计 ").append(stallMsTotal / 1000).append(" 秒")
-        }
-        sb.append('\n')
-        // 缓冲余量：负数=透支。这是"每隔几秒卡一下"的直接指标
-        sb.append("缓冲余量：").append(bufferMarginMs / 1000).append(" 秒")
-        if (underrunCount > 0) {
-            sb.append("  ⚠️ 透支 ").append(underrunCount).append(" 次")
         }
         sb.append('\n')
 
