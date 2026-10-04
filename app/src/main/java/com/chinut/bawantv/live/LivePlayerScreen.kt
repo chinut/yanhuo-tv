@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -935,11 +936,39 @@ fun LivePlayerScreen(
     // 播放页是「纯按键界面」：没有可聚焦项，方向键/确定键由这里接管。
     // 注册到焦点管理器，避免按键落到没人处理（否则播放中上下键没反应）。
     //
+    // ---------- 设置里改了主源/老电视模式 → 关掉播放器回首页 ----------
+    //
+    // 原来只有「三横键菜单里自己改主源」会走 onReloadCatalog；
+    // 在**设置页**改的时候播放器完全不感知（用户反馈「手动切换源后
+    // 直播列表没有切换」）。
+    //
+    // prefs.revision 每次改设置都会 +1，这里盯着它：
+    // 一变就退出播放器，首页会按新配置重新拉频道表。
+    val prefsRevision by prefs.revision.collectAsState()
+    var seenRevision by remember { mutableIntStateOf(prefsRevision) }
+    LaunchedEffect(prefsRevision) {
+        if (prefsRevision != seenRevision) {
+            seenRevision = prefsRevision
+            android.util.Log.i(TAG_LIVE, "设置变了（revision=$prefsRevision），退回首页重拉频道表")
+            onReloadCatalog()
+        }
+    }
+
     // 按键约定（按遥控器直觉来）：
     //   ↑ ↓  换台         ← →  切换这个台的播放源
     //   确定  呼出/收起台标条+频道列表        返回  退出播放
     val focusManager = com.chinut.bawantv.ui.theme.LocalTvFocusManager.current
-    DisposableEffect(focusManager, playlist.size) {
+    // ⚠️ key 必须包含 `index` 和 `sourceIndex`。
+    //
+    // 踩过的坑（用户反馈「有的频道显示有多个源，但按左右键没有反应」）：
+    // 拦截器 lambda 捕获了 `current`（= playlist[index]）和 `sourceIndex`。
+    // 原来 key 只有 focusManager + playlist.size，**换台后这个 effect 不重启**，
+    // 于是拦截器里 `candidatesOf(current)` 还是**上一个频道**的源列表：
+    //   · 上一个台只有 1 个源 → `list.size <= 1` → 直接 return（只闪一下台标）
+    //   · 用户视角就是"这台明明有好几个源，按左右没反应"
+    //
+    // 这和 v1.4.1 修的「短剧换集后按键拦截器失效」是同一个 bug 模式。
+    DisposableEffect(focusManager, playlist.size, index, sourceIndex) {
         focusManager?.setKeyInterceptor { dir ->
             // 清晰度面板打开时，方向键在面板里选择，不要拿去换台
             if (qualityPanel) {
