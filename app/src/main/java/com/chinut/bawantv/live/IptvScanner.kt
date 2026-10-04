@@ -37,8 +37,19 @@ import kotlin.coroutines.coroutineContext
  * 实测校准（用电脑版对照）：央视加密源虽然能下载，但**分片大小极小**
  * （500KB 上限只拿到几 KB），第 5 条就能挡住大部分。
  *
- * **所以扫描结果里可能仍混有少量花屏源** —— 用户按 ←→ 换源即可，
- * 这比"内置一堆必然花屏的源"好得多。
+ * 7. **用系统解码器真解一帧**，std 太低（近乎纯色）判为坏源
+ *
+ * ## ⚠️ 仍然测不出什么
+ *
+ * 判据 7 只解**一帧**，所以：
+ *
+ * · **测不出"画面静止"** —— 实测有一类假源（如 `std=57 但帧差=0`）
+ *   是固定画面/台标卡，看着有内容但根本不是直播。
+ *   要测这个必须解多帧、间隔取样，等于真播一遍，代价太大。
+ * · **解码器兼容性差异** —— 有些流特定设备解不出来，
+ *   但那不等于源坏了（所以解码失败时**不直接否掉**，只记录）。
+ *
+ * **所以扫描结果仍需用户按 ←→ 换源容忍。** 界面上要如实说明。
  */
 object IptvScanner {
 
@@ -223,16 +234,128 @@ object IptvScanner {
 
         // 3/4/5) 连续 3 个分片 + 大小稳定 + 不太小
         val sizes = ArrayList<Int>(segs.size)
+        var firstSeg: ByteArray? = null
         for (rel in segs) {
             val data = fetchBytes(absolute(base, rel)) ?: return false
             sizes.add(data.size)
+            if (firstSeg == null) firstSeg = data
         }
         if (sizes.size < 2) return false
         if (sizes.min() < 20 * 1024) return false          // 太小 → 不是有效视频
         val avg = sizes.average()
         val maxDev = sizes.maxOf { kotlin.math.abs(it - avg) } / avg
         if (maxDev > 0.9) return false                      // 波动过大 → 流不稳
+
+        // 7) **真解码一帧**，看画面是不是空的
+        //
+        // 为什么必须加这一步：用户实测"扫出来能出台但播放黑屏"。
+        // 我在电脑上用 ffmpeg 真解码测同一批源，发现坏源的特征是
+        // 「解不出帧」或「std 极低（纯色）」—— 而前面的判据全测不出，
+        // 因为它压根没解码，只看"数据能不能下载"。
+        //
+        // ⚠️ 注意：这里只解**一帧**，所以**测不出"画面静止"**
+        // （如 std=57 但帧差=0 的假频道）。这个限制写在类注释里。
+        val std = firstSeg?.let { runCatching { decodeFrameStd(it) }.getOrNull() }
+        if (std != null && std < 8.0) return false          // 近乎纯色 → 黑屏/灰屏
         return true
+    }
+
+    /**
+     * 用系统解码器解出一帧，返回灰度标准差。
+     *
+     * std 接近 0 说明画面近乎纯色（黑屏 / 灰屏 / 空画面）。
+     * 返回 null 表示解不出来 —— **这也应视为坏源**，
+     * 但调用方选择"不因解码失败就否掉"（有些设备解码器兼容性差，
+     * 宁可留下让用户换源，也不要全部误杀）。
+     */
+    private fun decodeFrameStd(segmentBytes: ByteArray): Double? {
+        val w = 160
+        val h = 90
+        var codec: android.media.MediaCodec? = null
+        var extractor: android.media.MediaExtractor? = null
+        return try {
+            // 临时文件：MediaExtractor 需要可 seek 的输入
+            val f = java.io.File.createTempFile("probe", ".ts")
+            f.writeBytes(segmentBytes)
+            extractor = android.media.MediaExtractor().apply {
+                setDataSource(f.absolutePath)
+            }
+            var track = -1
+            var mime: String? = null
+            for (i in 0 until extractor.trackCount) {
+                val m = extractor.getTrackFormat(i).getString(
+                    android.media.MediaFormat.KEY_MIME) ?: continue
+                if (m.startsWith("video/")) { track = i; mime = m; break }
+            }
+            if (track < 0 || mime == null) return null
+            extractor.selectTrack(track)
+
+            codec = android.media.MediaCodec.createDecoderByType(mime)
+            codec.configure(extractor.getTrackFormat(track), null, null, 0)
+            codec.start()
+
+            val info = android.media.MediaCodec.BufferInfo()
+            val inIdx = codec.dequeueInputBuffer(15_000)
+            if (inIdx < 0) return null
+            val buf = codec.getInputBuffer(inIdx) ?: return null
+            val n = extractor.readSampleData(buf, 0)
+            if (n <= 0) return null
+            codec.queueInputBuffer(inIdx, 0, n, 0, 0)
+
+            // 等输出（最多 1.5 秒）
+            val deadline = System.currentTimeMillis() + 1500
+            while (System.currentTimeMillis() < deadline) {
+                val outIdx = codec.dequeueOutputBuffer(info, 200_000)
+                if (outIdx >= 0) {
+                    val img = codec.getOutputImage(outIdx)
+                    val std = if (img != null) grayStd(img, w, h) else null
+                    codec.releaseOutputBuffer(outIdx, false)
+                    return std
+                }
+            }
+            null
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "解码失败：${e.javaClass.simpleName}")
+            null
+        } finally {
+            runCatching { codec?.stop() }
+            runCatching { codec?.release() }
+            runCatching { extractor?.release() }
+        }
+    }
+
+    /** 把 Image 缩到 w×h，算灰度标准差。 */
+    private fun grayStd(img: android.media.Image, w: Int, h: Int): Double {
+        val plane = img.planes[0]
+        val buf = plane.buffer
+        val rowStride = plane.rowStride
+        val pixStride = plane.pixelStride
+        val iw = img.width
+        val ih = img.height
+        var sum = 0.0
+        var sumSq = 0.0
+        var n = 0
+        // 采样（不逐像素，省时间）
+        val stepY = (ih / h).coerceAtLeast(1)
+        val stepX = (iw / w).coerceAtLeast(1)
+        var y = 0
+        while (y < ih) {
+            var x = 0
+            while (x < iw) {
+                val idx = y * rowStride + x * pixStride
+                if (idx < buf.limit()) {
+                    val v = buf.get(idx).toInt() and 0xFF
+                    sum += v
+                    sumSq += v.toDouble() * v
+                    n++
+                }
+                x += stepX
+            }
+            y += stepY
+        }
+        if (n == 0) return 0.0
+        val mean = sum / n
+        return kotlin.math.sqrt((sumSq / n) - mean * mean)
     }
 
     private fun client() = Http.client.newBuilder()
