@@ -1,13 +1,14 @@
 #EXTM3U
-# 实测能播的 IPTV 直连源。
+# 实测能播的 IPTV 直连源（合并三个来源，只保留验证通过的）。
 #
 # 判据：ffmpeg 真解码 —— 解 5 帧 + std>10（有内容）+ 帧差>1.5（画面在动）。
-# 来源：best-fan/iptv-sources + iptv-search.com，但**只保留实测通过的**。
 #
-# 实测可用率：best-fan 22/182（12%）、iptv-search 21/917（2%）。
-# 所以不要相信"网站说有"，只相信这里验证过的。
+# 来源与实测可用率：
+#   iptv-org cn.m3u   23 / 145  （16%）  ← 最可靠
+#   best-fan          22 / 182  （12%）
+#   iptv-search       21 / 917  （ 2%）  ← /live/fav/ 是临时 token，很快失效
 #
-# 目前缺：CCTV2 / 5 / 6 / 7 / 10 / 11 / 12 / 14（两个站都没有可用源）。
+# 仍然缺：CCTV2、CCTV6、CCTV7、CCTV10、CCTV11、CCTV12、CCTV15、CCTV16
 #EXTINF:-1 group-title="IPTV",CCTV1
 http://120.40.39.246:352/newlive/live/hls/1/live.m3u8
 #EXTINF:-1 group-title="IPTV",CCTV3
@@ -16,28 +17,26 @@ http://183.10.180.81:9901/tsfile/live/0003_1.m3u8?key=txiptv&playlive=1&authid=0
 https://live-play-hls.cctvnews.cctv.com/CCTVChannel/channel_cctv4_mbd.m3u8?auth_key=1791097200-1-b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c-1d69bbcbdea2dd8281d3dc59f42e8f50&yid=b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c
 #EXTINF:-1 group-title="IPTV",CCTV4
 http://58.56.162.102:4466/newlive/live/hls/4/live.m3u8
+#EXTINF:-1 group-title="IPTV",CCTV5体育
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/0f32eece
+#EXTINF:-1 group-title="IPTV",CCTV-8K HD (1080p)
+http://192.151.150.154/live/cctv8k.m3u8
 #EXTINF:-1 group-title="IPTV",CCTV8
 http://63.141.230.178:82/gslb/zbdq5.m3u8?id=cctv8k
+#EXTINF:-1 group-title="IPTV",CCTV-9 (576i)
+https://xykt-fix.github.io/Y77.m3u8
 #EXTINF:-1 group-title="IPTV",CCTV-9 纪录
 https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=92574abd34750c4b083d993636811947
 #EXTINF:-1 group-title="IPTV",CCTV9
 https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=04d0734a39c43ac7409c482c75ab83eb
 #EXTINF:-1 group-title="IPTV",CCTV13
 http://101.66.199.13:9901/tsfile/live/0013_1.m3u8?key=txiptv&playlive=0&authid=0
-#EXTINF:-1 group-title="IPTV",CCTV15 音乐
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/2cf1face
-#EXTINF:-1 group-title="IPTV",CCTV16 奥林匹克
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/f5e84d38
-#EXTINF:-1 group-title="IPTV",CCTV-17 (1080p)
+#EXTINF:-1 group-title="IPTV",CCTV-14 HD (1080p)
+http://74.91.26.218:82/live/cctv14hd.m3u8
+#EXTINF:-1 group-title="IPTV",CCTV-17 HD (1080p)
 http://74.91.26.218:82/live/cctv17hd.m3u8
-#EXTINF:-1 group-title="IPTV",CCTV17 农业农村
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/3c0716e8
-#EXTINF:-1 group-title="IPTV",山东教育卫视
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/b15ba807
 #EXTINF:-1 group-title="IPTV",山西卫视
 http://119.39.9.8:9901/tsfile/live/0118_1.m3u8
-#EXTINF:-1 group-title="IPTV",广东卫视
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/452e39db
 #EXTINF:-1 group-title="IPTV",延边卫视
 https://srs.iyb983.cn/video/CYS/index.m3u8
 #EXTINF:-1 group-title="IPTV",延边卫视
@@ -52,45 +51,51 @@ http://63.141.230.178:82/gslb/zbdq5.m3u8?id=jxwshd
 http://101.66.199.13:9901/tsfile/live/0124_1.m3u8?key=txiptv&playlive=0&authid=0
 #EXTINF:-1 group-title="IPTV",浙江卫视
 http://ali-xwl.cztv.com/live/channel01720Plxw.m3u8
-#EXTINF:-1 group-title="IPTV",深圳卫视
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/2e6586f6
 #EXTINF:-1 group-title="IPTV",西藏卫视
 http://59.39.89.130:60901/tsfile/live/0125_4.m3u8?key=txiptv&playlive=1&authid=0
 #EXTINF:-1 group-title="IPTV",辽宁卫视
 http://204.12.221.218:8181/3m1080p/lnws.m3u8
 #EXTINF:-1 group-title="IPTV",陕西卫视
 http://192.151.150.154/live/snwshd.m3u8
-#EXTINF:-1 group-title="IPTV",万荣综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/5e08a38a
+#EXTINF:-1 group-title="IPTV",ABN China (720p)
+https://mediaserver.abnvideos.com/streams/abnchina.m3u8
+#EXTINF:-1 group-title="IPTV",Ando TV (1080p)
+http://play.kankanlive.com/live/1711956137852982.m3u8
+#EXTINF:-1 group-title="IPTV",Bread TV (720p)
+https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
+#EXTINF:-1 group-title="IPTV",CCTV-Storm Music (1080p)
+http://38.75.136.137:98/gslb/dsdqpub/fyyy.m3u8?auth=testpub
+#EXTINF:-1 group-title="IPTV",CCTV-The First Theater (1080p)
+http://38.75.136.137:98/gslb/dsdqpub/dyjc.m3u8?auth=testpub
+#EXTINF:-1 group-title="IPTV",Chuxiong News Channel [Not 24/7]
+http://hwapi.yntv.net/ew265l/848y54.m3u8
+#EXTINF:-1 group-title="IPTV",Dragon TV International
+https://restream.pdtvhd.com/memfs/0b1b95c9-3543-4af9-9fdb-cf45f1602f17.m3u8
+#EXTINF:-1 group-title="IPTV",Guangzhou TV
+https://tencentplaybusiness.gztv.com/live/zonghes.m3u8
+#EXTINF:-1 group-title="IPTV",Harbin Comprehensive News Channel
+https://stream.hrbtv.net/xwzh/playlist.m3u8?_upt=ef41dd531755913594
+#EXTINF:-1 group-title="IPTV",Harbin Movie Channel
+https://stream.hrbtv.net/yspd/playlist.m3u8
+#EXTINF:-1 group-title="IPTV",Hebei TV (2160p)
+https://event.pull.hebtv.com/live/live101.m3u8
+#EXTINF:-1 group-title="IPTV",Hunan TV (2160p)
+http://hlsal-ldvt.qing.mgtv.com/nn_live/nn_x64/dWlwPTEyNy4wLjAuMSZ1aWQ9cWluZy1jbXMmbm5fdGltZXpvbmU9OCZjZG5leF9pZD1hbF9obHNfbGR2dCZ1dWlkPTliODY4NmU5ZTM2YzYwMmMmZT02OTE0NjA0JnY9MSZpZD1ITldTWkdTVCZzPTcwN2RiYTc2YzJjNmJmMTQ4MmUyZGYzOWU2NWM3YWFi/HNWSZGST.m3u8
+#EXTINF:-1 group-title="IPTV",Kangba TV
+http://110.185.237.164:8888/hls/30/index.m3u8
+#EXTINF:-1 group-title="IPTV",Lanzhou Comprehensive News Channel
+https://liveplus.lzr.com.cn/xwzh/HD/live.m3u8
+#EXTINF:-1 group-title="IPTV",Siping TV
+http://stream2.jlntv.cn/sptv/sd/live.m3u8?_upt=f27750421743154598
+#EXTINF:-1 group-title="IPTV",TV BRICS Chinese (1080p)
+https://chibrics.mediacdn.ru/cdn/brics/chinese/playlist.m3u8
+#EXTINF:-1 group-title="IPTV",Xinjiang TV 2
+http://110.153.180.106:55555/out_3/index.m3u8
+#EXTINF:-1 group-title="IPTV",Xinjiang TV 3
+http://110.153.180.106:55555/out_2/index.m3u8
+#EXTINF:-1 group-title="IPTV",Xinjiang TV 8
+http://120.70.60.179:9901/tsfile/live/1002_1.m3u8?authid=0&key=txiptv&playlive=1
 #EXTINF:-1 group-title="IPTV",世界地理
 http://183.10.180.81:9901/tsfile/live/1008_1.m3u8?key=txiptv&playlive=1&authid=0
-#EXTINF:-1 group-title="IPTV",东方影视
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/4c229a27
-#EXTINF:-1 group-title="IPTV",东方购物
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/daa09d27
-#EXTINF:-1 group-title="IPTV",东方购物一台
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/af68a3d2
-#EXTINF:-1 group-title="IPTV",东方购物一台
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/c89f5335
-#EXTINF:-1 group-title="IPTV",六师五家渠新闻综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/f878601a
-#EXTINF:-1 group-title="IPTV",兴安盟新闻综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/dc9f97e7
-#EXTINF:-1 group-title="IPTV",嘉荫综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/b58ef78f
-#EXTINF:-1 group-title="IPTV",庆安综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/ffed3db8
-#EXTINF:-1 group-title="IPTV",扶余综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/5a609934
-#EXTINF:-1 group-title="IPTV",洮南综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/8bd4e03b
-#EXTINF:-1 group-title="IPTV",焦作综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/175fa440
-#EXTINF:-1 group-title="IPTV",玛纳斯综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/3a0a545c
 #EXTINF:-1 group-title="IPTV",第一剧场
 http://183.10.180.81:9901/tsfile/live/1082_1.m3u8?key=txiptv&playlive=1&authid=0
-#EXTINF:-1 group-title="IPTV",荥经综合
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/c1dcfe2d
-#EXTINF:-1 group-title="IPTV",黑水电视台
-https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/58fc9dac
