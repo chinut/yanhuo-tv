@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+/* ==========================================================================
+   焰火TV 首页 · iOS 液态玻璃（按用户设计规格）
+   ---------------------------------------------------------------------------
+   布局严格固定（照参考图）：
+     左大卡  833 × 747  @ (127, 207)
+     右竖卡  248 × 747  @ (1059, 207)
+     右竖卡  248 × 747  @ (1441, 207)
+   材质：半透明磨砂玻璃 + 柔和反光 + 细微高光描边 + 弥散阴影
+   字体：SF 系无衬线，字重柔和（不用粗黑体）
+   ========================================================================== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden}
+
+body{
+  position:relative;color:#fff;
+  font-family:"SF Pro Display","SF Pro Text",-apple-system,"Microsoft YaHei UI",
+              "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-weight:400;
+  letter-spacing:.1px;
+  background:#070A18;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ======================= 背景：低饱和深蓝紫流体柔光 ======================= */
+.bg{position:absolute;inset:0;overflow:hidden;
+  background:
+    radial-gradient(1500px 950px at 50% 48%, #171E42 0%, #0D1228 52%, #080B1A 100%)}
+/* 柔和弥散光晕（低对比、不抢主体） */
+.halo{position:absolute;border-radius:50%;filter:blur(170px);mix-blend-mode:screen;
+  animation:drift 34s ease-in-out infinite}
+.h1{width:1300px;height:1300px;left:-360px;top:-240px;opacity:.78;
+  background:radial-gradient(circle,#4A5AD8 0%,rgba(74,90,216,0) 66%)}
+.h2{width:1250px;height:1250px;left:120px;bottom:-620px;opacity:.72;
+  background:radial-gradient(circle,#6B4FD0 0%,rgba(107,79,208,0) 66%);animation-delay:-11s}
+.h3{width:1100px;height:1100px;right:-280px;top:-360px;opacity:.60;
+  background:radial-gradient(circle,#3E7FD8 0%,rgba(62,127,216,0) 67%);animation-delay:-20s}
+.h4{width:1250px;height:1250px;right:-200px;bottom:-580px;opacity:.56;
+  background:radial-gradient(circle,#9A5CD8 0%,rgba(154,92,216,0) 67%);animation-delay:-6s}
+/* 中心一层极淡的冷白，托住主体 */
+.core{position:absolute;inset:0;
+  background:radial-gradient(900px 620px at 52% 46%, rgba(150,175,255,.055), transparent 72%)}
+@keyframes drift{
+  0%,100%{transform:translate3d(0,0,0) scale(1)}
+  33%{transform:translate3d(56px,-40px,0) scale(1.07)}
+  66%{transform:translate3d(-46px,36px,0) scale(.94)}
+}
+/* 极细颗粒，消除色带 */
+.grain{position:absolute;inset:0;opacity:.038;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>")}
+
+/* ======================= 顶部栏 ======================= */
+.head{position:absolute;left:0;top:0;width:100%;height:150px;
+  display:flex;align-items:center;padding:0 64px}
+
+.logo{width:58px;height:58px;border-radius:16px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;font-weight:600;letter-spacing:0;
+  background:linear-gradient(150deg,#7E8CF5 0%,#9B7BEE 52%,#6FA8F0 100%);
+  box-shadow:
+    0 8px 24px rgba(120,130,240,.34),
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(0,0,0,.16);
+  text-shadow:0 1px 4px rgba(40,30,90,.35)}
+.brand{margin-left:17px}
+.brand .n{font-size:31px;font-weight:500;letter-spacing:.4px;
+  text-shadow:0 2px 16px rgba(0,0,0,.45)}
+.brand .s{font-size:13px;font-weight:300;color:rgba(220,228,255,.46);
+  margin-top:5px;letter-spacing:3.6px}
+
+.head .right{margin-left:auto;display:flex;align-items:center;gap:18px}
+
+/* 时间组件：圆角深色悬浮玻璃 */
+.clockbox{
+  display:flex;align-items:center;gap:18px;
+  padding:12px 22px 12px 24px;border-radius:20px;
+  background:linear-gradient(160deg,rgba(255,255,255,.115),rgba(255,255,255,.045));
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:
+    0 12px 34px rgba(4,7,20,.50),
+    inset 0 1px 0 rgba(255,255,255,.30),
+    inset 0 -1px 0 rgba(255,255,255,.04)}
+.clockbox .d{font-size:15px;font-weight:300;color:rgba(226,234,255,.66);letter-spacing:.6px}
+.clockbox .t{font-size:22px;font-weight:500;color:#F2F5FF;letter-spacing:.2px;
+  font-variant-numeric:tabular-nums}
+.gear{width:56px;height:56px;border-radius:999px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+  color:rgba(232,238,255,.88);
+  background:linear-gradient(160deg,rgba(255,255,255,.115),rgba(255,255,255,.045));
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 12px 30px rgba(4,7,20,.46),inset 0 1px 0 rgba(255,255,255,.30)}
+
+/* ======================= 玻璃卡片公共材质 ======================= */
+.card{
+  position:absolute;overflow:hidden;border-radius:26px;
+  /* 玻璃底色：深浅两层白，模拟厚度 */
+  background:
+    linear-gradient(165deg,rgba(255,255,255,.155) 0%,rgba(255,255,255,.055) 42%,rgba(255,255,255,.028) 100%),
+    linear-gradient(180deg,rgba(24,30,62,.34),rgba(14,18,40,.46));
+  box-shadow:
+    /* 弥散阴影 */
+    0 40px 90px rgba(3,6,18,.62),
+    0 12px 30px rgba(3,6,18,.40),
+    /* 内侧高光与暗边 —— 玻璃厚度 */
+    inset 0 1.5px 0 rgba(255,255,255,.42),
+    inset 0 -1.5px 0 rgba(255,255,255,.06),
+    inset 1.5px 0 0 rgba(255,255,255,.14),
+    inset -1.5px 0 0 rgba(255,255,255,.09)}
+/* 细微高光描边（沿卡片轮廓一圈，左上最亮） */
+.card::before{
+  content:"";position:absolute;inset:0;z-index:12;pointer-events:none;
+  border-radius:inherit;padding:1.4px;
+  background:linear-gradient(152deg,
+    rgba(255,255,255,.66) 0%,rgba(255,255,255,.20) 15%,
+    rgba(255,255,255,.04) 38%,rgba(255,255,255,.05) 68%,
+    rgba(255,255,255,.26) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude}
+/* 玻璃顶部柔光带 */
+.card::after{
+  content:"";position:absolute;left:0;right:0;top:0;height:42%;z-index:11;
+  pointer-events:none;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0))}
+
+/* ---- 尺寸与位置（严格照参考图，不动） ---- */
+.big {left:127px;  top:207px; width:924px; height:747px}
+.bar1{left:1079px; top:207px; width:343px; height:747px}
+.bar2{left:1450px; top:207px; width:343px; height:747px}
+
+/* 聚焦状态：更亮的高光描边 + 更明显的外发光（Apple TV 的做法） */
+.focused{
+  background:
+    linear-gradient(165deg,rgba(255,255,255,.185) 0%,rgba(255,255,255,.070) 42%,rgba(255,255,255,.036) 100%),
+    linear-gradient(180deg,rgba(28,35,72,.32),rgba(16,21,46,.44));
+  box-shadow:
+    0 46px 104px rgba(3,6,18,.68),
+    0 14px 34px rgba(3,6,18,.44),
+    0 0 0 2.5px rgba(198,216,255,.50),
+    0 0 64px rgba(126,168,255,.34),
+    inset 0 2px 0 rgba(255,255,255,.52),
+    inset 0 -1.5px 0 rgba(255,255,255,.08),
+    inset 2px 0 0 rgba(255,255,255,.20),
+    inset -2px 0 0 rgba(255,255,255,.12)}
+.focused::before{
+  background:linear-gradient(152deg,
+    rgba(255,255,255,.86) 0%,rgba(255,255,255,.28) 15%,
+    rgba(255,255,255,.07) 38%,rgba(255,255,255,.09) 68%,
+    rgba(255,255,255,.38) 100%)}
+
+/* ======================= 左大卡：直播 ======================= */
+/* 内部暗调视频预览区 */
+.video{position:absolute;inset:0;z-index:0;
+  background:
+    radial-gradient(620px 420px at 36% 30%, rgba(96,124,220,.30), transparent 68%),
+    radial-gradient(460px 320px at 74% 66%, rgba(150,110,220,.20), transparent 70%),
+    linear-gradient(168deg,#141A34 0%,#0A0E20 74%,#080B18 100%)}
+/* 视频画面的一点点细节，避免死平 */
+.video::after{content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(240px 180px at 62% 38%, rgba(255,255,255,.055), transparent 72%),
+    radial-gradient(180px 140px at 44% 58%, rgba(180,205,255,.045), transparent 74%)}
+.veil{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(6,9,20,0) 40%,rgba(6,9,20,.22) 60%,
+    rgba(6,9,20,.58) 80%,rgba(6,9,20,.78) 100%)}
+
+/* 顶部小标签 */
+.tag{position:absolute;left:212px;top:56px;z-index:14;
+  display:flex;align-items:center;gap:9px;
+  padding:9px 18px;border-radius:999px;
+  font-size:15px;font-weight:400;color:rgba(240,245,255,.94);letter-spacing:.3px;
+  background:linear-gradient(160deg,rgba(255,255,255,.155),rgba(255,255,255,.055));
+  border:1px solid rgba(255,255,255,.17);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 8px 22px rgba(4,7,20,.40)}
+.tag i{width:8px;height:8px;border-radius:50%;background:#FF4D6A;
+  box-shadow:0 0 10px rgba(255,77,106,.85)}
+
+/* 左下角信息 */
+.info{position:absolute;left:56px;bottom:54px;z-index:14}
+.info .live{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.info .live i{width:9px;height:9px;border-radius:50%;background:#FF4D6A;
+  box-shadow:0 0 12px rgba(255,77,106,.9)}
+.info .live span{font-size:14px;font-weight:300;color:rgba(226,234,255,.62);
+  letter-spacing:2px}
+.info .cn{font-size:53px;font-weight:500;letter-spacing:-.6px;line-height:1.02;
+  text-shadow:0 4px 26px rgba(4,8,22,.62)}
+.info .hint{font-size:14px;font-weight:300;color:rgba(214,224,255,.42);
+  margin-top:13px;letter-spacing:.4px}
+
+/* ======================= 右侧竖卡 ======================= */
+.ph{position:absolute;inset:0;z-index:0;
+  background-size:cover;background-position:center 16%}
+.bar1 .ph{background-image:url("https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg")}
+.bar2 .ph{background-image:url("https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg")}
+/* 海报之上压一层相对均匀的暗调，让玻璃感统一（不是"贴块灰板"） */
+.psc{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(8,11,24,.34) 0%,rgba(8,11,24,.14) 30%,
+    rgba(8,11,24,.34) 58%,rgba(8,11,24,.70) 82%,rgba(8,11,24,.86) 100%)}
+/* 底部文字区的柔和分界光（玻璃面板顶边的反光） */
+.edge{position:absolute;left:11%;right:11%;bottom:41%;height:1px;z-index:2;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0),rgba(255,255,255,.26),rgba(255,255,255,0))}
+
+.btxt{position:absolute;left:25px;right:25px;bottom:50px;z-index:14}
+.bdg{width:48px;height:48px;border-radius:15px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  color:rgba(244,248,255,.94);
+  background:linear-gradient(160deg,rgba(255,255,255,.19),rgba(255,255,255,.075));
+  border:1px solid rgba(255,255,255,.20);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 8px 22px rgba(4,7,20,.44)}
+.bti{font-size:34px;font-weight:500;letter-spacing:-.2px;line-height:1.05;
+  text-shadow:0 3px 18px rgba(4,8,22,.66)}
+.bsu{font-size:14px;font-weight:300;color:rgba(214,224,255,.56);
+  margin-top:10px;letter-spacing:.3px}
+</style>
+</head>
+<body>
+
+  <div class="bg">
+    <div class="halo h1"></div><div class="halo h2"></div>
+    <div class="halo h3"></div><div class="halo h4"></div>
+  </div>
+  <div class="core"></div>
+  <div class="grain"></div>
+
+  <!-- ================= 顶部栏 ================= -->
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand">
+      <div class="n">方案 A · 小竖卡 · 间隙 28</div>
+      <div class="s">焰火随想　美好随现</div>
+    </div>
+    <div class="right">
+      <div class="clockbox">
+        <span class="d">2026年10月4日</span>
+        <span class="t">23:52</span>
+      </div>
+      <div class="gear">⚙</div>
+    </div>
+  </div>
+
+  <!-- ================= 左大卡：直播 ================= -->
+  <div class="card big focused">
+    <div class="video"></div>
+    <div class="veil"></div>
+    <div class="tag"><i></i>CCTV 1 综合</div>
+    <div class="info">
+      <div class="live"><i></i><span>正在直播</span></div>
+      <div class="cn">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+  </div>
+
+  <!-- ================= 右上竖卡：影视 ================= -->
+  <div class="card bar1">
+    <div class="ph"></div>
+    <div class="psc"></div>
+    <div class="edge"></div>
+    <div class="btxt">
+      <div class="bdg">▣</div>
+      <div class="bti">影视</div>
+      <div class="bsu">影视库 12 部</div>
+    </div>
+  </div>
+
+  <!-- ================= 右下竖卡：短剧 ================= -->
+  <div class="card bar2">
+    <div class="ph"></div>
+    <div class="psc"></div>
+    <div class="edge"></div>
+    <div class="btxt">
+      <div class="bdg">▶</div>
+      <div class="bti">短剧</div>
+      <div class="bsu">竖屏短剧 · 自动连播</div>
+    </div>
+  </div>
+
+</body>
+</html>

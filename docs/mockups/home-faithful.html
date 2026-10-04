@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  /* ============================================================
+     按参考图**像素级复刻**的布局。
+     参考图实测（1920x1080）：
+       块1 大块  x=127..959    宽 833  (43.4%)   切角 ≈165px
+       块2 竖条  x=1059..1306  宽 248  (12.9%)   切角 ≈62px
+       块3 竖条  x=1441..1688  宽 248  (12.9%)   切角 ≈62px
+       三块等高  y=207..953    高 747  (69.2%)
+       切角：左上 + 右下，45° 斜切；左下/右上为直角
+     ============================================================ */
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{width:1920px;height:1080px;overflow:hidden;position:relative;color:#eef2ff;
+    font-family:"Microsoft YaHei UI","Microsoft YaHei",sans-serif;
+    background:
+      radial-gradient(1250px 720px at 15% 8%, rgba(118,58,218,.52), transparent 62%),
+      radial-gradient(980px 660px at 84% 92%, rgba(220,70,140,.40), transparent 60%),
+      radial-gradient(1100px 800px at 50% 50%, #10142a, #070a15 78%);}
+
+  .blk{position:absolute;overflow:hidden;
+    border:3px solid rgba(255,255,255,.22);
+    box-shadow:0 12px 46px rgba(0,0,0,.55)}
+
+  /* 切角：左上 + 右下（45°）。尺寸按参考图 */
+  .big{left:127px; top:207px; width:833px; height:747px;
+    clip-path:polygon(165px 0, 100% 0, 100% calc(100% - 165px), calc(100% - 165px) 100%, 0 100%, 0 165px)}
+  .bar1{left:1059px; top:207px; width:248px; height:747px;
+    clip-path:polygon(62px 0, 100% 0, 100% calc(100% - 62px), calc(100% - 62px) 100%, 0 100%, 0 62px)}
+  .bar2{left:1441px; top:207px; width:248px; height:747px;
+    clip-path:polygon(62px 0, 100% 0, 100% calc(100% - 62px), calc(100% - 62px) 100%, 0 100%, 0 62px)}
+
+  /* ---------- 顶栏（在参考图的 y=207 之上） ---------- */
+  .head{position:absolute;left:0;top:0;width:100%;height:150px;
+    display:flex;align-items:center;padding:0 56px}
+  .logo{width:62px;height:62px;border-radius:15px;background:linear-gradient(140deg,#7b4dff,#ff4d9d);
+    display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900}
+  .brand{margin-left:17px}
+  .brand .n{font-size:34px;font-weight:800;letter-spacing:1px}
+  .brand .s{font-size:16px;color:#9aa4c6;margin-top:2px;letter-spacing:3px}
+  .head .r{margin-left:auto;display:flex;align-items:center;gap:22px}
+  .clock{font-size:24px;font-weight:600}.clock small{color:#9aa4c6;font-weight:400}
+  .gear{width:58px;height:58px;border-radius:15px;border:3px solid rgba(150,170,255,.55);
+    display:flex;align-items:center;justify-content:center;font-size:28px}
+
+  /* ---------- 块1：直播 ---------- */
+  .big{background:
+    radial-gradient(560px 340px at 60% 40%, rgba(80,130,220,.28), transparent 66%),
+    linear-gradient(160deg,#1a2340,#0d1226);
+    border-color:rgba(111,182,255,.85);
+    box-shadow:0 0 44px rgba(90,170,255,.40), inset 0 0 80px rgba(0,0,0,.5)}
+  .big .tag{position:absolute;left:190px;top:44px;font-size:20px;color:#cfe0ff;
+    background:rgba(10,16,32,.72);padding:7px 16px;border-radius:9px}
+  .big .txt{position:absolute;left:52px;bottom:46px}
+  .big .row{display:flex;align-items:center;gap:10px;font-size:20px;color:#d6dcf5;margin-bottom:12px}
+  .big .row i{width:12px;height:12px;border-radius:50%;background:#ff4d6d;box-shadow:0 0 12px #ff4d6d}
+  .big .cname{font-size:52px;font-weight:900}
+  .big .hint{font-size:16px;color:#8f9ac0;margin-top:8px}
+
+  /* ---------- 块2 / 块3：竖版海报 ---------- */
+  .ph{position:absolute;inset:0;background-size:cover;background-position:center 22%}
+  .scrim{position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(6,9,20,.02) 0%,rgba(6,9,20,.18) 44%,
+      rgba(6,9,20,.72) 76%,rgba(6,9,20,.94) 100%)}
+  .txt{position:absolute;left:26px;right:26px;bottom:44px}
+  .t{font-size:36px;font-weight:900;line-height:1.08}
+  .s{font-size:16px;color:#b9c2dd;margin-top:8px}
+  .badge{width:52px;height:52px;border-radius:13px;display:flex;align-items:center;
+    justify-content:center;font-size:25px;margin-bottom:14px}
+  .bar1 .ph{background-image:url("https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg")}
+  .bar2 .ph{background-image:url("https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg")}
+  .bar1 .badge{background:linear-gradient(150deg,#c8783c,#8a4a22)}
+  .bar2 .badge{background:linear-gradient(150deg,#a05bc8,#6a2f8a)}
+
+  /* 参考图轮廓（淡淡的叠在上面，方便对比） */
+  .ghost{position:absolute;inset:0;opacity:.16;pointer-events:none;
+    background-size:100% 100%;background-repeat:no-repeat;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1920 1080'><rect width='1920' height='1080' fill='none'/></svg>")}
+
+  .lbl{position:absolute;font-size:15px;color:#7fe7c4;letter-spacing:1px;opacity:.9}
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand"><div class="n">焰火TV</div><div class="s">焰火随想　美好随现</div></div>
+    <div class="r">
+      <div class="clock">2026年10月4日　<small>23:10</small></div>
+      <div class="gear">⚙</div>
+    </div>
+  </div>
+
+  <!-- 块1 = 区域 1+2 = 直播 -->
+  <div class="blk big">
+    <div class="tag">CCTV 1 综合</div>
+    <div class="txt">
+      <div class="row"><i></i>正在直播</div>
+      <div class="cname">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+    <div class="lbl" style="left:190px;top:16px">1 + 2 · 直播（宽 833px · 43.4%）</div>
+  </div>
+
+  <!-- 块2 = 区域 3 = 影视 -->
+  <div class="blk bar1">
+    <div class="ph"></div><div class="scrim"></div>
+    <div class="txt">
+      <div class="badge">▣</div>
+      <div class="t">影视</div>
+      <div class="s">影视库 12 部</div>
+    </div>
+    <div class="lbl" style="left:10px;top:14px">3 · 影视<br>宽 248px · 12.9%</div>
+  </div>
+
+  <!-- 块3 = 区域 4 = 短剧 -->
+  <div class="blk bar2">
+    <div class="ph"></div><div class="scrim"></div>
+    <div class="txt">
+      <div class="badge">▶</div>
+      <div class="t">短剧</div>
+      <div class="s">竖屏短剧 · 自动连播</div>
+    </div>
+    <div class="lbl" style="left:10px;top:14px">4 · 短剧<br>宽 248px · 12.9%</div>
+  </div>
+
+</body>
+</html>

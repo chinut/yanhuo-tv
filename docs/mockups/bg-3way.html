@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+/* ==========================================================================
+   三种背景方向对比（都套同一套官方数值）
+   圆角 大卡 48px / 窄卡 40px　文字对比度全部 ≥7:1　卡片尺寸不变
+   布局：大卡 842×747 @(127,207)　窄卡 380×747 @(1001,207)/(1413,207)　间隙 32
+   ========================================================================== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:3420px;overflow:hidden;background:#000}
+body{font-family:"SF Pro Display","SF Pro Text",-apple-system,"Microsoft YaHei UI",
+     "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;color:#fff}
+
+/* 官方 token */
+:root{
+  --text-primary:#F0F1F5;    /* 17.22:1 */
+  --text-secondary:#C8C9D0;  /* 11.77:1 */
+  --text-tertiary:#9A9BA4;   /*  7.03:1 ← 底线 */
+  --accent-live:#FF4D5E;
+  --accent-warm:#FF7A45;
+}
+
+.pane{position:relative;width:1920px;height:1140px;overflow:hidden}
+.pane .label{position:absolute;left:127px;top:40px;z-index:99;
+  font-size:20px;font-weight:500;letter-spacing:.2px;color:#F0F1F5}
+.pane .sub{position:absolute;left:127px;top:72px;z-index:99;
+  font-size:15px;font-weight:400;color:#9A9BA4;line-height:1.5;max-width:1000px}
+
+/* 舞台：内容区从 y=118 开始 */
+.stage{position:absolute;left:0;top:118px;width:1920px;height:1022px;
+  transform:scale(1);transform-origin:0 0}
+.wrap{position:absolute;inset:0}
+
+/* ---------------- 公共卡片几何 ---------------- */
+.big {position:absolute;left:127px; top:89px; width:842px; height:747px;
+  border-radius:48px;overflow:hidden}
+.bar1{position:absolute;left:1001px;top:89px; width:380px; height:747px;
+  border-radius:40px;overflow:hidden}
+.bar2{position:absolute;left:1413px;top:89px; width:380px; height:747px;
+  border-radius:40px;overflow:hidden}
+
+.head{position:absolute;left:0;top:0;width:100%;height:150px;display:flex;align-items:center;padding:0 64px}
+.logo{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;
+  justify-content:center;font-size:26px;font-weight:600;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+.brand{margin-left:17px}
+.brand .n{font-size:31px;font-weight:500;letter-spacing:.3px}
+.brand .s{font-size:14px;font-weight:400;letter-spacing:3.4px}  /* 提对比度 */
+.head .r{margin-left:auto;display:flex;align-items:center;gap:18px}
+.clockbox{display:flex;align-items:center;gap:18px;padding:12px 22px 12px 24px;border-radius:20px}
+.clockbox .d{font-size:16px;font-weight:400}
+.clockbox .t{font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
+.gear{width:56px;height:56px;border-radius:999px;display:flex;align-items:center;
+  justify-content:center;font-size:24px}
+
+.video{position:absolute;inset:0}
+.veil{position:absolute;inset:0}       /* 官方 scrim */
+.itag{position:absolute;left:212px;top:56px;display:flex;align-items:center;gap:9px;
+  padding:9px 18px;border-radius:999px;font-size:16px;font-weight:400}
+.itag i{width:8px;height:8px;border-radius:50%;background:var(--accent-live)}
+.info{position:absolute;left:56px;bottom:54px}
+.info .lv{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.info .lv i{width:9px;height:9px;border-radius:50%;background:var(--accent-live)}
+.info .lv span{font-size:16px;font-weight:400;letter-spacing:1.8px}
+.info .cn{font-size:60px;font-weight:600;letter-spacing:-.8px;line-height:1.02}
+.info .hint{font-size:22px;font-weight:400;margin-top:14px}
+
+.ph{position:absolute;inset:0;background-size:cover;background-position:center 16%}
+.psc{position:absolute;inset:0}
+.btxt{position:absolute;left:30px;right:30px;bottom:52px}
+.bdg{width:52px;height:52px;border-radius:18px;margin-bottom:17px;display:flex;
+  align-items:center;justify-content:center;font-size:24px}
+.bti{font-size:40px;font-weight:600;letter-spacing:-.3px}
+.bsu{font-size:22px;font-weight:400;margin-top:10px}
+
+/* 官方 scrim（7.2 节原文） */
+.official-veil{background:linear-gradient(180deg,
+  rgba(7,9,13,0) 0%,rgba(7,9,13,0) 45%,rgba(7,9,13,.55) 72%,rgba(7,9,13,.92) 100%)}
+.official-psc{background:linear-gradient(180deg,
+  rgba(7,9,13,.35) 0%,rgba(7,9,13,.10) 28%,rgba(7,9,13,.62) 68%,rgba(7,9,13,.94) 100%)}
+
+/* ==========================================================================
+   A · Flat Cinema Dark（报告首选）
+   ========================================================================== */
+.A{background:linear-gradient(180deg,#14171E 0%,#0B0D12 55%,#07090D 100%)}
+.A .big{background:#15181F;box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+.A .bar1,.A .bar2{background:#15181F;box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+.A .logo{background:linear-gradient(150deg,#5E6AD2,#8A63E8)}
+.A .brand .n{color:var(--text-primary)}
+.A .brand .s{color:var(--text-tertiary)}
+.A .clockbox{background:#15181F;box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+.A .clockbox .d{color:var(--text-tertiary)}
+.A .clockbox .t{color:var(--text-primary)}
+.A .gear{background:#15181F;box-shadow:0 0 0 1px rgba(255,255,255,.06);color:var(--text-secondary)}
+.A .video{background:
+  radial-gradient(640px 440px at 38% 34%, rgba(110,130,215,.22), transparent 70%),
+  linear-gradient(168deg,#181A22,#0C0E14 74%)}
+.A .veil{background:linear-gradient(180deg,
+  rgba(7,9,13,0) 0%,rgba(7,9,13,0) 45%,rgba(7,9,13,.55) 72%,rgba(7,9,13,.92) 100%)}
+.A .itag{background:rgba(255,255,255,.10);box-shadow:0 0 0 1px rgba(255,255,255,.06);color:var(--text-primary)}
+.A .info .cn{color:var(--text-primary)}
+.A .info .lv span{color:var(--text-secondary)}
+.A .info .hint{color:var(--text-tertiary)}
+.A .psc{background:linear-gradient(180deg,
+  rgba(7,9,13,.35) 0%,rgba(7,9,13,.10) 28%,rgba(7,9,13,.62) 68%,rgba(7,9,13,.94) 100%)}
+.A .bdg{background:rgba(255,255,255,.11);box-shadow:0 0 0 1px rgba(255,255,255,.06);color:var(--text-primary)}
+.A .bti{color:var(--text-primary)}
+.A .bsu{color:var(--text-tertiary)}
+/* 焦点态：官方数值 */
+.A .big.focused{box-shadow:0 0 0 2px rgba(255,255,255,.85),0 24px 64px rgba(0,0,0,.85)}
+
+/* ==========================================================================
+   E · Warm Ember Dark
+   ========================================================================== */
+.E{background:linear-gradient(180deg,#14100E 0%,#0C0A09 60%,#080706 100%)}
+.E .big{background:#171310;box-shadow:0 0 0 1px rgba(255,235,205,.07)}
+.E .bar1,.E .bar2{background:#171310;box-shadow:0 0 0 1px rgba(255,235,205,.07)}
+.E .logo{background:linear-gradient(150deg,#FF9A5C,#E0552B)}
+.E .brand .n{color:#FBF4EC}
+.E .brand .s{color:#A69C92}
+.E .clockbox{background:#171310;box-shadow:0 0 0 1px rgba(255,235,205,.07)}
+.E .clockbox .d{color:#A69C92}
+.E .clockbox .t{color:#FBF4EC}
+.E .gear{background:#171310;box-shadow:0 0 0 1px rgba(255,235,205,.07);color:#E8DFD5}
+.E .video{background:
+  radial-gradient(640px 440px at 38% 34%, rgba(230,150,90,.16), transparent 70%),
+  linear-gradient(168deg,#1F1712,#0E0A08 74%)}
+.E .veil{background:linear-gradient(180deg,
+  rgba(7,9,13,0) 0%,rgba(7,9,13,0) 45%,rgba(9,7,6,.58) 72%,rgba(9,7,6,.93) 100%)}
+.E .itag{background:rgba(255,240,225,.11);box-shadow:0 0 0 1px rgba(255,235,205,.10);color:#FBF4EC}
+.E .itag i{background:var(--accent-warm)}
+.E .info .lv i{background:var(--accent-warm)}
+.E .info .cn{color:#FBF4EC}
+.E .info .lv span{color:#D8CEC2}
+.E .info .hint{color:#A69C92}
+.E .psc{background:linear-gradient(180deg,
+  rgba(9,7,6,.36) 0%,rgba(9,7,6,.10) 28%,rgba(9,7,6,.64) 68%,rgba(9,7,6,.94) 100%)}
+.E .bdg{background:rgba(255,240,225,.12);box-shadow:0 0 0 1px rgba(255,235,205,.10);color:#FFB27A}
+.E .bti{color:#FBF4EC}
+.E .bsu{color:#A69C92}
+.E .big.focused{box-shadow:0 0 0 2px rgba(255,178,122,.85),0 24px 64px rgba(0,0,0,.85)}
+</style>
+</head>
+<body>
+<script>
+const TPL = `
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand"><div class="n">焰火TV</div><div class="s">焰火随想　美好随现</div></div>
+    <div class="r">
+      <div class="clockbox"><span class="d">2026年10月4日</span><span class="t">00:12</span></div>
+      <div class="gear">⚙</div>
+    </div>
+  </div>
+  <div class="big focused">
+    <div class="video"></div><div class="veil"></div>
+    <div class="itag"><i></i>CCTV 1 综合</div>
+    <div class="info">
+      <div class="lv"><i></i><span>正在直播</span></div>
+      <div class="cn">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+  </div>
+  <div class="bar1">
+    <div class="ph" style="background-image:url('https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg')"></div>
+    <div class="psc"></div>
+    <div class="btxt"><div class="bdg">▣</div><div class="bti">影视</div><div class="bsu">影视库 12 部</div></div>
+  </div>
+  <div class="bar2">
+    <div class="ph" style="background-image:url('https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg')"></div>
+    <div class="psc"></div>
+    <div class="btxt"><div class="bdg">▶</div><div class="bti">短剧</div><div class="bsu">竖屏短剧 · 自动连播</div></div>
+  </div>`;
+
+const PANES = [
+  ['A','Flat Cinema Dark（报告首选）',
+   '纯平 #0B0D12 + 一条竖向渐变。无光斑、无动画、无颗粒。卡片 #15181F + 1px rgba(255,255,255,.06) 描边。强调色只留给直播红点。'],
+  ['E','Warm Ember Dark（品牌向）',
+   'A 的纪律 + 一点暖余烬：#14100E 底，品牌暖色 #FF7A45 只出现在直播点和焦点环上。'],
+  ['SUNSET','晚霞 · 隔毛玻璃（你要的）',
+   '冷紫天顶 → 珊瑚橘 → 暖金地平线 + 磨砂罩。视觉最丰富，但属于"背景参与构图"，和 Google 官方「背景应是安静的满幅场」的取向相反。'],
+];
+
+document.body.innerHTML = PANES.map(([cls,t,w])=>`
+  <div class="pane ${cls}">
+    <div class="label">${t}</div>
+    <div class="sub">${w}</div>
+    <div class="stage">${TPL}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>

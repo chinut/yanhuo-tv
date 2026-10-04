@@ -1037,7 +1037,16 @@ fun LivePlayerScreen(
     //   · 用户视角就是"这台明明有好几个源，按左右没反应"
     //
     // 这和 v1.4.1 修的「短剧换集后按键拦截器失效」是同一个 bug 模式。
-    DisposableEffect(focusManager, playlist.size, index, sourceIndex) {
+    // ⚠️ key 里必须带 **qualityCursor**。
+    //
+    // 踩过的坑（和 UnifiedVideoScreen 的分类面板同一个病）：
+    // 原来 key 只有 `(focusManager, playlist.size, index, sourceIndex)`，
+    // 而 `qualityCursor` 变化**不会**触发重注册 —— 闭包里读到的永远是
+    // 注册那一刻的值。表现：按一下↓ 能到第 2 个源，再按就卡住不动。
+    //
+    // 之所以没早发现：key 里有 `index`，所以"换台后第一次按"总是好的；
+    // 只有"在同一个频道里连续调源"才会卡，而多数频道只有 1~2 个源。
+    DisposableEffect(focusManager, playlist.size, index, sourceIndex, qualityCursor) {
         focusManager?.setKeyInterceptor { dir ->
             // 清晰度面板打开时，方向键在面板里选择，不要拿去换台
             if (qualityPanel) {
@@ -1054,8 +1063,12 @@ fun LivePlayerScreen(
                     // ←→ 也用来在列表里移动。
                     //
                     // 原来这两键直接返回 true（什么都不做），本意是"别拿去换台"，
-                    // 但用户看到的是一按左右就没反应 —— 对着几十个源只能一个个按上下，
+                    // 但用户看到的是一按左右就没反应 —— 对着多个源只能一个个按上下，
                     // 很别扭。现在让它们等价于上下。
+                    //
+                    // ⚠️ 用户反馈过「如果是属性就不要给用户框体，让用户误解可以被选中；
+                    // 如果要给用户操作的权利，就不要区别对待某些键」——
+                    // 既然列表是可操作的，四个方向键都该能用。
                     com.chinut.bawantv.ui.theme.Direction.Left -> {
                         qualityCursor = (qualityCursor - 1).coerceAtLeast(0); true
                     }

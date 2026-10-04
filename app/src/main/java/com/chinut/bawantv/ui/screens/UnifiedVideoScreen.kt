@@ -383,7 +383,22 @@ fun UnifiedVideoScreen(
     }
 
     // 面板打开时接管方向键与确定键（不要影响瀑布流）
-    androidx.compose.runtime.DisposableEffect(manager, typePanel) {
+    //
+    // ⚠️ key 里必须带 **typeCursor**（以及列表长度）。
+    //
+    // 踩过的坑：原来只有 `(manager, typePanel)`，而 `DisposableEffect` 只在
+    // key 变化时重新注册 —— 于是 `typeCursor` 变了它也不重注册，
+    // lambda 里读到的 `typeCursor` **永远是注册那一刻的值**。
+    //
+    // 表现（用户实测"方向键没用"）：第一次按 ↓ 能到第 2 项，
+    // 之后每次都算 `0 + 1 = 1`，**卡在同一格不动**。
+    // 慢按有时能动是因为恰好赶上了别的重组，快按必卡。
+    androidx.compose.runtime.DisposableEffect(
+        manager,
+        typePanel,
+        typeCursor,
+        typePanelItems.size,
+    ) {
         if (!typePanel) return@DisposableEffect onDispose { }
         manager?.setKeyInterceptor { dir ->
             when (dir) {

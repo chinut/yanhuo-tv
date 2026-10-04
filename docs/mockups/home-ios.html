@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+/* ==========================================================================
+   iOS 液态玻璃首页 —— **按电视真实能力**绘制
+   ---------------------------------------------------------------------------
+   为什么不用 backdrop-filter：Android WebView / Compose 都没有真背景模糊
+   （工程里的 frostedGlass 就是"半透明底色 + 白色微渐变 + 顶部亮边"三层），
+   示意图必须按真实能力画，否则你看到的和电视上不一样。
+   ==========================================================================
+   布局：参考图坐标
+     块1 x=127..959 (833×747) 切角165   块2 x=1059..1306 切角62   块3 x=1441..1688 切角62
+     三块 y=207..953，左上+右下 45° 切角
+   ========================================================================== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden}
+body{position:relative;color:#fff;-webkit-font-smoothing:antialiased;
+  font-family:"SF Pro Display","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  background:#04050B}
+
+/* ---------------- 背景：深空 + 大块极光（真实可渲染） ---------------- */
+.bg{position:absolute;inset:0;overflow:hidden;
+  background:radial-gradient(1700px 1100px at 50% 132%, #0F1730 0%, #080B16 46%, #04050B 100%)}
+.blob{position:absolute;border-radius:50%;filter:blur(120px);mix-blend-mode:screen;
+  animation:float 28s ease-in-out infinite}
+.b1{width:1100px;height:1100px;left:-320px;top:-400px;opacity:.85;
+  background:radial-gradient(circle,#3B5FFF 0%,rgba(59,95,255,0) 66%)}
+.b2{width:960px;height:960px;right:-280px;top:-340px;opacity:.66;
+  background:radial-gradient(circle,#FF4E9E 0%,rgba(255,78,158,0) 66%);animation-delay:-10s}
+.b3{width:1300px;height:1300px;left:16%;bottom:-760px;opacity:.40;
+  background:radial-gradient(circle,#1FD3C6 0%,rgba(31,211,198,0) 65%);animation-delay:-17s}
+.b4{width:880px;height:880px;right:0%;bottom:-460px;opacity:.55;
+  background:radial-gradient(circle,#8A5CFF 0%,rgba(138,92,255,0) 67%);animation-delay:-6s}
+@keyframes float{
+  0%,100%{transform:translate3d(0,0,0) scale(1)}
+  33%{transform:translate3d(74px,-48px,0) scale(1.10)}
+  66%{transform:translate3d(-58px,46px,0) scale(.93)}
+}
+.grain{position:absolute;inset:0;opacity:.05;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3'/></filter><rect width='150' height='150' filter='url(%23n)'/></svg>")}
+
+/* ---------------- 顶栏 ---------------- */
+.head{position:absolute;left:0;top:0;width:100%;height:152px;display:flex;align-items:center;padding:0 66px}
+.logo{width:60px;height:60px;border-radius:17px;display:flex;align-items:center;justify-content:center;
+  font-size:29px;font-weight:800;letter-spacing:-.5px;
+  background:linear-gradient(150deg,#FF7AC0,#7B5BFF 52%,#3F86FF);
+  box-shadow:0 10px 30px rgba(110,86,255,.40),
+             inset 0 1.5px 0 rgba(255,255,255,.60),
+             inset 0 -1.5px 0 rgba(0,0,0,.26);
+  text-shadow:0 1px 5px rgba(0,0,0,.28)}
+.brand{margin-left:18px}
+.brand .n{font-size:33px;font-weight:700;letter-spacing:-.3px;text-shadow:0 2px 18px rgba(0,0,0,.62)}
+.brand .s{font-size:14px;color:rgba(255,255,255,.44);margin-top:4px;letter-spacing:4.5px}
+.head .r{margin-left:auto;display:flex;align-items:center;gap:18px}
+
+/* 玻璃胶囊（frostedGlass 等价：底色 + 微白 + 亮边） */
+.pill,.gear{border-radius:999px;border:1px solid rgba(255,255,255,.15);
+  background:linear-gradient(180deg,rgba(16,19,34,.66),rgba(8,10,20,.80));
+  box-shadow:0 8px 28px rgba(0,0,0,.46),
+             inset 0 1.5px 0 rgba(255,255,255,.30),
+             inset 0 -1px 0 rgba(255,255,255,.04)}
+.pill{display:flex;align-items:center;gap:12px;padding:12px 26px}
+.pill .d{font-size:17px;font-weight:450;color:rgba(255,255,255,.76);letter-spacing:.2px}
+.pill .t{font-size:23px;font-weight:650;letter-spacing:-.2px}
+.gear{width:60px;height:60px;display:flex;align-items:center;justify-content:center;
+  font-size:25px;color:rgba(255,255,255,.92)}
+
+/* ---------------- 玻璃容器 ---------------- */
+.glass{position:absolute;overflow:hidden;
+  /* 底色（深）+ 微白渐变 —— 和 frostedGlass 一致 */
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.060),rgba(255,255,255,.012) 34%,rgba(255,255,255,0)),
+    linear-gradient(180deg,rgba(12,15,28,.60),rgba(6,8,16,.78));
+  box-shadow:
+    0 34px 76px rgba(0,0,0,.66),
+    0 6px 18px rgba(0,0,0,.36),
+    inset 0 1.5px 0 rgba(255,255,255,.34),
+    inset 0 -1.5px 0 rgba(255,255,255,.06),
+    inset 1.5px 0 0 rgba(255,255,255,.13),
+    inset -1.5px 0 0 rgba(255,255,255,.09)}
+/* 沿切角描亮边（模拟玻璃棱边反光） */
+.glass::before{content:"";position:absolute;inset:0;z-index:8;pointer-events:none;padding:1.5px;
+  background:linear-gradient(148deg,
+    rgba(255,255,255,.62) 0%, rgba(255,255,255,.14) 16%,
+    rgba(255,255,255,.03) 40%, rgba(255,255,255,.06) 70%,
+    rgba(255,255,255,.30) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude}
+
+.big{left:127px;top:207px;width:833px;height:747px;
+  clip-path:polygon(165px 0,100% 0,100% calc(100% - 165px),calc(100% - 165px) 100%,0 100%,0 165px)}
+.bar1{left:1059px;top:207px;width:248px;height:747px;
+  clip-path:polygon(62px 0,100% 0,100% calc(100% - 62px),calc(100% - 62px) 100%,0 100%,0 62px)}
+.bar2{left:1441px;top:207px;width:248px;height:747px;
+  clip-path:polygon(62px 0,100% 0,100% calc(100% - 62px),calc(100% - 62px) 100%,0 100%,0 62px)}
+
+/* 聚焦：亮边更亮 + 外发光 */
+.focused{background:
+    linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.02) 34%,rgba(255,255,255,0)),
+    linear-gradient(180deg,rgba(14,18,34,.56),rgba(6,8,16,.74));
+  box-shadow:
+    0 42px 94px rgba(0,0,0,.70),
+    0 0 0 3px rgba(140,192,255,.60),
+    0 0 78px rgba(96,156,255,.48),
+    inset 0 1.5px 0 rgba(255,255,255,.46),
+    inset 0 -1.5px 0 rgba(255,255,255,.08),
+    inset 1.5px 0 0 rgba(255,255,255,.20),
+    inset -1.5px 0 0 rgba(255,255,255,.12)}
+.focused::before{background:linear-gradient(148deg,
+    rgba(255,255,255,.78) 0%, rgba(255,255,255,.20) 16%,
+    rgba(255,255,255,.05) 40%, rgba(255,255,255,.09) 70%,
+    rgba(255,255,255,.40) 100%)}
+
+/* ---------------- 块1 直播 ---------------- */
+.video{position:absolute;inset:0;z-index:0;
+  background:
+    radial-gradient(600px 400px at 38% 32%, rgba(120,170,255,.30), transparent 68%),
+    radial-gradient(460px 320px at 78% 64%, rgba(255,140,190,.18), transparent 70%),
+    linear-gradient(165deg,#18223F,#090D1A 74%)}
+/* 视频画面上的柔和光斑（更像"真在播"） */
+.video::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(300px 220px at 62% 40%, rgba(255,255,255,.075), transparent 70%)}
+.veil{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,rgba(5,7,14,0) 42%,rgba(5,7,14,.32) 64%,
+    rgba(5,7,14,.72) 86%,rgba(5,7,14,.90) 100%)}
+
+.tag{position:absolute;left:206px;top:54px;z-index:9;display:flex;align-items:center;gap:9px;
+  padding:10px 19px;border-radius:999px;font-size:16px;font-weight:500;
+  color:rgba(255,255,255,.94);letter-spacing:.2px;
+  background:linear-gradient(180deg,rgba(16,19,34,.62),rgba(8,10,20,.76));
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.32),0 6px 22px rgba(0,0,0,.38)}
+.tag i{width:8px;height:8px;border-radius:50%;background:#FF4D6D;box-shadow:0 0 11px #FF4D6D}
+
+.info{position:absolute;left:58px;bottom:56px;z-index:9}
+.live{display:flex;align-items:center;gap:10px;margin-bottom:15px}
+.live i{width:9px;height:9px;border-radius:50%;background:#FF4D6D;box-shadow:0 0 13px #FF4D6D}
+.live span{font-size:15px;font-weight:500;color:rgba(255,255,255,.64);letter-spacing:1.8px}
+.cname{font-size:56px;font-weight:700;letter-spacing:-1.4px;line-height:1.0;
+  text-shadow:0 4px 26px rgba(0,0,0,.66)}
+.hint{font-size:15px;color:rgba(255,255,255,.40);margin-top:13px;letter-spacing:.3px}
+
+/* ---------------- 块2/3 竖版 ----------------
+   海报铺满整块。文字区不用单独的玻璃板（会像贴灰板），
+   改用**暗渐变 + 一道分界高光** —— 这在不支持模糊的电视上才干净。 */
+.ph{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center 18%}
+.bar1 .ph{background-image:url("https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg")}
+.bar2 .ph{background-image:url("https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg")}
+.pscrim{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(5,7,14,.26) 0%,rgba(5,7,14,.05) 28%,
+    rgba(5,7,14,.34) 60%,rgba(5,7,14,.76) 84%,rgba(5,7,14,.92) 100%)}
+.edge{position:absolute;left:12%;right:12%;bottom:38%;height:1px;z-index:2;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.26),rgba(255,255,255,0))}
+.btxt{position:absolute;left:26px;right:26px;bottom:50px;z-index:9}
+.badge{width:50px;height:50px;border-radius:15px;margin-bottom:17px;
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+  background:linear-gradient(160deg,rgba(255,255,255,.20),rgba(255,255,255,.09));
+  border:1px solid rgba(255,255,255,.24);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.40),0 7px 20px rgba(0,0,0,.42)}
+.btitle{font-size:36px;font-weight:700;letter-spacing:-.7px;line-height:1.04;
+  text-shadow:0 3px 20px rgba(0,0,0,.70)}
+.bsub{font-size:15px;color:rgba(255,255,255,.56);margin-top:10px;letter-spacing:.2px}
+</style>
+</head>
+<body>
+
+  <div class="bg">
+    <div class="blob b1"></div><div class="blob b2"></div>
+    <div class="blob b3"></div><div class="blob b4"></div>
+  </div>
+  <div class="grain"></div>
+
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand"><div class="n">焰火TV</div><div class="s">焰火随想　美好随现</div></div>
+    <div class="r">
+      <div class="pill"><span class="d">2026年10月4日</span><span class="t">23:24</span></div>
+      <div class="gear">⚙</div>
+    </div>
+  </div>
+
+  <div class="glass big focused">
+    <div class="video"></div>
+    <div class="veil"></div>
+    <div class="tag"><i></i>CCTV 1 综合</div>
+    <div class="info">
+      <div class="live"><i></i><span>正在直播</span></div>
+      <div class="cname">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+  </div>
+
+  <div class="glass bar1">
+    <div class="ph"></div><div class="pscrim"></div><div class="edge"></div>
+    <div class="btxt">
+      <div class="badge">▣</div>
+      <div class="btitle">影视</div>
+      <div class="bsub">影视库 12 部</div>
+    </div>
+  </div>
+
+  <div class="glass bar2">
+    <div class="ph"></div><div class="pscrim"></div><div class="edge"></div>
+    <div class="btxt">
+      <div class="badge">▶</div>
+      <div class="btitle">短剧</div>
+      <div class="bsub">竖屏短剧 · 自动连播</div>
+    </div>
+  </div>
+
+</body>
+</html>

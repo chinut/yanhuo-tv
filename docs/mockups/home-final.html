@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{width:1920px;height:1080px;overflow:hidden;color:#eef2ff;
+    font-family:"Microsoft YaHei UI","Microsoft YaHei",sans-serif;
+    background:
+      radial-gradient(1250px 720px at 15% 8%, rgba(118,58,218,.52), transparent 62%),
+      radial-gradient(980px 660px at 84% 92%, rgba(220,70,140,.40), transparent 60%),
+      radial-gradient(1100px 800px at 50% 50%, #10142a, #070a15 78%);}
+
+  /* 切角：左上 + 右下 */
+  .cut{clip-path:polygon(30px 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px)}
+
+  .head{display:flex;align-items:center;height:86px;padding:0 40px}
+  .logo{width:62px;height:62px;border-radius:15px;background:linear-gradient(140deg,#7b4dff,#ff4d9d);
+    display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900}
+  .brand{margin-left:17px}
+  .brand .n{font-size:34px;font-weight:800;letter-spacing:1px}
+  .brand .s{font-size:16px;color:#9aa4c6;margin-top:2px;letter-spacing:3px}
+  .head .r{margin-left:auto;display:flex;align-items:center;gap:22px}
+  .clock{font-size:24px;font-weight:600}.clock small{color:#9aa4c6;font-weight:400}
+  .gear{width:58px;height:58px;border-radius:15px;border:3px solid rgba(150,170,255,.55);
+    display:flex;align-items:center;justify-content:center;font-size:28px}
+
+  .main{display:flex;gap:22px;padding:8px 40px 36px;height:958px}
+
+  /* ===== 1+2 直播 ===== */
+  .live{flex:1;position:relative;border:4px solid #6fb6ff;
+    background:
+      radial-gradient(700px 420px at 62% 42%, rgba(80,130,220,.30), transparent 66%),
+      linear-gradient(160deg,#1a2340,#0d1226);
+    box-shadow:0 0 46px rgba(90,170,255,.42), inset 0 0 90px rgba(0,0,0,.5)}
+  .live .tag{position:absolute;left:32px;top:28px;font-size:21px;color:#cfe0ff;
+    background:rgba(10,16,32,.72);padding:7px 16px;border-radius:9px}
+  .live .txt{position:absolute;left:34px;bottom:30px}
+  .live .row{display:flex;align-items:center;gap:10px;font-size:20px;color:#d6dcf5;margin-bottom:12px}
+  .live .row i{width:12px;height:12px;border-radius:50%;background:#ff4d6d;box-shadow:0 0 12px #ff4d6d}
+  .live .cname{font-size:56px;font-weight:900}
+  .live .hint{font-size:17px;color:#8f9ac0;margin-top:8px}
+
+  /* ===== 3 / 4 竖条 ===== */
+  .side{width:452px;display:flex;flex-direction:column;gap:20px}
+  .card{flex:1;position:relative;overflow:hidden;border:3px solid rgba(255,255,255,.18)}
+  /* 竖版海报：填满卡片（≈2:3 与卡片比例接近，所以几乎不裁切） */
+  .card .ph{position:absolute;inset:0;background-size:cover;background-position:center 24%}
+  .card .scrim{position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(6,9,20,.02) 0%,rgba(6,9,20,.20) 46%,
+      rgba(6,9,20,.72) 74%,rgba(6,9,20,.93) 100%)}
+  .card .txt{position:absolute;left:26px;right:26px;bottom:26px}
+  .card .t{font-size:37px;font-weight:900;line-height:1.08}
+  .card .s{font-size:17px;color:#b9c2dd;margin-top:8px}
+  .card .badge{width:54px;height:54px;border-radius:13px;display:flex;align-items:center;
+    justify-content:center;font-size:26px;margin-bottom:14px}
+
+  /* 用真实竖版人像海报（2:3） */
+  .card.movie .ph{background-image:url("https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg")}
+  .card.drama .ph{background-image:url("https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg")}
+  .card.movie .badge{background:linear-gradient(150deg,#c8783c,#8a4a22)}
+  .card.drama .badge{background:linear-gradient(150deg,#a05bc8,#6a2f8a)}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="logo">焰</div>
+  <div class="brand"><div class="n">焰火TV</div><div class="s">焰火随想　美好随现</div></div>
+  <div class="r">
+    <div class="clock">2026年10月4日　<small>23:02</small></div>
+    <div class="gear">⚙</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="live cut">
+    <div class="tag">CCTV 1 综合</div>
+    <div class="txt">
+      <div class="row"><i></i>正在直播</div>
+      <div class="cname">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="card movie cut">
+      <div class="ph"></div><div class="scrim"></div>
+      <div class="txt">
+        <div class="badge">▣</div>
+        <div class="t">影视</div>
+        <div class="s">影视库 12 部</div>
+      </div>
+    </div>
+    <div class="card drama cut">
+      <div class="ph"></div><div class="scrim"></div>
+      <div class="txt">
+        <div class="badge">▶</div>
+        <div class="t">短剧</div>
+        <div class="s">竖屏短剧 · 自动连播</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

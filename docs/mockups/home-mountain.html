@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+/* ==========================================================================
+   背景：山间看落日 —— 青 → 白 → 一丝落日余辉
+   ---------------------------------------------------------------------------
+   明度结构（低 → 高 → 暖）：
+     天顶   柔和青   #A8D4E6   空气感、清透
+     中上   淡青白   #D9EDF4
+     中段   ▸ 白 ◂   #F7FAFB   最亮处，视线中心是"亮"的
+     中下   暖白     #FBEFE2
+     地平线 落日余辉  #F6D3B4   很克制的一层暖
+   关键：整屏是**高明度**的，暗部只留给卡片本身。
+   ========================================================================== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden}
+body{position:relative;overflow:hidden;
+  font-family:"SF Pro Display","SF Pro Text",-apple-system,"Microsoft YaHei UI",
+              "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
+
+/* ---------------- 山间空气：青 → 白 → 暖 ---------------- */
+.sky{position:absolute;inset:0;
+  background:linear-gradient(180deg,
+    #8FC6DF 0%,
+    #B6DCEC 8%,
+    #DCF0F7 16%,
+    #F2FAFC 23%,
+    #FCFEFE 30%,   /* ← 最白处上移到卡片上方的空档 */
+    #FBF8F3 42%,
+    #F9EDE0 56%,
+    #F8E0C6 70%,
+    #F6D2AE 84%,
+    #F3C79C 100%)}
+
+/* 山峦剪影：极淡，只做"山间"的暗示 */
+/* 山峦只留最下缘一条，且浅到几乎只是"空气里的远山"——
+        太高太实会在卡片缝隙里露出怪形状（v2 踩到过）。 */
+.ridge{position:absolute;left:0;right:0;bottom:0;height:19%;opacity:.22}
+.ridge svg{width:100%;height:100%;display:block}
+
+/* 落日余辉：地平线附近一圈很淡的暖光核 */
+.sun{position:absolute;left:50%;top:96%;width:1700px;height:820px;
+  transform:translate(-50%,-50%);border-radius:50%;filter:blur(120px);
+  background:radial-gradient(ellipse at center,
+    rgba(255,208,152,.62) 0%,rgba(255,186,132,.32) 40%,rgba(255,175,120,0) 70%)}
+
+/* 天顶一层更冷的青，压住上缘 */
+.topcool{position:absolute;left:0;right:0;top:0;height:30%;
+  background:radial-gradient(1500px 700px at 50% -16%,
+    rgba(104,180,212,.52) 0%,rgba(104,180,212,0) 72%)}
+
+/* 极细颗粒，消色带 */
+.grain{position:absolute;inset:0;opacity:.05;pointer-events:none;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>")}
+
+/* ================= 顶部栏（浅底 → 深字） ================= */
+.head{position:absolute;left:0;top:0;width:100%;height:150px;
+  display:flex;align-items:center;padding:0 64px}
+.logo{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;
+  justify-content:center;font-size:26px;font-weight:600;color:#fff;
+  background:linear-gradient(150deg,#7FB8D4,#5E9BC4 58%,#E8A87C);
+  box-shadow:0 6px 18px rgba(60,110,150,.26),inset 0 1px 0 rgba(255,255,255,.55)}
+.brand{margin-left:17px}
+.brand .n{font-size:31px;font-weight:600;letter-spacing:.3px;color:#16252E}
+.brand .s{font-size:14px;font-weight:400;letter-spacing:3.4px;color:#5C6E78}
+.head .r{margin-left:auto;display:flex;align-items:center;gap:18px}
+.clockbox{display:flex;align-items:center;gap:18px;padding:12px 22px 12px 24px;
+  border-radius:20px;background:rgba(255,255,255,.62);
+  box-shadow:0 4px 18px rgba(80,110,130,.14),inset 0 0 0 1px rgba(255,255,255,.85)}
+.clockbox .d{font-size:16px;font-weight:400;color:#4E6270}
+.clockbox .t{font-size:22px;font-weight:600;color:#16252E;font-variant-numeric:tabular-nums}
+.gear{width:56px;height:56px;border-radius:999px;display:flex;align-items:center;
+  justify-content:center;font-size:24px;color:#22333D;
+  background:rgba(255,255,255,.62);
+  box-shadow:0 4px 18px rgba(80,110,130,.14),inset 0 0 0 1px rgba(255,255,255,.85)}
+
+/* ================= 卡片：暖灰玻璃（在亮底上自然是"暗"的） ================= */
+.card{position:absolute;overflow:hidden;
+  /* 暖灰玻璃：上方偏冷、下方偏暖，透出背景的余辉。
+     不透明度从 .50~.72 降到 .34~.52 —— 亮背景上太实会像贴了黑块。 */
+  background:linear-gradient(168deg,
+    rgba(58,80,96,.20) 0%,
+    rgba(44,62,76,.26) 46%,
+    rgba(62,54,54,.30) 100%);
+  box-shadow:
+    0 26px 64px rgba(58,88,108,.30),
+    0 6px 18px rgba(58,88,108,.18),
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 0 -1px 0 rgba(255,214,168,.22),
+    inset 0 0 0 1px rgba(255,255,255,.17)}
+.big {left:127px; top:207px; width:842px; height:747px; border-radius:48px}
+.bar1{left:1001px;top:207px; width:380px; height:747px; border-radius:40px}
+.bar2{left:1413px;top:207px; width:380px; height:747px; border-radius:40px}
+
+/* 聚焦：官方数值（scale 1.05 / 2px rgba(255,255,255,.85) / 黑辉光） */
+.big.focused{
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,.85),
+    0 34px 80px rgba(40,70,90,.42),
+    inset 0 1px 0 rgba(255,255,255,.38)}
+
+/* ---------------- 大卡：直播 ---------------- */
+.video{position:absolute;inset:0;
+  /* 浅色画面：亮背景里卡片内部也应该是"明的"，
+     否则整块发黑、像贴上去的。可读性交给下面的 .veil。 */
+  background:
+    radial-gradient(680px 470px at 36% 28%, rgba(178,220,240,.42), transparent 72%),
+    radial-gradient(540px 370px at 78% 66%, rgba(248,205,162,.34), transparent 74%),
+    linear-gradient(168deg,rgba(120,152,172,.30),rgba(96,88,92,.26) 78%)}
+.veil{position:absolute;inset:0;
+  background:linear-gradient(180deg,
+    rgba(9,14,18,0) 0%,
+    rgba(9,14,18,.04) 42%,
+    rgba(9,14,18,.42) 64%,
+    rgba(9,14,18,.72) 82%,
+    rgba(9,14,18,.86) 100%)}
+
+.itag{position:absolute;left:212px;top:56px;display:flex;align-items:center;gap:9px;
+  padding:9px 18px;border-radius:999px;font-size:16px;font-weight:400;color:#F2F8FB;
+  background:rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 0 0 1px rgba(255,255,255,.20)}
+.itag i{width:8px;height:8px;border-radius:50%;background:#FF5A66;
+  box-shadow:0 0 10px rgba(255,90,102,.9)}
+
+.info{position:absolute;left:56px;bottom:54px}
+.info .lv{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.info .lv i{width:9px;height:9px;border-radius:50%;background:#FF5A66;
+  box-shadow:0 0 12px rgba(255,90,102,.9)}
+.info .lv span{font-size:16px;font-weight:400;letter-spacing:1.8px;color:#DDE9EF}
+.info .cn{font-size:60px;font-weight:600;letter-spacing:-.8px;line-height:1.02;color:#FFFFFF;
+  text-shadow:0 3px 20px rgba(6,12,16,.55)}
+.info .hint{font-size:22px;font-weight:400;margin-top:14px;color:#C3D2DA}
+
+/* ---------------- 窄卡 ---------------- */
+.ph{position:absolute;inset:0;background-size:cover;background-position:center 16%}
+.psc{position:absolute;inset:0;
+  background:linear-gradient(180deg,
+    rgba(9,14,18,.26) 0%,rgba(9,14,18,.06) 26%,
+    rgba(9,14,18,.50) 64%,rgba(9,14,18,.86) 100%)}
+.btxt{position:absolute;left:30px;right:30px;bottom:52px}
+.bdg{width:52px;height:52px;border-radius:18px;margin-bottom:17px;display:flex;
+  align-items:center;justify-content:center;font-size:24px;color:#F2F8FB;
+  background:rgba(255,255,255,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 0 0 1px rgba(255,255,255,.20)}
+.bti{font-size:40px;font-weight:600;letter-spacing:-.3px;color:#FFFFFF;
+  text-shadow:0 2px 16px rgba(6,12,16,.50)}
+.bsu{font-size:22px;font-weight:400;margin-top:10px;color:#C9D7DE}
+</style>
+</head>
+<body>
+
+  <div class="sky"></div>
+  <!-- 山峦剪影（极淡） -->
+  <div class="ridge">
+    <svg viewBox="0 0 1920 400" preserveAspectRatio="none">
+      <path d="M0,400 L0,250 L210,150 L340,215 L520,96 L690,205 L860,140 L1030,228 L1210,120 L1390,210 L1560,158 L1740,232 L1920,168 L1920,400 Z"
+            fill="#93AEC2"/>
+    </svg>
+  </div>
+  <div class="sun"></div>
+  <div class="topcool"></div>
+  <div class="grain"></div>
+
+  <!-- ============ 顶部栏 ============ -->
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand">
+      <div class="n">焰火TV</div>
+      <div class="s">焰火随想　美好随现</div>
+    </div>
+    <div class="r">
+      <div class="clockbox"><span class="d">2026年10月4日</span><span class="t">00:24</span></div>
+      <div class="gear">⚙</div>
+    </div>
+  </div>
+
+  <!-- ============ 大卡：直播 ============ -->
+  <div class="card big focused">
+    <div class="video"></div>
+    <div class="veil"></div>
+    <div class="itag"><i></i>CCTV 1 综合</div>
+    <div class="info">
+      <div class="lv"><i></i><span>正在直播</span></div>
+      <div class="cn">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+  </div>
+
+  <!-- ============ 窄卡：影视 ============ -->
+  <div class="card bar1">
+    <div class="ph" style="background-image:url('https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg')"></div>
+    <div class="psc"></div>
+    <div class="btxt"><div class="bdg">▣</div><div class="bti">影视</div><div class="bsu">影视库 12 部</div></div>
+  </div>
+
+  <!-- ============ 窄卡：短剧 ============ -->
+  <div class="card bar2">
+    <div class="ph" style="background-image:url('https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg')"></div>
+    <div class="psc"></div>
+    <div class="btxt"><div class="bdg">▶</div><div class="bti">短剧</div><div class="bsu">竖屏短剧 · 自动连播</div></div>
+  </div>
+
+</body>
+</html>

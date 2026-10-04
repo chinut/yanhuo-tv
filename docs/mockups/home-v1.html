@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    width:1920px; height:1080px; overflow:hidden;
+    font-family:"Microsoft YaHei UI","Microsoft YaHei",sans-serif;
+    background:
+      radial-gradient(1200px 700px at 18% 12%, rgba(120,60,220,.55), transparent 62%),
+      radial-gradient(900px 620px at 78% 88%, rgba(220,70,140,.42), transparent 60%),
+      radial-gradient(1100px 800px at 50% 50%, #10142a, #070a15 78%);
+    color:#eef2ff;
+  }
+
+  /* ================= 标注 ================= */
+  .note {
+    position:absolute; font-size:19px; line-height:1.5;
+    color:#8ff0c8; background:rgba(6,26,20,.80);
+    border:2px solid #2fd39a; border-left:7px solid #2fd39a;
+    border-radius:9px; padding:10px 15px; z-index:99; max-width:370px;
+  }
+  .note b { color:#fff; }
+  .note.q { color:#ffd98a; background:rgba(32,22,4,.85); border-color:#ffb43d; border-left-color:#ffb43d; }
+
+  /* ================= 顶栏 ================= */
+  .head { display:flex; align-items:center; height:92px; padding:0 40px; }
+  .logo { width:66px; height:66px; border-radius:16px;
+    background:linear-gradient(140deg,#7b4dff,#ff4d9d);
+    display:flex; align-items:center; justify-content:center;
+    font-size:32px; font-weight:900; color:#fff; }
+  .brand { margin-left:18px; }
+  .brand .n { font-size:36px; font-weight:800; letter-spacing:1px; }
+  .brand .s { font-size:17px; color:#9aa4c6; margin-top:3px; letter-spacing:3px; }
+  .head .right { margin-left:auto; display:flex; align-items:center; gap:24px; }
+  .clock { font-size:25px; color:#dfe5ff; font-weight:600; }
+  .clock small { color:#9aa4c6; font-weight:400; }
+  .gear { width:62px; height:62px; border-radius:16px;
+    border:3px solid rgba(150,170,255,.55); display:flex; align-items:center;
+    justify-content:center; font-size:30px; }
+
+  /* ================= 主体 ================= */
+  .main { display:flex; gap:22px; padding:14px 40px 0; height:966px; }
+
+  /* ---------- 左：直播大画面 ---------- */
+  .hero { flex:1; border-radius:26px; position:relative; overflow:hidden;
+    border:4px solid #6fb6ff;
+    box-shadow:0 0 44px rgba(90,170,255,.45), inset 0 0 90px rgba(0,0,0,.5);
+    background:linear-gradient(160deg,#1a2340,#0d1226); }
+  .hero .video { position:absolute; inset:0;
+    background:
+      radial-gradient(560px 340px at 68% 40%, rgba(90,150,255,.30), transparent 62%),
+      linear-gradient(120deg,#131a33,#0a0f1f); }
+  .hero .tag { position:absolute; left:38px; top:34px; font-size:22px; color:#cfe0ff;
+    background:rgba(10,16,32,.7); padding:7px 16px; border-radius:9px; }
+  .hero .live { position:absolute; left:40px; bottom:112px; display:flex; align-items:center; gap:11px;
+    font-size:21px; color:#d6dcf5; }
+  .hero .live i { width:12px; height:12px; border-radius:50%; background:#ff4d6d; display:block;
+    box-shadow:0 0 12px #ff4d6d; }
+  .hero .cname { position:absolute; left:40px; bottom:52px; font-size:58px; font-weight:900; letter-spacing:1px; }
+  .hero .hint { position:absolute; left:42px; bottom:22px; font-size:18px; color:#8f9ac0; }
+
+  /* ---------- 右列 ---------- */
+  .side { width:470px; display:flex; flex-direction:column; gap:18px; }
+
+  /* 方块拼字 + 竖排 */
+  .glyphbox { display:flex; gap:16px; align-items:stretch; }
+  .glyphcol { display:flex; flex-direction:column; gap:8px; }
+  .glyphcol.shrink { justify-content:center; }
+  .blk { width:74px; height:74px; background:linear-gradient(150deg,#ffffff,#d8def5);
+    display:flex; align-items:center; justify-content:center;
+    color:#0b0f1e; font-size:38px; font-weight:900;
+    clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px); }
+  .blk.slim { height:74px; width:52px; font-size:34px; }
+
+  /* 竖卡片 */
+  .card { flex:1; border-radius:22px; position:relative; overflow:hidden;
+    clip-path:polygon(26px 0,100% 0,100% calc(100% - 26px),calc(100% - 26px) 100%,0 100%,0 26px);
+    border:3px solid rgba(255,255,255,.20); }
+  .card .ph { position:absolute; inset:0;
+    background-size:cover; background-position:center 22%; }
+  .card .scrim { position:absolute; inset:0;
+    background:linear-gradient(180deg,rgba(6,9,20,.10) 0%,rgba(6,9,20,.34) 42%,rgba(6,9,20,.80) 76%,rgba(6,9,20,.94) 100%); }
+  .card .txt { position:absolute; left:26px; right:26px; bottom:24px; }
+  .card .t { font-size:34px; font-weight:900; }
+  .card .s { font-size:18px; color:#b9c2dd; margin-top:6px; }
+
+  .card.movie .ph { background-image:
+    linear-gradient(0deg,rgba(0,0,0,.10),rgba(0,0,0,.10)),
+    repeating-linear-gradient(115deg,#4a3b2a 0 18px,#5a4832 18px 36px),
+    radial-gradient(300px 400px at 50% 38%, rgba(255,214,160,.55), transparent 70%); }
+  .card.drama .ph { background-image:
+    linear-gradient(0deg,rgba(0,0,0,.10),rgba(0,0,0,.10)),
+    repeating-linear-gradient(70deg,#3a2a3f 0 18px,#4a3550 18px 36px),
+    radial-gradient(300px 400px at 52% 34%, rgba(255,190,225,.55), transparent 70%); }
+
+  .face { position:absolute; width:120px; height:120px; border-radius:50%;
+    border:3px dashed rgba(255,255,255,.55); left:50%; top:34%; transform:translate(-50%,-50%);
+    display:flex; align-items:center; justify-content:center; font-size:15px; color:#fff;
+    background:rgba(0,0,0,.25); text-align:center; }
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand">
+      <div class="n">焰火TV</div>
+      <div class="s">焰火随想　美好随现</div>
+    </div>
+    <div class="right">
+      <div class="clock">2026年10月4日　<small>22:41</small></div>
+      <div class="gear">⚙</div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ============ 左：直播 ============ -->
+    <div class="hero">
+      <div class="video"></div>
+      <div class="tag">CCTV 1 综合</div>
+      <div class="live"><i></i>正在直播</div>
+      <div class="cname">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+      <div class="note" style="left:26px; top:120px;">
+        <b>① 左侧直播大画面 —— 完全不动</b><br>
+        保持现在的样子（最大、亮边框、默认焦点）
+      </div>
+    </div>
+
+    <!-- ============ 右列 ============ -->
+    <div class="side">
+
+      <!-- 方块拼字 + 央视 竖排 -->
+      <div class="glyphbox">
+        <div class="glyphcol">
+          <div class="blk">央</div>
+          <div class="blk">视</div>
+        </div>
+        <div class="glyphcol shrink">
+          <div class="blk slim"></div>
+          <div class="blk slim"></div>
+        </div>
+        <div class="glyphcol" style="justify-content:center;">
+          <div style="font-size:19px; color:#9aa4c6; line-height:1.7; padding-left:8px;">
+            你要的<b style="color:#fff">「央视」</b>方块拼字<br>
+            （大块＝字，细条＝装饰笔画）<br>
+            四个角切刀 · 竖排
+          </div>
+        </div>
+      </div>
+
+      <!-- 影视 -->
+      <div class="card movie">
+        <div class="ph"></div>
+        <div class="face">人脸区域<br>不再切掉</div>
+        <div class="scrim"></div>
+        <div class="txt">
+          <div class="t">影视</div>
+          <div class="s">影视库 12 部</div>
+        </div>
+      </div>
+
+      <!-- 短剧 -->
+      <div class="card drama">
+        <div class="ph"></div>
+        <div class="face">人脸区域<br>不再切掉</div>
+        <div class="scrim"></div>
+        <div class="txt">
+          <div class="t">短剧</div>
+          <div class="s">竖屏短剧 · 自动连播</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 标注 -->
+    <div class="note q" style="right:36px; top:210px;">
+      <b>② 这一列全部「竖」了</b><br>
+      影视 / 短剧 从横条改成<b>竖向卡片</b>（高 &gt; 宽），
+      四个角<b>切刀</b>（不是圆角）
+    </div>
+
+    <div class="note" style="right:36px; bottom:40px;">
+      <b>③ 海报不再切头切脖</b><br>
+      卡片变竖之后比例接近海报本身（≈2:3），<br>
+      用<b>完整显示</b>而不用裁切 —— 人脸自然完整
+    </div>
+
+  </div>
+
+</body>
+</html>

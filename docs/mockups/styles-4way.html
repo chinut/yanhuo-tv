@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+/* ==========================================================================
+   首页风格四方向对比（2×2 大图）
+   每格 1500×844，舞台 1920×1080 缩放 0.78125 正好铺满。
+   布局沿用已确认坐标，只比视觉语言。半径整体收小（用户说切角太大）。
+   ========================================================================== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:3040px;height:1728px;overflow:hidden;background:#000}
+body{font-family:"SF Pro Display","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;color:#fff;display:grid;
+  grid-template-columns:1520px 1520px;grid-template-rows:864px 864px;gap:0}
+
+.cell{position:relative;width:1520px;height:864px;overflow:hidden;
+  border-right:2px solid #1c1c1c;border-bottom:2px solid #1c1c1c}
+
+/* 1920×1080 → 1520×855（缩放 .7917，位移补足留白） */
+.stage{position:absolute;left:0;top:0;width:1920px;height:1080px;
+  transform:scale(.7917);transform-origin:0 0}
+
+.cap{position:absolute;left:0;right:0;bottom:0;z-index:99;padding:14px 22px 16px;
+  background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.88) 46%);
+  font-size:17px;font-weight:600;letter-spacing:.3px}
+.cap em{display:block;font-style:normal;font-size:13.5px;font-weight:400;
+  color:rgba(255,255,255,.62);margin-top:5px;line-height:1.45}
+
+/* ---------------- 布局 ---------------- */
+.big{position:absolute;left:127px;top:207px;width:833px;height:747px;overflow:hidden}
+.b1{position:absolute;left:1059px;top:207px;width:248px;height:747px;overflow:hidden}
+.b2{position:absolute;left:1441px;top:207px;width:248px;height:747px;overflow:hidden}
+.head{position:absolute;left:0;top:0;width:100%;height:152px;display:flex;align-items:center;padding:0 66px}
+.logo{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:27px;font-weight:800}
+.brand{margin-left:17px}
+.brand .n{font-size:32px;font-weight:700;letter-spacing:-.3px}
+.brand .s{font-size:13px;margin-top:4px;letter-spacing:4px}
+.head .r{margin-left:auto;display:flex;align-items:center;gap:16px}
+.clk{font-size:22px;font-weight:600}
+.clk small{font-size:16px;font-weight:400;margin-right:12px}
+.gear{width:56px;height:56px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:24px}
+.vid{position:absolute;inset:0}
+.veil{position:absolute;inset:0}
+.itag{position:absolute;left:200px;top:52px;display:flex;align-items:center;gap:8px;
+  padding:9px 17px;border-radius:999px;font-size:15px;font-weight:500}
+.itag i{width:7px;height:7px;border-radius:50%;background:#FF4D6D}
+.info{position:absolute;left:56px;bottom:54px}
+.info .lv{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.info .lv i{width:8px;height:8px;border-radius:50%;background:#FF4D6D}
+.info .lv span{font-size:14px;letter-spacing:1.6px}
+.info .cn{font-size:54px;font-weight:700;letter-spacing:-1.3px;line-height:1}
+.info .hint{font-size:14px;margin-top:12px}
+.ph{position:absolute;inset:0;background-size:cover;background-position:center 18%}
+.psc{position:absolute;inset:0}
+.bt{position:absolute;left:24px;right:24px;bottom:46px}
+.bdg{width:46px;height:46px;border-radius:14px;margin-bottom:15px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.bti{font-size:34px;font-weight:700;letter-spacing:-.6px}
+.bsu{font-size:14px;margin-top:9px}
+
+/* ===== 方向 1：Apple TV 式（近黑 + 单一冷光） ===== */
+.d1{background:#0B0B0F}
+.d1 .glow{position:absolute;inset:0;
+  background:radial-gradient(1500px 900px at 30% -10%,#1A2130 0%,rgba(26,33,48,0) 60%),
+             radial-gradient(1200px 800px at 100% 110%,#14181F 0%,rgba(20,24,31,0) 55%)}
+.d1 .big{background:#14161C;border-radius:22px;box-shadow:0 32px 70px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.07)}
+.d1 .b1,.d1 .b2{border-radius:20px;box-shadow:0 28px 60px rgba(0,0,0,.70),0 0 0 1px rgba(255,255,255,.07)}
+.d1 .logo{background:linear-gradient(150deg,#5E6AD2,#8A63E8);box-shadow:0 8px 22px rgba(94,106,210,.34)}
+.d1 .brand .s{color:rgba(255,255,255,.38)}
+.d1 .clk{color:rgba(255,255,255,.86)}.d1 .clk small{color:rgba(255,255,255,.44)}
+.d1 .gear{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);color:rgba(255,255,255,.8)}
+.d1 .vid{background:radial-gradient(600px 400px at 40% 36%,rgba(120,160,255,.20),transparent 70%),
+  linear-gradient(165deg,#1B2130,#0E1118 76%)}
+.d1 .veil{background:linear-gradient(180deg,transparent 44%,rgba(8,9,12,.52) 66%,rgba(8,9,12,.86) 88%)}
+.d1 .itag{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.92)}
+.d1 .info .lv span{color:rgba(255,255,255,.58)}
+.d1 .info .hint{color:rgba(255,255,255,.38)}
+.d1 .psc{background:linear-gradient(180deg,rgba(8,9,12,.30) 0%,rgba(8,9,12,.06) 30%,rgba(8,9,12,.42) 62%,rgba(8,9,12,.82) 86%,rgba(8,9,12,.94) 100%)}
+.d1 .bdg{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.16)}
+.d1 .bsu{color:rgba(255,255,255,.52)}
+
+/* ===== 方向 2：纯平近黑（Netflix / Google TV 式） ===== */
+.d2{background:#08090B}
+.d2 .big{background:#101215;border-radius:6px}
+.d2 .b1,.d2 .b2{border-radius:6px}
+.d2 .logo{background:#E50914}
+.d2 .brand .s{color:rgba(255,255,255,.34)}
+.d2 .clk{color:rgba(255,255,255,.82)}.d2 .clk small{color:rgba(255,255,255,.40)}
+.d2 .gear{background:transparent;border:none;color:rgba(255,255,255,.7)}
+.d2 .vid{background:radial-gradient(700px 460px at 42% 34%,rgba(130,150,200,.14),transparent 72%),
+  linear-gradient(170deg,#191C22,#0C0E11 78%)}
+.d2 .veil{background:linear-gradient(180deg,transparent 50%,rgba(6,7,9,.60) 72%,rgba(6,7,9,.92) 92%)}
+.d2 .itag{background:transparent;border:none;padding-left:0;color:rgba(255,255,255,.72)}
+.d2 .info .cn{font-size:58px}
+.d2 .info .lv span{color:rgba(255,255,255,.52)}
+.d2 .info .hint{color:rgba(255,255,255,.34)}
+.d2 .psc{background:linear-gradient(180deg,rgba(6,7,9,.22) 0%,rgba(6,7,9,.04) 34%,rgba(6,7,9,.50) 66%,rgba(6,7,9,.88) 88%,rgba(6,7,9,.97) 100%)}
+.d2 .bdg{background:transparent;border:none;width:auto;height:auto;font-size:20px}
+.d2 .bsu{color:rgba(255,255,255,.46)}
+
+/* ===== 方向 3：单色相玻璃（玉石蓝） ===== */
+.d3{background:#080C14}
+.d3 .glow{position:absolute;inset:0;
+  background:radial-gradient(1600px 1000px at 22% -16%,#16243B 0%,rgba(22,36,59,0) 58%),
+             radial-gradient(1100px 900px at 104% 108%,#101A2B 0%,rgba(16,26,43,0) 56%)}
+.d3 .big{background:linear-gradient(158deg,rgba(150,185,235,.10),rgba(120,155,210,.035));
+  border-radius:24px;box-shadow:0 34px 74px rgba(0,0,0,.66),
+    inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 0 1px rgba(160,195,245,.16)}
+.d3 .b1,.d3 .b2{border-radius:22px;box-shadow:0 30px 64px rgba(0,0,0,.66),
+    inset 0 1px 0 rgba(255,255,255,.15),inset 0 0 0 1px rgba(160,195,245,.15)}
+.d3 .logo{background:linear-gradient(150deg,#4C7BE0,#7A63E0);box-shadow:0 8px 24px rgba(76,123,224,.36)}
+.d3 .brand .s{color:rgba(190,212,245,.42)}
+.d3 .clk{color:rgba(228,238,255,.9)}.d3 .clk small{color:rgba(190,212,245,.48)}
+.d3 .gear{background:rgba(150,185,235,.10);border:1px solid rgba(160,195,245,.18);color:rgba(228,238,255,.86)}
+.d3 .vid{background:radial-gradient(620px 420px at 40% 34%,rgba(96,150,235,.24),transparent 70%),
+  linear-gradient(165deg,#16203A,#0A0E18 76%)}
+.d3 .veil{background:linear-gradient(180deg,transparent 44%,rgba(6,9,16,.50) 66%,rgba(6,9,16,.86) 88%)}
+.d3 .itag{background:rgba(150,185,235,.12);border:1px solid rgba(160,195,245,.20);color:rgba(232,240,255,.94)}
+.d3 .info .lv span{color:rgba(190,212,245,.60)}
+.d3 .info .cn{color:#F2F6FF}
+.d3 .info .hint{color:rgba(190,212,245,.42)}
+.d3 .psc{background:linear-gradient(180deg,rgba(6,9,16,.30) 0%,rgba(6,9,16,.06) 30%,rgba(6,9,16,.44) 62%,rgba(6,9,16,.84) 86%,rgba(6,9,16,.95) 100%)}
+.d3 .bdg{background:rgba(150,185,235,.16);border:1px solid rgba(160,195,245,.22)}
+.d3 .bsu{color:rgba(190,212,245,.56)}
+
+/* ===== 方向 4：暖中性 + 金色点缀 ===== */
+.d4{background:#0D0B0A}
+.d4 .glow{position:absolute;inset:0;
+  background:radial-gradient(1500px 950px at 26% -14%,#221B16 0%,rgba(34,27,22,0) 58%),
+             radial-gradient(1200px 900px at 102% 106%,#1A1512 0%,rgba(26,21,18,0) 56%)}
+.d4 .big{background:#171310;border-radius:20px;box-shadow:0 32px 70px rgba(0,0,0,.72),0 0 0 1px rgba(255,235,205,.08)}
+.d4 .b1,.d4 .b2{border-radius:18px;box-shadow:0 28px 62px rgba(0,0,0,.70),0 0 0 1px rgba(255,235,205,.08)}
+.d4 .logo{background:linear-gradient(150deg,#D9A441,#B87A2A);box-shadow:0 8px 24px rgba(217,164,65,.30)}
+.d4 .brand .s{color:rgba(240,225,205,.38)}
+.d4 .clk{color:rgba(245,238,228,.88)}.d4 .clk small{color:rgba(240,225,205,.44)}
+.d4 .gear{background:rgba(255,235,205,.07);border:1px solid rgba(255,235,205,.13);color:rgba(245,238,228,.82)}
+.d4 .vid{background:radial-gradient(620px 420px at 40% 36%,rgba(230,180,110,.18),transparent 70%),
+  linear-gradient(165deg,#211B16,#100D0B 76%)}
+.d4 .veil{background:linear-gradient(180deg,transparent 44%,rgba(12,10,9,.52) 66%,rgba(12,10,9,.88) 88%)}
+.d4 .itag{background:rgba(255,235,205,.10);border:1px solid rgba(255,235,205,.16);color:rgba(248,240,228,.94)}
+.d4 .itag i{background:#E8B65C;box-shadow:0 0 10px #E8B65C}
+.d4 .info .lv i{background:#E8B65C}
+.d4 .info .lv span{color:rgba(240,225,205,.58)}
+.d4 .info .cn{color:#FBF6EF}
+.d4 .info .hint{color:rgba(240,225,205,.40)}
+.d4 .psc{background:linear-gradient(180deg,rgba(12,10,9,.30) 0%,rgba(12,10,9,.06) 30%,rgba(12,10,9,.44) 62%,rgba(12,10,9,.84) 86%,rgba(12,10,9,.95) 100%)}
+.d4 .bdg{background:rgba(255,235,205,.13);border:1px solid rgba(255,235,205,.18);color:#E8B65C}
+.d4 .bsu{color:rgba(240,225,205,.54)}
+</style>
+</head>
+<body>
+<script>
+const TPL = `
+  <div class="glow"></div>
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand"><div class="n">焰火TV</div><div class="s">焰火随想　美好随现</div></div>
+    <div class="r"><div class="clk"><small>2026年10月4日</small>23:40</div><div class="gear">⚙</div></div>
+  </div>
+  <div class="big">
+    <div class="vid"></div><div class="veil"></div>
+    <div class="itag"><i></i>CCTV 1 综合</div>
+    <div class="info">
+      <div class="lv"><i></i><span>正在直播</span></div>
+      <div class="cn">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+  </div>
+  <div class="b1">
+    <div class="ph" style="background-image:url('https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg')"></div>
+    <div class="psc"></div>
+    <div class="bt"><div class="bdg">▣</div><div class="bti">影视</div><div class="bsu">影视库 12 部</div></div>
+  </div>
+  <div class="b2">
+    <div class="ph" style="background-image:url('https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg')"></div>
+    <div class="psc"></div>
+    <div class="bt"><div class="bdg">▶</div><div class="bti">短剧</div><div class="bsu">竖屏短剧 · 自动连播</div></div>
+  </div>`;
+
+const NOTES = [
+ ["方向 1 · 近黑 + 单一冷光（Apple TV 式）",
+  "背景近黑、只留一层冷色光；卡片 22px 圆角 + 1px 极淡描边。最克制，也最不容易翻车。"],
+ ["方向 2 · 纯平近黑（Netflix / Google TV 式）",
+  "零装饰：无玻璃、无光晕、无描边，只有 6px 圆角。效果全靠海报本身，最省 GPU。"],
+ ["方向 3 · 单色相玻璃（玉石蓝）",
+  "保留玻璃质感，但只用一个色相（蓝灰），切角改 24px 圆角。**删掉彩虹光斑**是关键。"],
+ ["方向 4 · 暖中性 + 金色点缀（辨识度最高）",
+  "深邃暖黑 + 单一金色点缀。和市面上清一色蓝紫拉开距离，气质更沉稳。"],
+];
+
+document.body.innerHTML = NOTES.map(([t,w],i)=>`
+  <div class="cell">
+    <div class="stage d${i+1}">${TPL}</div>
+    <div class="cap">${t}<em>${w}</em></div>
+  </div>`).join('');
+</script>
+</body>
+</html>

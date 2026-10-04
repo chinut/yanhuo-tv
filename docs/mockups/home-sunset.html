@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+/* ==========================================================================
+   焰火TV 首页 · iOS 液态玻璃（按用户设计规格）
+   ---------------------------------------------------------------------------
+   布局严格固定（照参考图）：
+     左大卡  833 × 747  @ (127, 207)
+     右竖卡  248 × 747  @ (1059, 207)
+     右竖卡  248 × 747  @ (1441, 207)
+   材质：半透明磨砂玻璃 + 柔和反光 + 细微高光描边 + 弥散阴影
+   字体：SF 系无衬线，字重柔和（不用粗黑体）
+   ========================================================================== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden}
+
+body{
+  position:relative;color:#fff;
+  font-family:"SF Pro Display","SF Pro Text",-apple-system,"Microsoft YaHei UI",
+              "PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-weight:400;
+  letter-spacing:.1px;
+  background:#070A18;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ======================= 背景：隔着毛玻璃看晚霞 =======================
+   思路：先画晚霞（冷紫天顶 → 品红 → 珊瑚橘 → 暖金地平线 + 横向云带），
+        再罩一层低饱和磨砂把色阶压柔 —— 隔着玻璃看才柔、才梦幻。
+   ====================================================================== */
+.bg{position:absolute;inset:0;overflow:hidden;
+  /* 晚霞竖向色带：上深紫 → 中品红 → 下暖金 */
+  background:linear-gradient(180deg,
+    #1E1A40 0%,
+    #402A66 13%,
+    #6B3478 28%,
+    #A34677 44%,
+    #D65F6C 59%,
+    #F08356 73%,
+    #FBB069 86%,
+    #FFD79B 100%)}
+
+/* 云带：拉长的椭圆 + 大模糊，横向铺开 */
+.cloud{position:absolute;border-radius:50%;filter:blur(90px);mix-blend-mode:screen;
+  animation:drift 40s ease-in-out infinite}
+.c1{width:1900px;height:320px;left:-160px;top:38%;opacity:.44;
+  background:radial-gradient(ellipse at center,#FF8FB0 0%,rgba(255,143,176,0) 70%)}
+.c2{width:2100px;height:280px;left:-240px;top:56%;opacity:.50;
+  background:radial-gradient(ellipse at center,#FFB27A 0%,rgba(255,178,122,0) 70%);
+  animation-delay:-13s}
+.c3{width:1700px;height:250px;left:-100px;top:72%;opacity:.46;
+  background:radial-gradient(ellipse at center,#FFD9A0 0%,rgba(255,217,160,0) 72%);
+  animation-delay:-24s}
+.c4{width:1500px;height:300px;right:-260px;top:24%;opacity:.32;
+  background:radial-gradient(ellipse at center,#B07BE0 0%,rgba(176,123,224,0) 70%);
+  animation-delay:-7s}
+
+/* 地平线暖光核：晚霞最亮的那一点 */
+.sun{position:absolute;left:50%;top:74%;width:1300px;height:760px;
+  transform:translate(-50%,-50%);border-radius:50%;filter:blur(130px);
+  background:radial-gradient(ellipse at center,
+    rgba(255,226,170,.62) 0%,rgba(255,190,120,.32) 38%,rgba(255,160,90,0) 70%)}
+
+/* 天顶冷光：压住上缘，避免整屏都在暖 */
+.topcool{position:absolute;left:0;right:0;top:0;height:46%;
+  background:radial-gradient(1200px 620px at 46% -8%,
+    rgba(92,104,200,.42) 0%,rgba(92,104,200,0) 68%)}
+
+/* ---- 磨砂罩：这就是"隔着玻璃"的关键 ----
+   低饱和 + 半透明，把上面的色阶差压小、云带边缘化开 */
+.frost{position:absolute;inset:0;
+  /* 只留很薄一层：目的是"化开色阶"，不是"盖住颜色" */
+  background:linear-gradient(180deg,
+    rgba(30,32,62,.30) 0%,
+    rgba(58,44,86,.24) 26%,
+    rgba(104,66,108,.16) 48%,
+    rgba(150,92,106,.11) 68%,
+    rgba(190,126,114,.07) 100%);
+  backdrop-filter:blur(30px) saturate(108%);}
+/* 第二层更细的雾，让云带之间不至于"分层" */
+.frost2{position:absolute;inset:0;backdrop-filter:blur(8px);}
+
+@keyframes drift{
+  0%,100%{transform:translate3d(0,0,0) scale(1)}
+  33%{transform:translate3d(52px,-22px,0) scale(1.06)}
+  66%{transform:translate3d(-44px,18px,0) scale(.95)}
+}
+/* 极细颗粒，消除色带 */
+.grain{position:absolute;inset:0;opacity:.045;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>")}
+
+/* ======================= 顶部栏 ======================= */
+.head{position:absolute;left:0;top:0;width:100%;height:150px;
+  display:flex;align-items:center;padding:0 64px}
+
+.logo{width:58px;height:58px;border-radius:16px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;font-weight:600;letter-spacing:0;
+  background:linear-gradient(150deg,#7E8CF5 0%,#9B7BEE 52%,#6FA8F0 100%);
+  box-shadow:
+    0 8px 24px rgba(120,130,240,.34),
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(0,0,0,.16);
+  text-shadow:0 1px 4px rgba(40,30,90,.35)}
+.brand{margin-left:17px}
+.brand .n{font-size:31px;font-weight:500;letter-spacing:.4px;
+  text-shadow:0 2px 16px rgba(0,0,0,.45)}
+/* 原来 300 字重 @ .46 透明度 → 对比度 3.37:1，不达 WCAG AA。
+       提到 400 字重 @ .78，电视上才看得清。 */
+.brand .s{font-size:13px;font-weight:400;color:rgba(232,238,255,.78);
+  margin-top:5px;letter-spacing:3.6px}
+
+.head .right{margin-left:auto;display:flex;align-items:center;gap:18px}
+
+/* 时间组件：圆角深色悬浮玻璃 */
+.clockbox{
+  display:flex;align-items:center;gap:18px;
+  padding:12px 22px 12px 24px;border-radius:20px;
+  background:linear-gradient(160deg,rgba(255,255,255,.115),rgba(255,255,255,.045));
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:
+    0 12px 34px rgba(4,7,20,.50),
+    inset 0 1px 0 rgba(255,255,255,.30),
+    inset 0 -1px 0 rgba(255,255,255,.04)}
+.clockbox .d{font-size:15px;font-weight:400;color:rgba(232,238,255,.82);letter-spacing:.6px}
+.clockbox .t{font-size:22px;font-weight:500;color:#F2F5FF;letter-spacing:.2px;
+  font-variant-numeric:tabular-nums}
+.gear{width:56px;height:56px;border-radius:999px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+  color:rgba(232,238,255,.88);
+  background:linear-gradient(160deg,rgba(255,255,255,.115),rgba(255,255,255,.045));
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 12px 30px rgba(4,7,20,.46),inset 0 1px 0 rgba(255,255,255,.30)}
+
+/* ======================= 玻璃卡片公共材质 ======================= */
+.card{
+  position:absolute;overflow:hidden;
+  /* 圆角：大卡 48px、窄卡 40px（不等比缩放）。
+     依据 Material ExtraLarge 28dp × density 2.0 = 56px，
+     这里取 48px 略收一点更稳。 */
+  border-radius:48px;
+  /* 玻璃底色：带暖调的半透明 —— 真实玻璃会把背后的晚霞暖光透进来，
+     用冷蓝会跟暖背景打架（v1 就是这个毛病） */
+  background:
+    linear-gradient(165deg,rgba(255,236,222,.165) 0%,rgba(255,225,215,.060) 42%,rgba(255,220,210,.030) 100%),
+    linear-gradient(180deg,rgba(38,28,54,.32),rgba(22,16,36,.44));
+  box-shadow:
+    /* 弥散阴影 */
+    0 40px 90px rgba(3,6,18,.62),
+    0 12px 30px rgba(3,6,18,.40),
+    /* 内侧高光与暗边 —— 玻璃厚度 */
+    inset 0 1.5px 0 rgba(255,255,255,.42),
+    inset 0 -1.5px 0 rgba(255,255,255,.06),
+    inset 1.5px 0 0 rgba(255,255,255,.14),
+    inset -1.5px 0 0 rgba(255,255,255,.09)}
+/* 细微高光描边（沿卡片轮廓一圈，左上最亮） */
+.card::before{
+  content:"";position:absolute;inset:0;z-index:12;pointer-events:none;
+  border-radius:inherit;padding:1.4px;
+  background:linear-gradient(152deg,
+    rgba(255,255,255,.66) 0%,rgba(255,255,255,.20) 15%,
+    rgba(255,255,255,.04) 38%,rgba(255,255,255,.05) 68%,
+    rgba(255,255,255,.26) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude}
+/* 玻璃顶部柔光带 */
+.card::after{
+  content:"";position:absolute;left:0;right:0;top:0;height:42%;z-index:11;
+  pointer-events:none;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0))}
+
+/* ---- 尺寸与位置（严格照参考图，不动） ---- */
+.big {left:127px;  top:207px; width:842px; height:747px}
+.bar1{left:1001px; top:207px; width:380px; height:747px; border-radius:40px}
+.bar2{left:1413px; top:207px; width:380px; height:747px; border-radius:40px}
+
+/* 聚焦状态：更亮的高光描边 + 更明显的外发光（Apple TV 的做法） */
+.focused{
+  background:
+    linear-gradient(165deg,rgba(255,240,228,.195) 0%,rgba(255,228,216,.075) 42%,rgba(255,222,212,.038) 100%),
+    linear-gradient(180deg,rgba(44,32,62,.30),rgba(26,18,42,.42));
+  box-shadow:
+    0 46px 104px rgba(3,6,18,.68),
+    0 14px 34px rgba(3,6,18,.44),
+    0 0 0 2.5px rgba(255,236,222,.54),
+    0 0 64px rgba(255,178,138,.30),
+    inset 0 2px 0 rgba(255,255,255,.52),
+    inset 0 -1.5px 0 rgba(255,255,255,.08),
+    inset 2px 0 0 rgba(255,255,255,.20),
+    inset -2px 0 0 rgba(255,255,255,.12)}
+.focused::before{
+  background:linear-gradient(152deg,
+    rgba(255,255,255,.86) 0%,rgba(255,255,255,.28) 15%,
+    rgba(255,255,255,.07) 38%,rgba(255,255,255,.09) 68%,
+    rgba(255,255,255,.38) 100%)}
+
+/* ======================= 左大卡：直播 ======================= */
+/* 内部暗调视频预览区 */
+.video{position:absolute;inset:0;z-index:0;
+  background:
+    radial-gradient(620px 420px at 36% 30%, rgba(112,132,225,.26), transparent 68%),
+    radial-gradient(480px 340px at 76% 64%, rgba(220,120,150,.18), transparent 70%),
+    linear-gradient(168deg,#1A1A38 0%,#0D0E22 72%,#0A0A18 100%)}
+/* 视频画面的一点点细节，避免死平 */
+.video::after{content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(240px 180px at 62% 38%, rgba(255,255,255,.055), transparent 72%),
+    radial-gradient(180px 140px at 44% 58%, rgba(180,205,255,.045), transparent 74%)}
+.veil{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(6,9,20,0) 40%,rgba(6,9,20,.22) 60%,
+    rgba(6,9,20,.58) 80%,rgba(6,9,20,.78) 100%)}
+
+/* 顶部小标签 */
+.tag{position:absolute;left:212px;top:56px;z-index:14;
+  display:flex;align-items:center;gap:9px;
+  padding:9px 18px;border-radius:999px;
+  font-size:15px;font-weight:400;color:rgba(240,245,255,.94);letter-spacing:.3px;
+  background:linear-gradient(160deg,rgba(255,255,255,.155),rgba(255,255,255,.055));
+  border:1px solid rgba(255,255,255,.17);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 8px 22px rgba(4,7,20,.40)}
+.tag i{width:8px;height:8px;border-radius:50%;background:#FF4D6A;
+  box-shadow:0 0 10px rgba(255,77,106,.85)}
+
+/* 左下角信息 */
+.info{position:absolute;left:56px;bottom:54px;z-index:14}
+.info .live{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.info .live i{width:9px;height:9px;border-radius:50%;background:#FF4D6A;
+  box-shadow:0 0 12px rgba(255,77,106,.9)}
+.info .live span{font-size:14px;font-weight:400;color:rgba(232,238,255,.80);
+  letter-spacing:2px}
+.info .cn{font-size:53px;font-weight:500;letter-spacing:-.6px;line-height:1.02;
+  text-shadow:0 4px 26px rgba(4,8,22,.62)}
+.info .hint{font-size:14px;font-weight:400;color:rgba(228,236,255,.70);
+  margin-top:13px;letter-spacing:.4px}
+
+/* ======================= 右侧竖卡 ======================= */
+.ph{position:absolute;inset:0;z-index:0;
+  background-size:cover;background-position:center 16%}
+.bar1 .ph{background-image:url("https://image.tmdb.org/t/p/w500/1E5baAaEse26fej7uHcjOgEE2t2.jpg")}
+.bar2 .ph{background-image:url("https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg")}
+/* 海报之上压一层相对均匀的暗调，让玻璃感统一（不是"贴块灰板"） */
+.psc{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(14,12,28,.30) 0%,rgba(14,12,28,.10) 30%,
+    rgba(16,12,30,.32) 58%,rgba(18,12,30,.68) 82%,rgba(18,12,30,.86) 100%)}
+/* 底部文字区的柔和分界光（玻璃面板顶边的反光） */
+.edge{position:absolute;left:11%;right:11%;bottom:41%;height:1px;z-index:2;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0),rgba(255,255,255,.26),rgba(255,255,255,0))}
+
+.btxt{position:absolute;left:25px;right:25px;bottom:50px;z-index:14}
+.bdg{width:48px;height:48px;border-radius:15px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  color:rgba(244,248,255,.94);
+  background:linear-gradient(160deg,rgba(255,255,255,.19),rgba(255,255,255,.075));
+  border:1px solid rgba(255,255,255,.20);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 8px 22px rgba(4,7,20,.44)}
+.bti{font-size:34px;font-weight:500;letter-spacing:-.2px;line-height:1.05;
+  text-shadow:0 3px 18px rgba(4,8,22,.66)}
+.bsu{font-size:14px;font-weight:400;color:rgba(228,236,255,.78);
+  margin-top:10px;letter-spacing:.3px}
+</style>
+</head>
+<body>
+
+  <div class="bg">
+    <div class="cloud c1"></div><div class="cloud c2"></div>
+    <div class="cloud c3"></div><div class="cloud c4"></div>
+    <div class="sun"></div>
+    <div class="topcool"></div>
+  </div>
+  <div class="frost"></div>
+  <div class="frost2"></div>
+  <div class="grain"></div>
+
+  <!-- ================= 顶部栏 ================= -->
+  <div class="head">
+    <div class="logo">焰</div>
+    <div class="brand">
+      <div class="n">晚霞 · 隔毛玻璃 v3（官方圆角）</div>
+      <div class="s">焰火随想　美好随现</div>
+    </div>
+    <div class="right">
+      <div class="clockbox">
+        <span class="d">2026年10月4日</span>
+        <span class="t">23:52</span>
+      </div>
+      <div class="gear">⚙</div>
+    </div>
+  </div>
+
+  <!-- ================= 左大卡：直播 ================= -->
+  <div class="card big focused">
+    <div class="video"></div>
+    <div class="veil"></div>
+    <div class="tag"><i></i>CCTV 1 综合</div>
+    <div class="info">
+      <div class="live"><i></i><span>正在直播</span></div>
+      <div class="cn">CCTV-1 综合</div>
+      <div class="hint">按「确定」进入全屏 · 上下键换台</div>
+    </div>
+  </div>
+
+  <!-- ================= 右上竖卡：影视 ================= -->
+  <div class="card bar1">
+    <div class="ph"></div>
+    <div class="psc"></div>
+    <div class="edge"></div>
+    <div class="btxt">
+      <div class="bdg">▣</div>
+      <div class="bti">影视</div>
+      <div class="bsu">影视库 12 部</div>
+    </div>
+  </div>
+
+  <!-- ================= 右下竖卡：短剧 ================= -->
+  <div class="card bar2">
+    <div class="ph"></div>
+    <div class="psc"></div>
+    <div class="edge"></div>
+    <div class="btxt">
+      <div class="bdg">▶</div>
+      <div class="bti">短剧</div>
+      <div class="bsu">竖屏短剧 · 自动连播</div>
+    </div>
+  </div>
+
+<div style="position:absolute;left:127px;bottom:34px;z-index:60;
+  font-size:13px;letter-spacing:.4px;color:rgba(255,240,230,.62);
+  font-family:'SF Pro Text','Microsoft YaHei UI',sans-serif">
+  圆角 大卡 48px / 窄卡 40px　·　大卡 842×747 @(127,207)　·　窄卡 380×747 @(1001,207)/(1413,207)　·　间隙 32　·　左右边距 127 对称
+</div></body>
+</html>
