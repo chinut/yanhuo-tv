@@ -52,6 +52,25 @@ object HomeWarmup {
     @Volatile
     private var done: Boolean = false
 
+    /**
+     * 上次预热用的是哪套配置（主源 + 老电视模式）。
+     *
+     * ⚠️ 为什么需要它：`done` 一旦为 true 就永远不再预热，
+     * 而全工程**没有一处调用过 `reset()`** —— 于是用户在设置里
+     * 换了主源，首页预览和点进去的播放还是旧源（用户实测反馈过）。
+     *
+     * 靠"每个改设置的地方记得调 reset()"是不可靠的（一定会漏），
+     * 所以这里记住配置，下次预热时自己对不上就作废重来。
+     */
+    @Volatile
+    private var warmKey: String = ""
+
+    /** 当前配置的指纹。 */
+    private fun keyOf(): String {
+        val p = prefs
+        return p.livePreset + "|" + p.oldTvMode + "|" + p.liveSourceUrl
+    }
+
     val isReady: Boolean get() = done
 
     fun groups(): List<LiveGroup>? = groupsCache
@@ -64,11 +83,32 @@ object HomeWarmup {
      * 谁慢都不拖累另一个。
      */
     suspend fun warmUp(context: Context) {
+        // 配置变了 → 之前的预热结果作废
+        val want = keyOf()
+        if (done && warmKey != want) {
+            android.util.Log.i("BawanWarmup", "主源/老电视模式变了，重新预热频道表")
+            reset()
+        }
         if (done) return
         withContext(Dispatchers.IO) {
-            // 1) 频道表：本地资源，几十毫秒
+            // 1) 频道表
+            //
+            // ⚠️ 这里原来用 `LiveCatalog.builtin(context)` —— 那是**内置表**
+            // （央视网/省市台网页），完全没看主源设置。结果不管用户选
+            // 「GitHub 源」还是开了老电视模式，首页预览永远是央视网
+            // （用户反馈过）。
+            //
+            // 改成 `load(...)`：它会按 preset + oldTvMode 选源。
+            // 主源是 GitHub 时这里就会去拉开源源（有 12 秒预算，失败退回内置）。
             runCatching {
-                val groups = LiveCatalog.builtin(context)
+                // prefs 是同包（ui）里的顶层 val，直接用即可
+                val prefs = prefs
+                val groups = LiveCatalog.load(
+                    context = context,
+                    customSourceUrl = prefs.liveSourceUrl,
+                    preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset),
+                    oldTvMode = prefs.oldTvMode,
+                )
                 groupsCache = groups
                 // 跨分组去重：与首页/播放页的换台表保持一致
                 val uniq = LinkedHashMap<String, LiveChannel>()
@@ -105,12 +145,14 @@ object HomeWarmup {
                 }
             }
 
+            warmKey = want
             done = true
         }
     }
 
     /** 把内存里的结果清掉（进程重启自然消失，这里给测试用）。 */
     fun reset() {
+        warmKey = ""
         groupsCache = null
         allChannelsCache = null
         done = false

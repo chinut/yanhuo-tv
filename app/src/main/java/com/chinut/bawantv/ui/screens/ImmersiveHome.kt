@@ -160,8 +160,17 @@ fun ImmersiveHome(
         val warmedAll = com.chinut.bawantv.ui.HomeWarmup.allChannels()
 
         val all: List<LiveChannel> = warmedAll ?: run {
+            // 兜底也要**走主源设置**，不能用内置表 ——
+            // 否则开了老电视模式却没有预热时，首页又退回央视网（用户反馈过）。
             val groups = warmedGroups
-                ?: runCatching { LiveCatalog.builtin(context) }.getOrDefault(emptyList())
+                ?: runCatching {
+                    LiveCatalog.load(
+                        context = context,
+                        customSourceUrl = prefs.liveSourceUrl,
+                        preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset),
+                        oldTvMode = prefs.oldTvMode,
+                    )
+                }.getOrDefault(emptyList())
             // 跨分组去重的整表：点开后上下键能一路换到任何台
             val uniq = LinkedHashMap<String, LiveChannel>()
             groups.flatMap { it.channels }.forEach { c ->

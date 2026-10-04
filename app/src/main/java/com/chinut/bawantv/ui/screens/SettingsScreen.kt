@@ -199,34 +199,51 @@ fun SettingsScreen(
                         checked = prefs.oldTvMode,
                     ) {
                         prefs.oldTvMode = it
-                        // 打开时如果主源还是「内置频道」，自动切到 GitHub 源
-                        if (it && prefs.livePreset ==
-                            com.chinut.bawantv.live.LivePreset.Default.name
-                        ) {
-                            prefs.livePreset = com.chinut.bawantv.live.LivePreset.OpenSource.name
-                        }
+                        // ⚠️ 这里**故意不改** prefs.livePreset。
+                        //
+                        // 老电视模式是在 LiveCatalog.load 里**运行时覆盖**成
+                        // GitHub 源的（见那边的注释）。这样用户关掉开关后，
+                        // 他原来选的主源还在 —— 比"改设置值"体验好，
+                        // 也不会出现两个设置互相打架。
+                        toast(
+                            context,
+                            if (it) "老电视模式已开：只用 GitHub 源" else "老电视模式已关",
+                        )
                     }
 
-                    // ---------- 主源（A / B / AB）----------
+                    // 主源选择**只在老电视模式关闭时出现**。
                     //
-                    // A = App 内置频道表（央视/省市台网页 + 内置直连源）
-                    // B = best-fan/iptv-sources 开源源（每日自动检测，全直连）
-                    // AB = 两个都加载，播放页里自己挑
-                    TvRow(
-                        label = "主源",
-                        hint = com.chinut.bawantv.live.LivePreset
-                            .of(prefs.livePreset).hint,
-                        hintColor = Ink.TextTertiary,
-                        actionText = com.chinut.bawantv.live.LivePreset
-                            .of(prefs.livePreset).label,
-                    ) {
-                        val all = com.chinut.bawantv.live.LivePreset.entries
-                        val cur = all.indexOf(
-                            com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)
-                        )
-                        prefs.livePreset = all[(cur + 1) % all.size].name
-                        toast(context, "主源已切到 " +
-                            com.chinut.bawantv.live.LivePreset.of(prefs.livePreset).label)
+                    // 打开老电视模式就是"我只想要最轻的那套"（GitHub 直连源），
+                    // 再给他一个可能选回「内置频道」（央视网网页播放）的开关
+                    // 就是自相矛盾 —— 用户指出过这个逻辑错误：
+                    //   「开启老电视模式了就只用 iptv 源就好了啊，
+                    //     你现在的这个逻辑，给的那个老电视模式开关有啥意义呢？」
+                    //
+                    // 老电视模式下的强制逻辑在 LiveCatalog.load 里（运行时覆盖），
+                    // 所以这里只是不给入口，设置值保持不变 ——
+                    // 用户关掉开关后就恢复他原来选的主源。
+                    if (!prefs.oldTvMode) {
+                        // ---------- 主源（A / B / AB）----------
+                        //
+                        // A = App 内置频道表（央视/省市台网页 + 内置直连源）
+                        // B = best-fan/iptv-sources 开源源（每日自动检测，全直连）
+                        // AB = 两个都加载，播放页里自己挑
+                        TvRow(
+                            label = "主源",
+                            hint = com.chinut.bawantv.live.LivePreset
+                                .of(prefs.livePreset).hint,
+                            hintColor = Ink.TextTertiary,
+                            actionText = com.chinut.bawantv.live.LivePreset
+                                .of(prefs.livePreset).label,
+                        ) {
+                            val all = com.chinut.bawantv.live.LivePreset.entries
+                            val cur = all.indexOf(
+                                com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)
+                            )
+                            prefs.livePreset = all[(cur + 1) % all.size].name
+                            toast(context, "主源已切到 " +
+                                com.chinut.bawantv.live.LivePreset.of(prefs.livePreset).label)
+                        }
                     }
 
                 }

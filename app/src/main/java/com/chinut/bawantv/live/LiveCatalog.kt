@@ -42,6 +42,14 @@ object LiveCatalog {
     /** 扫描得来的 IPTV 直连源（内置默认配置）。 */
     private const val IPTV_ASSET = "live/iptv.m3u"
 
+    /**
+     * 实测能播的 IPTV 源。
+     *
+     * best-fan 那个列表实测 182 个地址只有 22 个真能播（12%），
+     * 所以把这 22 个单独存一份、**排在最前面** —— 用户至少立刻有 19 个台能看。
+     */
+    private const val IPTV_VERIFIED_ASSET = "live/iptv_verified.m3u"
+
     @Volatile
     private var cachedBuiltin: List<LiveGroup>? = null
 
@@ -74,7 +82,19 @@ object LiveCatalog {
                         .bufferedReader(Charsets.UTF_8).use { it.readText() }
                 }.getOrNull()?.let { parse(it) }.orEmpty()
 
-                val merged = if (iptv.isEmpty()) groups else iptv + groups
+                // 已验证源排最前：它们是**真解码验证过**的，
+                // 比"列表说有"可靠得多（实测 182 个只有 22 个能播）。
+                val verified = runCatching {
+                    context.assets.open(IPTV_VERIFIED_ASSET)
+                        .bufferedReader(Charsets.UTF_8).use { it.readText() }
+                }.getOrNull()?.let { parse(it) }.orEmpty()
+
+                val merged = when {
+                    verified.isEmpty() && iptv.isEmpty() -> groups
+                    verified.isEmpty() -> iptv + groups
+                    iptv.isEmpty() -> verified + groups
+                    else -> verified + iptv + groups
+                }
                 cachedBuiltin = merged
                 merged
             }
@@ -193,7 +213,16 @@ object LiveCatalog {
         //
         // AB 时并行拉 —— 串行会让首屏等两倍时间。
         // 开源源失败就只留内置，**绝不让频道表变空**（那用户就什么都看不了了）。
-        val engine: List<LiveGroup> = when (preset) {
+        // 老电视模式 = 强制 GitHub 源。
+        //
+        // 为什么不靠"改 prefs.livePreset"来实现：那样用户关掉开关后
+        // 就找不回原来选的主源了。这里**运行时覆盖**，设置值保持不动，
+        // 关掉开关自然恢复。
+        //
+        // 用户原话：「开启老电视模式了就只用 iptv 源就好了啊」。
+        val effective = if (oldTvMode) LivePreset.OpenSource else preset
+
+        val engine: List<LiveGroup> = when (effective) {
             LivePreset.Default -> builtin
             LivePreset.OpenSource -> openSourceGroups(context, oldTvMode) ?: builtin
             LivePreset.Both -> {

@@ -1,6 +1,8 @@
 <#
 .SYNOPSIS
-  本地一键发布：构建 release APK，并上传到 Gitee / GitHub 的 Release。
+  本地一键发布：构建 release APK，并上传到 GitHub 的 Release。
+（⚠️ 2026-10 起不再同步 Gitee —— 那边提示"上传内容违规"。
+  GiteeToken 参数保留只为兼容，传了也不会用。）
 
 .DESCRIPTION
   App 的「检查更新」会读取 Gitee 与 GitHub 的 latest release，

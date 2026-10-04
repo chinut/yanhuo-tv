@@ -1,7 +1,5 @@
 <#
 .SYNOPSIS
-    发布焰火TV 新版本到 GitHub + Gitee。
-
 .DESCRIPTION
     一条命令完成：读版本号 → 打包 → 建 tag → 建 Release → 传 APK。
 
@@ -21,12 +19,6 @@
         versionCode: 23
         versionName: 1.0.22
 
-    ## 已知限制：Gitee 的 APK 要手动传
-
-    Gitee 的附件接口（attach_files）对 API 令牌返回 405，v8 也是 302/404，
-    试过 5 条路径都不通。所以 Gitee 的 Release 建好后，需要到网页端
-    手动把 APK 拖进附件区 —— 否则应用优先读 Gitee 时会报
-    「找到了新版本，但 Release 里没有 APK 附件」。
 
 .PARAMETER VersionCode
     versionCode（整数，每次发版 +1）。必须在 app/build.gradle.kts 里同步。
@@ -136,5 +128,3 @@ $publisher = Join-Path $root 'tools\publish_release.py'
     --notes $Notes --sha $sha
 
 Write-Host ''
-Write-Host '提醒：Gitee 的 APK 附件需要到网页端手动上传：' -ForegroundColor Yellow
-Write-Host "  https://gitee.com/$repo/releases/tag/$tag" -ForegroundColor Yellow

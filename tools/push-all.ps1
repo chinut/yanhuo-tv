@@ -1,16 +1,17 @@
 # ============================================================
-#  焰火TV —— 一键推送到 GitHub + Gitee
+#  焰火TV —— 一键推送到 GitHub
+#
+#  ⚠️ 2026-10 起不再同步 Gitee：那边提示"上传内容违规"。
+#  代码只推 GitHub；Release 也只发 GitHub。
 #
 #  前置条件：两个平台各建一个**空仓库**（不要勾选初始化 README / .gitignore）：
 #      GitHub : https://github.com/new           仓库名 yanhuo-tv
-#      Gitee  : https://gitee.com/projects/new   仓库名 yanhuo-tv
 #
 #  用法：
 #      .\tools\push-all.ps1
 #
 #  首次推送时 git 会弹窗要账号密码：
 #      GitHub 密码位置填 Personal Access Token（不是登录密码）
-#      Gitee  密码位置填私人令牌
 #  填过一次后 Windows 凭据管理器会记住，以后不用再填。
 # ============================================================
 
@@ -85,17 +86,17 @@ function Push-One($name, $remote) {
 }
 
 $okGithub = Push-One "GitHub" "origin"
-$okGitee = Push-One "Gitee" "gitee"
+$okGitee = $false   # Gitee 已停用
 
 Write-Host ""
 Write-Host "=== 结果 ===" -ForegroundColor Cyan
 Write-Host ("  GitHub : " + $(if ($okGithub) { "✓ 成功" } else { "✗ 失败" }))
-Write-Host ("  Gitee  : " + $(if ($okGitee) { "✓ 成功" } else { "✗ 失败" }))
+Write-Host "  Gitee  : 已停用（不再同步）" -ForegroundColor DarkGray
 Write-Host ""
 
 if ($okGithub -or $okGitee) {
     Write-Host "下一步：打 tag 触发自动构建发布 Release" -ForegroundColor Yellow
     Write-Host "    .\tools\publish.ps1 -Tag v1.0.0 -GiteeToken <token> -GitHubToken <token>" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  （App 内的「检查更新」读取 Gitee 优先 / GitHub 回退的 latest release）" -ForegroundColor DarkGray
+    Write-Host "  （App 内的「检查更新」读取 GitHub 的 latest release）" -ForegroundColor DarkGray
 }
