@@ -1,14 +1,13 @@
 package com.chinut.bawantv.unified
 
+import com.chinut.bawantv.BawanApp
 import com.chinut.bawantv.core.Http
 import com.chinut.bawantv.core.Net
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 /**
  * 七猫短剧数据源。
@@ -51,11 +50,27 @@ import org.json.JSONObject
  * 这个接口**没有"浏览全部"**，只能按名字搜。所以列表页用一组题材热词
  * （总裁 / 战神 / 重生 …）各搜一页，合并去重。
  * 这是接口能力决定的，不是偷懒。
+ *
+ * # 列表必须落盘（踩过的坑）
+ *
+ * 用户反馈：「客户机上安装时发生过一次断网，现在短剧里面没内容了」。
+ *
+ * 原因：这个源原来**只有进程内缓存**（`@Volatile listCache`）——
+ * 断网时当下还能看，但**一旦重启 App 就空**，
+ * 而且再联网前一直空着。用户视角就是"短剧没了"。
+ *
+ * 影视那边（[LibraryStore]）一直有 `ddys_library.tsv` 落盘，短剧这块漏了。
+ * 现在补上：`cached()` 先给磁盘上的旧列表（**不联网**），
+ * 联网成功后再覆盖写回。
  */
 object QimaoSource : VideoSource {
 
     private const val TAG = "BawanQimao"
     private const val API = "https://xiaoqi.icofun.cn/API/qimao_duanju.php"
+
+    private const val FILE_NAME = "qimao_list.tsv"
+    private const val SEP = '\u001F'
+    private const val LINE_FIELDS = 8
 
     override val id = "qimao"
     override val displayName = "七猫短剧"
@@ -71,10 +86,78 @@ object QimaoSource : VideoSource {
         "甜宠", "逆袭", "复仇", "年代", "玄幻", "都市",
     )
 
-    /** 列表缓存（进程内）。 */
+    /** 进程内缓存。落盘见 [saveToDisk] / [loadFromDisk]。 */
     @Volatile private var listCache: List<UnifiedMovie>? = null
 
-    override suspend fun cached(): List<UnifiedMovie> = listCache.orEmpty()
+    private fun file(): File = File(BawanApp.ctx().filesDir, FILE_NAME)
+
+    // ==================== 落盘 ====================
+
+    private fun esc(s: String): String =
+        s.replace(SEP.toString(), " ").replace("\n", " ").replace("\r", " ")
+
+    private fun toLine(m: UnifiedMovie): String = listOf(
+        m.id, m.title, m.poster, m.year, m.typeName, m.area, m.score, m.remarks,
+    ).joinToString(SEP.toString()) { esc(it) }
+
+    private fun parseLine(line: String): UnifiedMovie? {
+        if (line.isBlank()) return null
+        val f = line.split(SEP)
+        if (f.size < LINE_FIELDS) return null
+        return UnifiedMovie(
+            id = f[0],
+            title = f[1],
+            poster = f[2],
+            year = f[3],
+            typeName = f[4],
+            area = f[5],
+            score = f[6],
+            remarks = f[7],
+        )
+    }
+
+    /**
+     * 读磁盘缓存。**不联网**，所以断网也能立刻出内容。
+     *
+     * 写入用「临时文件 + 改名」，避免断电/断网时留下半截文件
+     * （半截文件解析出来是半份列表，比空还糟）。
+     */
+    private fun loadFromDisk(): List<UnifiedMovie> {
+        val f = file()
+        if (!f.exists()) return emptyList()
+        val lines = runCatching { f.readLines() }.getOrDefault(emptyList())
+        if (lines.isEmpty()) return emptyList()
+        val list = lines.asSequence().mapNotNull { parseLine(it) }.toList()
+        if (list.isEmpty()) {
+            runCatching { f.delete() }
+            return emptyList()
+        }
+        return list
+    }
+
+    private fun saveToDisk(list: List<UnifiedMovie>) {
+        runCatching {
+            val f = file()
+            val tmp = File(f.parentFile, "$FILE_NAME.tmp")
+            tmp.writeText(list.joinToString("\n") { toLine(it) })
+            if (!tmp.renameTo(f)) {
+                f.writeText(tmp.readText())
+                tmp.delete()
+            }
+        }.onFailure {
+            android.util.Log.w(TAG, "写短剧缓存失败：${it.message}")
+        }
+    }
+
+    override suspend fun cached(): List<UnifiedMovie> = withContext(Dispatchers.IO) {
+        listCache?.let { return@withContext it }
+        val disk = loadFromDisk()
+        if (disk.isNotEmpty()) {
+            android.util.Log.i(TAG, "从磁盘缓存读到 ${disk.size} 部短剧")
+            listCache = disk
+        }
+        disk
+    }
 
     override suspend fun refresh(
         onProgress: (Int, Int, Int) -> Unit,
@@ -91,7 +174,23 @@ object QimaoSource : VideoSource {
         }
         val list = out.values.toList()
         android.util.Log.i(TAG, "列表聚合 ${list.size} 部（${HOT.size} 个热词）")
-        if (list.isNotEmpty()) listCache = list
+
+        if (list.isNotEmpty()) {
+            listCache = list
+            saveToDisk(list)
+        } else {
+            // ⚠️ 拉不到时**回退磁盘缓存**，不要返回空。
+            //
+            // 这正是用户遇到的场景：安装时断网 → 聚合结果为空 →
+            // 返回空列表 → 短剧页空白。有磁盘缓存就先拿出来用。
+            val disk = loadFromDisk()
+            if (disk.isNotEmpty()) {
+                android.util.Log.w(TAG, "本次没拉到，回退磁盘缓存 ${disk.size} 部")
+                listCache = disk
+                return@withContext disk
+            }
+            android.util.Log.w(TAG, "本次没拉到，磁盘也没有缓存")
+        }
         list
     }
 
