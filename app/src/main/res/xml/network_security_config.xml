@@ -1,10 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- 直播/影视源大量使用 http 或自签证书，这里全部放行（自用学习项目） -->
+    <!--
+      直播/影视源大量使用 http 或自签证书，这里全部放行（自用学习项目）。
+
+      ============ 为什么要内置 Let's Encrypt 的根证书 ============
+
+      踩过的坑：用户电视（Android 9）上短剧一直刷不出来，抓到的错误是
+
+          SSLHandshakeException:
+            CertPathValidatorException: Trust anchor for certification path not found.
+
+      因为短剧接口的证书由 **Let's Encrypt 的 `YR1` 中间证书**签发，
+      而 Android 9 的系统根证书库里**没有签它的 CA** —— 较新的
+      Let's Encrypt 信任链要求较新的系统信任库。
+
+      本机 / 新模拟器的证书库是新的，所以一直正常，只有老电视不行。
+
+      修法：把 ISRG Root X1 / X2 打包进信任锚。
+      · 比"退回纯 HTTP"好：内容仍然加密，没有中间人风险
+      · 比"放宽证书校验"好得多：那会接受任意证书
+
+      X1 有效到 2035 年、X2 到 2040 年，两个一起装可以覆盖
+      Let's Encrypt 现有的全部中间证书（R3/R4/R10-R14/E1/E5/E6/YR1/YR2…）。
+    -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />
+            <!-- 系统信任库太老时，用这两个兜底 -->
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
         </trust-anchors>
     </base-config>
 </network-security-config>

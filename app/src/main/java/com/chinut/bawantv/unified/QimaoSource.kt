@@ -235,11 +235,33 @@ object QimaoSource : VideoSource {
             // SocketTimeoutException=超时，SSLHandshakeException=证书
             "${e.javaClass.simpleName}（${e.message?.take(90)}）"
         }
-        val (plain, _) = fetch(API, "name=%E6%80%BB%E8%A3%81&page=1")
+        // 逐条路径测，各自报确切异常 —— 只有一个布尔值定位不了问题
+        val httpErr = runCatching {
+            val req = okhttp3.Request.Builder().url("$API_PLAIN?name=%E6%80%BB%E8%A3%81&page=1")
+                .header("User-Agent", Http.UA_MOBILE)
+                .build()
+            Http.client.newCall(req).execute().use { r ->
+                val b = r.body?.string().orEmpty()
+                "HTTP ${r.code}，${b.length} 字符"
+            }
+        }.getOrElse { "${it.javaClass.simpleName}（${it.message?.take(70)}）" }
+
+        // 纯 TCP 探测：分别试 80 / 443，判断是"端口被挡"还是"应用层失败"
+        fun tcpProbe(host: String, port: Int): String = runCatching {
+            java.net.Socket().use { s ->
+                s.connect(java.net.InetSocketAddress(host, port), 6000)
+                "通"
+            }
+        }.getOrElse { "${it.javaClass.simpleName}" }
+
+        val tcp80 = tcpProbe("xiaoqi.icofun.cn", 80)
+        val tcp443 = tcpProbe("xiaoqi.icofun.cn", 443)
+
         val line = buildString {
-            append("https: ").append(httpsErr)
-            append(" ｜ http: ")
-            append(if (plain != null) "可用（${plain.length} 字符）" else "也不可用")
+            append("https=").append(httpsErr.take(60))
+            append(" ｜ http=").append(httpErr.take(60))
+            append(" ｜ TCP80=").append(tcp80)
+            append(" TCP443=").append(tcp443)
         }
         com.chinut.bawantv.core.PlayDiag.probeResult = line
         android.util.Log.i(TAG, "接口自检 → $line")
