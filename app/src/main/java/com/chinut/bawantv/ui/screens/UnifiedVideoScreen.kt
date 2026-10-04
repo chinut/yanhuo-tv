@@ -400,20 +400,47 @@ fun UnifiedVideoScreen(
         typePanelItems.size,
     ) {
         if (!typePanel) return@DisposableEffect onDispose { }
+        // ---------- 二维表格导航 ----------
+        //
+        // ⚠️ 这里原来是**一维**的：↑↓ 改 `typeCursor`，←→ 直接 `true`（什么都不做）。
+        //
+        // 但面板视觉上是**两列并排**的（`perCol` + 两个 `Column`），
+        // 所以一维光标会造成两种荒谬行为：
+        //   · 按 ↓ 走到左列底部后**横跳到右列顶部**（用户："可以一直向下"）
+        //   · 按 → 没有任何反应（按键被吃掉）
+        //
+        // 用户原话：「说明是表格被折叠了 这在电视的操作逻辑上是非常愚蠢的」——
+        // 说得对，画成表格就得按表格操作。
+        //
+        // 现在行列分离：←→ 整列移动，↑↓ 在本列内移动。
         manager?.setKeyInterceptor { dir ->
+            val n = typePanelItems.size
+            if (n == 0) return@setKeyInterceptor true
+            // 列优先两列：idx = row + col * rows
+            //
+            // ⚠️ 必须和绘制那边**同一个算法**。我第一版这里写成 `row * 2 + col`
+            // （行优先），而绘制是列优先，两边对不上 → 光标会跳到没画出来的格子上
+            // （表现：按 ↓ 高亮消失，因为算出来的索引没有对应的 UI）。
+            val rows = (n + 1) / 2
+            var row = typeCursor % rows
+            var col = typeCursor / rows
             when (dir) {
-                com.chinut.bawantv.ui.theme.Direction.Up -> {
-                    typeCursor = (typeCursor - 1).coerceAtLeast(0); true
-                }
+                com.chinut.bawantv.ui.theme.Direction.Up ->
+                    row = (row - 1).coerceAtLeast(0)
 
-                com.chinut.bawantv.ui.theme.Direction.Down -> {
-                    typeCursor = (typeCursor + 1).coerceAtMost(typePanelItems.size - 1); true
-                }
+                com.chinut.bawantv.ui.theme.Direction.Down ->
+                    row = (row + 1).coerceAtMost(rows - 1)
 
-                com.chinut.bawantv.ui.theme.Direction.Left,
-                com.chinut.bawantv.ui.theme.Direction.Right,
-                -> true
+                com.chinut.bawantv.ui.theme.Direction.Left ->
+                    col = 0                       // 左列是第 0 列，到头就不动
+
+                com.chinut.bawantv.ui.theme.Direction.Right ->
+                    // 右列只有在该行确实存在时才可去（n 为奇数时最后一格没有右列）
+                    if (row + rows < n) col = 1
             }
+            val idx = row + col * rows
+            typeCursor = if (idx in 0 until n) idx else typeCursor
+            true
         }
         manager?.setConfirmInterceptor {
             val picked = typePanelItems.getOrNull(typeCursor)
@@ -613,19 +640,28 @@ fun UnifiedVideoScreen(
                 )
                 Spacer(Modifier.height(4.sdp))
                 Text(
-                    "上下选择 · 「确定」切换 · 「三横键」关闭",
+                    "方向键选择 · 「确定」切换 · 「三横键」关闭",
                     color = Ink.TextFaint,
                     fontSize = Txt.Tiny,
                 )
                 Spacer(Modifier.height(12.sdp))
 
-                val perCol = (typePanelItems.size + 1) / 2
+                // ---------- 两列表格（行优先）----------
+                //
+                // 左列放前半、右列放后半：
+                //     左列 = 0 .. rows-1        右列 = rows .. n-1
+                // 和键盘那边的 `idx = row * 2 + col` 完全对应。
+                //
+                // 为什么不用"隔一个摆"（左 0,2,4… 右 1,3,5…）：
+                // 那样两列长度不等（左 6 / 右 5），行号在两列里含义不同，
+                // 光标推进看起来像乱跳，用户会觉得"表格被折叠了"。
+                val rows = (typePanelItems.size + 1) / 2
                 Row(horizontalArrangement = Arrangement.spacedBy(10.sdp)) {
                     listOf(0, 1).forEach { col ->
                         Column(Modifier.weight(1f)) {
-                            val from = col * perCol
-                            val to = (from + perCol).coerceAtMost(typePanelItems.size)
-                            for (i in from until to) {
+                            for (row in 0 until rows) {
+                                val i = row + col * rows      // 行优先：左列前一半、右列后一半
+                                if (i >= typePanelItems.size) continue
                                 val name = typePanelItems[i]
                                 val isCur = i == typeCursor
                                 val isActive = (name == "全部" && typeFilter.isBlank()) ||
