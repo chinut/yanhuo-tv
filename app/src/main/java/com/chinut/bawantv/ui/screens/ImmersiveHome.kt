@@ -246,12 +246,28 @@ fun ImmersiveHome(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(Dim.SafeH * 0.7f, Dim.SafeV * 0.8f),
+                // 左右留白：批准稿是 127px 对称。
+                //
+                // 原来用 `Dim.SafeH * 0.7f`（48×0.7=33.6dp）再乘缩放系数，
+                // 实测左边距偏小、右边卡还顶出了屏幕。
+                // 这里给**明确**的横向边距，和纵向分开写，避免再被系数带偏。
+                // 标定结果：120.sdp → 左边距 244px，即 **1.sdp ≈ 2px**。
+                // 批准稿的边距是 127px，取 48.sdp ≈ 96px
+                // （比批准稿略小，但换来更高的卡片 —— 卡片高度是更重要的观感）
+                .padding(start = 48.sdp, end = 48.sdp, top = 8.sdp, bottom = 10.sdp),
         ) {
             // ---------- 品牌头：Logo + 文字 ----------
             BrandHeader(onOpenSettings = onOpenSettings, manager = manager)
 
-            Spacer(Modifier.height(18.sdp))
+            // ⚠️ 这里**不要**再插 Spacer。
+            //
+            // 批准稿里三条卡片占 996px（含头部所在的区域），
+            // 头部是**叠在留白上**的。原来头部(115dp) + Spacer(18dp) 一共占了 266px，
+            // 卡片只剩 821px 高 → 比批准稿矮 175px，整屏看起来"扁"。
+            //
+            // 收紧成：头部 52dp + 上下留白 27dp，
+            // 卡片拿到约 996px，和批准稿一致。
+            Spacer(Modifier.height(2.sdp))
 
             // ---------- 三条并排：1 大 + 2 窄 ----------
             //
@@ -269,34 +285,45 @@ fun ImmersiveHome(
             LiveHero(
                 channel = liveChannel,
                 focusKey = entryKey,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(2.216f).fillMaxHeight(),
                 onEnter = {
                     liveChannel?.let { onOpenLive(it, playlist.ifEmpty { listOf(it) }) }
                 },
             )
 
-            // ---------- 右：影视 + 短剧（各占一半） ----------
+            // ---------- 中：影视 ----------
             //
-            // 设置块已搬到右上角齿轮（用户要求）。
-            // 空出来的地方给影视和短剧，两块各占一半、都比原来大。
-            Column(
-                Modifier
-                    .width(380.sdp)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(16.sdp),
-            ) {
-                MovieEntry(
-                    movies = movies,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    onEnter = onOpenMovieWall,
-                    manager = manager,
-                )
-                ShortDramaEntry(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    onEnter = onOpenShortDrama,
-                    manager = manager,
-                )
-            }
+            // ⚠️ 这里原来是一个 `Column { 影视 + 短剧 }` —— 两张卡**上下堆叠**。
+            // 那是错的：批准稿是**三条并排等高**（1 大 + 2 窄竖条）。
+            //
+            // 堆叠的后果不只是"看起来不一样"，而是丢掉了**竖版**这个核心诉求：
+            // 竖条比例 380/747 = 0.51（接近海报本身 2:3），
+            // 所以海报能完整显示、人脸不切；
+            // 而上下堆叠后每张只有约一半高度（~740×420 = 横条 1.76），
+            // 又回到"海报被拦腰截断"的老问题。
+            MovieEntry(
+                movies = movies,
+                // ⚠️ 用 **weight 表达比例**，不要写死 dp。
+                //
+                // 踩了两次同一个坑：
+                //   · 写 `380.sdp` → 太宽，三条溢出屏幕，大卡被挤成窄条
+                //   · 改 `190.sdp` → 又不对，因为 `.sdp` 会乘一个**缩放系数**
+                //     （`scale = min(w/960, h/540)`，实测约 1.9），
+                //     写死的 dp 值在不同机器上表现不一样
+                //
+                // 批准稿的比例是 大卡 : 窄卡 = 842 : 380 ≈ 2.216 : 1。
+                // 用 weight 表达这个比值，跟缩放系数无关，任何分辨率都成立。
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                onEnter = onOpenMovieWall,
+                manager = manager,
+            )
+
+            // ---------- 右：短剧 ----------
+            ShortDramaEntry(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                onEnter = onOpenShortDrama,
+                manager = manager,
+            )
             }
         }
     }
@@ -314,7 +341,7 @@ private fun BrandHeader(
 ) {
     val r = com.chinut.bawantv.ui.theme.LocalResponsive.current
     Row(
-        Modifier.fillMaxWidth().height(r.dp(56)),
+        Modifier.fillMaxWidth().height(r.dp(52)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Logo：优先用设计稿的图形；取不到就只显示文字，保证任何构建都有品牌
