@@ -1030,6 +1030,26 @@ private fun UnifiedDetailScreen(
                         fontSize = Txt.Label,
                         fontWeight = FontWeight.Bold,
                     )
+                    // ---------- 免费集数说明 ----------
+                    //
+                    // 短剧（红果）只免费放前几集，实测 22 部剧**全是 3 集**
+                    // （详情页 `accessible_episode_cnt` = 3，第 4 集起服务端 404）。
+                    // 这是站点的商业限制，突破不了。
+                    //
+                    // 但**列表得说清楚** —— 否则用户点第 4 集看到黑屏，
+                    // 只会以为"软件坏了"。
+                    //
+                    // 免费数直接从 eps 里数（url 非空的个数），
+                    // 不用把 freeCount 一层层传上来，也不会因来源不同而失准。
+                    val freeN = eps.count { it.url.isNotBlank() }
+                    if (eps.size > 1 && freeN in 1 until eps.size) {
+                        Spacer(Modifier.height(3.sdp))
+                        Text(
+                            "免费 $freeN 集，其余需付费（点不动的是锁定的）",
+                            color = Ink.Amber,
+                            fontSize = Txt.Tiny,
+                        )
+                    }
                     Spacer(Modifier.height(8.sdp))
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 112.sdp),
@@ -1055,6 +1075,9 @@ private fun UnifiedDetailScreen(
                             }
                             EpisodeButton(
                                 name = label,
+                                // 地址为空 = 这一集在付费墙后面。
+                                // 短剧那边只有前几集能取到地址（详见 HongguoSource）。
+                                locked = eps[i].url.isBlank(),
                                 onClick = { if (current != null) onPlay(movie, current, eps, i) },
                             )
                         }
@@ -1214,7 +1237,12 @@ private fun SourceButton(
 
 /** 一集。 */
 @Composable
-private fun EpisodeButton(name: String, onClick: () -> Unit) {
+private fun EpisodeButton(
+    name: String,
+    /** 锁定：这一集没有可播地址（付费墙）。 */
+    locked: Boolean = false,
+    onClick: () -> Unit,
+) {
     val f = rememberTvFocusState()
     Box(
         Modifier
@@ -1222,24 +1250,42 @@ private fun EpisodeButton(name: String, onClick: () -> Unit) {
             .height(42.sdp)
             .tvFocusable(
                 focusState = f,
+                // 🔒 锁定的集**不注册点击** ——
+                // 以前它和普通集长得一样，用户点了就黑屏，以为坏了。
+                action = !locked,
+                enabled = !locked,
                 shape = RoundedCornerShape(10.sdp),
                 focusedScale = 1.06f,
                 borderWidth = 3.dp,
-                baseBackground = Ink.Card,
+                baseBackground = if (locked) Ink.Card.copy(alpha = 0.45f) else Ink.Card,
                 focusedBackground = Ink.AccentSoft,
-                onClick = onClick,
+                onClick = if (locked) null else onClick,
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            name,
-            color = if (f.focused) Color.White else Ink.TextSecondary,
-            fontSize = Txt.Caption,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 6.sdp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (locked) {
+                Text(
+                    "\uD83D\uDD12",
+                    fontSize = Txt.Tiny,
+                    color = Ink.TextFaint,
+                )
+                Spacer(Modifier.width(4.sdp))
+            }
+            Text(
+                name,
+                color = when {
+                    locked -> Ink.TextFaint
+                    f.focused -> Color.White
+                    else -> Ink.TextSecondary
+                },
+                fontSize = Txt.Caption,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 6.sdp),
+            )
+        }
     }
 }
 
