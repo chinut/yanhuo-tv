@@ -1807,19 +1807,20 @@ private fun ChannelCard(
             }
         }
 
-        Spacer(Modifier.height(12.sdp))
+        Spacer(Modifier.height(10.sdp))
 
-        // ---------- 只留遥控器方向键图形 ----------
-        com.chinut.bawantv.ui.DpadHint(
-            up = "上个台",
-            down = "下个台",
-            left = if (alternates > 0) "上个源" else "只有一个源",
-            right = if (alternates > 0) "下个源" else "",
-            center = "确定",
-            compact = true,
-            // 卡片里已经有底色了，这里不要再叠一层背景，否则像"卡片里嵌卡片"
-            transparent = true,
-        )
+        // ---------- 一行按键提示 ----------
+        //
+        // 原来是整个遥控器圆盘图（约 120dp 高）。用户反馈：
+        // 「换台的时候提示下就好了啊」—— 说得对，那图看几次就记住了，
+        // 常驻只是白占地方。压成一行文字，信息一样不少。
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HintKey("↑↓", "换台")
+            Spacer(Modifier.width(14.sdp))
+            HintKey("←→", if (alternates > 0) "换源" else "换源")
+            Spacer(Modifier.width(14.sdp))
+            HintKey("≡", "更多")
+        }
     }
 }
 

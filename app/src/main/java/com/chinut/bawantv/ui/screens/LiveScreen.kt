@@ -254,20 +254,8 @@ fun LiveScreen(
 
         Spacer(Modifier.height(14.sdp))
 
-        // ---------- 遥控器方向键图示 ----------
-        // 直播页方向键的语义和别处不一样（↑↓ 换台、←→ 换源），
-        // 所以这里放一张遥控器圆盘图，把四个方向各干什么直接画出来。
-        com.chinut.bawantv.ui.DpadHint(
-            up = "上一个台",
-            down = "下一个台",
-            left = "上一个源",
-            right = "下一个源",
-            center = "确定",
-            title = "遥控器 · 播放中",
-            modifier = Modifier.padding(bottom = 4.sdp),
-        )
-
-        Spacer(Modifier.height(14.sdp))
+        // 遥控器图示**不放在这里**（用户反馈：占地方，换台时提示一下就够了）。
+        // 播放中按 ↑↓/←→ 时左下角会浮出一行提示；首页有完整的方向盘图。
 
         // ---------- 第一级：分类 ----------
         val catSplit = remember(allChannels) {
