@@ -37,6 +37,9 @@ object LiveCatalog {
 
     private const val BUILTIN_ASSET = "live/cctv.m3u"
 
+    /** 扫描得来的 IPTV 直连源（内置默认配置）。 */
+    private const val IPTV_ASSET = "live/iptv.m3u"
+
     @Volatile
     private var cachedBuiltin: List<LiveGroup>? = null
 
@@ -55,8 +58,23 @@ object LiveCatalog {
                     context.assets.open(BUILTIN_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() }
                 }.getOrDefault("")
                 val groups = parse(text).ifEmpty { fallbackCctv() }
-                cachedBuiltin = groups
-                groups
+
+                // 内置的 IPTV 直连源（扫描得来的，见 assets/live/iptv.m3u）。
+                //
+                // 放在**前面**，这样：
+                //   · 「全部」里 IPTV 台排在央视/地方台网页源之前（直连更省资源，
+                //     老电视优先用直连，不用起 WebView）
+                //   · 「IPTV」分类直接就是这个文件的内容
+                //
+                // 用户自己扫描或导入的源优先级更高（见 load），会盖过这一份。
+                val iptv = runCatching {
+                    context.assets.open(IPTV_ASSET)
+                        .bufferedReader(Charsets.UTF_8).use { it.readText() }
+                }.getOrNull()?.let { parse(it) }.orEmpty()
+
+                val merged = if (iptv.isEmpty()) groups else iptv + groups
+                cachedBuiltin = merged
+                merged
             }
         }
     }
@@ -319,6 +337,72 @@ object LiveCatalog {
     }
 
     /** 频道名归一化，用于同名匹配：CCTV-1 综合 / CCTV1综合 → cctv1。 */
+    // ==================== 频道分类 ====================
+    //
+    // 用户要求直播分成「全部 / 央视 / 地方台 / IPTV」四类：
+    //   · 全部   —— 所有频道（含 IPTV 扫到的），保持现在的样子
+    //   · 央视   —— 只放央视系（CCTV-x / CGTN / 央视频）
+    //   · 地方台 —— 其他（省市县台、卫视）
+    //   · IPTV   —— 扫描/导入得来的直连源
+    //
+    // 分类顺序就是界面上 tab 的顺序，别随便调。
+
+    enum class Category(val label: String) {
+        All("全部"),
+        Cctv("央视"),
+        Local("地方台"),
+        Iptv("IPTV"),
+    }
+
+    /** 央视系的判定：CCTV / CGTN / 央视频 / 央视 前缀。 */
+    private val CCTV_RE = Regex(
+        "^(CCTV|CGTN|央视频|央视|中国国际)",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /**
+     * 判断一个频道属于哪一类（不含「全部」—— 那是所有类的并集）。
+     *
+     * 优先看它来自哪个分组：扫描/导入来的分组名带「扫描源 / 我的源 / 自定义」
+     * 前缀（见 [load]），这些直接归 IPTV，不管台名是什么。
+     * 剩下的按台名判定央视还是地方台。
+     */
+    fun categoryOf(channel: LiveChannel): Category {
+        // 分组名里带这些词 → 是扫描/导入得来的直连源
+        //
+        // ⚠️ 用 contains 而不是 startsWith：分组名可能是
+        // 「扫描源 · IPTV」（中间有点和空格），也可能只叫「IPTV」。
+        val g = channel.group
+        if (g.contains("扫描") || g.contains("我的源") ||
+            g.contains("自定义") || g.startsWith("IPTV", ignoreCase = true)
+        ) {
+            return Category.Iptv
+        }
+        return if (CCTV_RE.containsMatchIn(channel.name.trim())) {
+            Category.Cctv
+        } else {
+            Category.Local
+        }
+    }
+
+    /**
+     * 把频道表按分类切开。
+     *
+     * 「全部」保持原样（跨分组合并、按台名去重），
+     * 这也是播放时上下键换台的顺序 —— 不能变，否则老用户的习惯就断了。
+     */
+    fun splitByCategory(all: List<LiveChannel>): Map<Category, List<LiveChannel>> {
+        val cctv = all.filter { categoryOf(it) == Category.Cctv }
+        val iptv = all.filter { categoryOf(it) == Category.Iptv }
+        val local = all.filter { categoryOf(it) == Category.Local }
+        return linkedMapOf(
+            Category.All to all,
+            Category.Cctv to cctv,
+            Category.Local to local,
+            Category.Iptv to iptv,
+        )
+    }
+
     fun normalizeName(name: String): String = name
         .lowercase()
         .replace(Regex("""[\s\-_·、,，.。:：()（）\[\]【】]"""), "")

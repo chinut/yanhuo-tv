@@ -617,6 +617,10 @@ fun BawanRoot(
                         livePlaylist = emptyList()
                         focusEpoch++
                     },
+                    // 菜单里选台（可能跨分类跳很远，比按上下键快）
+                    onChannelChange = { picked ->
+                        livePlaying = picked
+                    },
                 )
             }
 

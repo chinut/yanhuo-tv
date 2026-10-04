@@ -114,6 +114,8 @@ fun LivePlayerScreen(
     /** 频道总表（用于上下换台）。为空时只能在当前频道内换源。 */
     channels: List<LiveChannel> = emptyList(),
     onClose: () -> Unit = {},
+    /** 从菜单里直接选台（比按键换台跳得远）。 */
+    onChannelChange: (LiveChannel) -> Unit = {},
 ) {
     val context = LocalContext.current
     val prefs = BawanApp.prefs
@@ -126,6 +128,35 @@ fun LivePlayerScreen(
 
     var index by remember {
         mutableIntStateOf(playlist.indexOfFirst { it.url == initialChannel.url }.coerceAtLeast(0))
+    }
+
+    // ---------- 切换菜单（三横键）的状态 ----------
+    //
+    // 面板分两段：上面分类、下面该分类的频道列表 + 本频道的源。
+    // 用 menuSeg 记住光标在哪一段（0=分类行，1=列表）。
+    var menuCategory by remember {
+        mutableStateOf(com.chinut.bawantv.live.LiveCatalog.categoryOf(initialChannel))
+    }
+    var menuSeg by remember { mutableIntStateOf(1) }
+    var menuCatCursor by remember {
+        mutableIntStateOf(
+            com.chinut.bawantv.live.LiveCatalog.Category.entries
+                .indexOf(com.chinut.bawantv.live.LiveCatalog.categoryOf(initialChannel))
+                .coerceAtLeast(0)
+        )
+    }
+    /** 菜单里光标选中的频道下标（针对 menuCategory 过滤后的列表）。 */
+    var menuChannelCursor by remember { mutableIntStateOf(-1) }
+
+    /** 当前分类下可换的台。 */
+    val menuChannels: List<LiveChannel> = remember(channels, menuCategory) {
+        if (menuCategory == com.chinut.bawantv.live.LiveCatalog.Category.All) {
+            channels
+        } else {
+            channels.filter {
+                com.chinut.bawantv.live.LiveCatalog.categoryOf(it) == menuCategory
+            }
+        }
     }
     /** 直连地址缓存用的 key：频道 + 源下标（不同源的地址不一样）。 */
     fun cacheKeyOf(ch: LiveChannel, srcIndex: Int): String =
@@ -832,6 +863,22 @@ fun LivePlayerScreen(
         return if (at >= 0) at else 0
     }
 
+    /**
+     * 菜单里切换分类（←→ 键）。
+     *
+     * 顺便把分类行的光标和频道光标都归零 —— 否则换完分类，
+     * 光标会停在一个对新分类无意义的下标上。
+     */
+    fun onMenuMoveCategory(delta: Int) {
+        val cats = com.chinut.bawantv.live.LiveCatalog.Category.entries
+        val n = cats.size
+        menuCatCursor = ((menuCatCursor + delta) % n + n) % n
+        menuCategory = cats[menuCatCursor]
+        menuChannelCursor = 0
+        menuSeg = 0
+        hudTimeoutToken++
+    }
+
     fun tune(delta: Int) {
         if (playlist.size <= 1) return
         index = (index + delta + playlist.size) % playlist.size
@@ -983,7 +1030,46 @@ fun LivePlayerScreen(
             .background(Color.Black)
             .onPreviewKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (e.key) {
+                // ---------- 切换菜单打开时：方向键操作菜单 ----------
+                //
+                // 必须先拦截 —— 否则用户一边在菜单里选台，一边频道还在乱跳。
+                if (qualityPanel) {
+                    when (e.key) {
+                        Key.DirectionUp -> {
+                            if (menuSeg == 1 && menuChannelCursor <= 0) {
+                                // 列表顶上再按「上」→ 跳到分类行
+                                menuSeg = 0
+                                hudTimeoutToken++
+                            } else if (menuSeg == 1) {
+                                menuChannelCursor -= 1
+                                hudTimeoutToken++
+                            }
+                            true
+                        }
+
+                        Key.DirectionDown -> {
+                            if (menuSeg == 0) {
+                                menuSeg = 1
+                                if (menuChannelCursor < 0) menuChannelCursor = 0
+                            } else if (menuChannels.isNotEmpty()) {
+                                val n = menuChannels.size
+                                menuChannelCursor = (menuChannelCursor + 1) % n
+                            }
+                            hudTimeoutToken++
+                            true
+                        }
+
+                        Key.DirectionLeft -> {
+                            onMenuMoveCategory(-1); true
+                        }
+
+                        Key.DirectionRight -> {
+                            onMenuMoveCategory(1); true
+                        }
+
+                        else -> false
+                    }
+                } else when (e.key) {
                     Key.DirectionUp -> {
                         tune(-1); true
                     }
@@ -1343,6 +1429,53 @@ fun LivePlayerScreen(
                 }
                 qualityPanel = false
             },
+            // ---------- 切换菜单：分类 + 频道 ----------
+            categories = com.chinut.bawantv.live.LiveCatalog.Category.entries,
+            category = menuCategory,
+            catCursor = menuCatCursor,
+            segment = menuSeg,
+            channels = menuChannels,
+            channelCursor = menuChannelCursor,
+            currentChannelUrl = current.url,
+            onCategory = { cat ->
+                menuCategory = cat
+                menuSeg = 1
+                menuChannelCursor = 0
+                hudTimeoutToken++
+            },
+            onMoveCat = { d ->
+                val n = com.chinut.bawantv.live.LiveCatalog.Category.entries.size
+                menuCatCursor = ((menuCatCursor + d) % n + n) % n
+                menuCategory = com.chinut.bawantv.live.LiveCatalog.Category.entries[menuCatCursor]
+                menuSeg = 1
+                menuChannelCursor = 0
+                hudTimeoutToken++
+            },
+            onMoveChannel = { d ->
+                if (menuChannels.isNotEmpty()) {
+                    if (menuChannelCursor < 0) {
+                        // 第一次移动：从当前频道出发
+                        val at = menuChannels.indexOfFirst { it.url == current.url }
+                        menuChannelCursor = if (at >= 0) at else 0
+                    } else {
+                        val n = menuChannels.size
+                        menuChannelCursor = ((menuChannelCursor + d) % n + n) % n
+                    }
+                    hudTimeoutToken++
+                }
+            },
+            onLeaveListUp = {
+                // 在列表顶上再按「上」→ 跳到分类行
+                menuSeg = 0
+                hudTimeoutToken++
+            },
+            onPickChannel = { ch ->
+                qualityCursor = 0
+                sourceIndex = 0
+                retryToken++
+                onChannelChange(ch)
+                qualityPanel = false
+            },
         )
     }
     }
@@ -1366,6 +1499,19 @@ private fun QualityPanel(
     activeIndex: Int,
     cursor: Int,
     onPick: (Int) -> Unit,
+    // ---------- 切换菜单 ----------
+    categories: List<com.chinut.bawantv.live.LiveCatalog.Category>,
+    category: com.chinut.bawantv.live.LiveCatalog.Category,
+    catCursor: Int,
+    segment: Int,
+    channels: List<LiveChannel>,
+    channelCursor: Int,
+    currentChannelUrl: String,
+    onCategory: (com.chinut.bawantv.live.LiveCatalog.Category) -> Unit,
+    onMoveCat: (Int) -> Unit,
+    onMoveChannel: (Int) -> Unit,
+    onLeaveListUp: () -> Unit,
+    onPickChannel: (LiveChannel) -> Unit,
 ) {
     // 每个频道的源可能有几十个（央视 33 个），面板必须能滚动，
     // 否则超出的项会跑到屏幕外 —— 用户「看得到列表但选不中」就是这么来的。
@@ -1395,7 +1541,117 @@ private fun QualityPanel(
             fontSize = Txt.Section,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(Modifier.height(4.sdp))
+        Spacer(Modifier.height(10.sdp))
+
+        // ---------- 分类行（全部 / 央视 / 地方台 / IPTV）----------
+        //
+        // 在播放中就能换分类 —— 不用退回列表页。这是用户要的"切换菜单"。
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.sdp),
+        ) {
+            categories.forEachIndexed { i, cat ->
+                val on = cat == category
+                val cursorHere = segment == 0 && i == catCursor
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.sdp))
+                        .background(
+                            when {
+                                cursorHere -> Ink.Accent.copy(alpha = 0.45f)
+                                on -> Color.White.copy(alpha = 0.16f)
+                                else -> Color.White.copy(alpha = 0.06f)
+                            }
+                        )
+                        .border(
+                            width = if (cursorHere) 3.sdp else 0.sdp,
+                            color = if (cursorHere) Ink.AccentBright else Color.Transparent,
+                            shape = RoundedCornerShape(10.sdp),
+                        )
+                        .clickable { onCategory(cat) }
+                        .padding(vertical = 8.sdp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        cat.label,
+                        color = if (on || cursorHere) Color.White else Ink.TextTertiary,
+                        fontSize = Txt.Caption,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.sdp))
+
+        // ---------- 该分类下的频道列表 ----------
+        Text(
+            "频道 · " + channels.size + " 个",
+            color = Ink.TextTertiary,
+            fontSize = Txt.Tiny,
+        )
+        Spacer(Modifier.height(6.sdp))
+        val chListState = rememberLazyListState()
+        LaunchedEffect(channelCursor, channels.size) {
+            if (channelCursor >= 0 && channelCursor < channels.size) {
+                runCatching { chListState.animateScrollToItem(channelCursor) }
+            }
+        }
+        androidx.compose.foundation.lazy.LazyColumn(
+            state = chListState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 190.sdp),
+        ) {
+            itemsIndexed(channels) { i, ch ->
+                val isHere = ch.url == currentChannelUrl
+                val isCursor = segment == 1 && i == channelCursor
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.sdp)
+                        .clip(RoundedCornerShape(12.sdp))
+                        .background(
+                            when {
+                                isCursor -> Ink.Accent.copy(alpha = 0.30f)
+                                isHere -> Color.White.copy(alpha = 0.10f)
+                                else -> Color.White.copy(alpha = 0.04f)
+                            }
+                        )
+                        .border(
+                            width = if (isCursor) 3.sdp else 0.sdp,
+                            color = if (isCursor) Ink.AccentBright else Color.Transparent,
+                            shape = RoundedCornerShape(12.sdp),
+                        )
+                        .clickable { onPickChannel(ch) }
+                        .padding(horizontal = 12.sdp, vertical = 9.sdp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        ch.name,
+                        color = if (isCursor || isHere) Color.White else Ink.TextSecondary,
+                        fontSize = Txt.Caption,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (isHere) {
+                        Text("正在看", color = Ink.AccentBright, fontSize = Txt.Tiny)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.sdp))
+
+        // ---------- 本频道的源 ----------
+        Text(
+            "线路 · " + sources.size + " 个",
+            color = Ink.TextTertiary,
+            fontSize = Txt.Tiny,
+        )
+        Spacer(Modifier.height(6.sdp))
         Text(
             channel.name,
             color = Ink.TextTertiary,
@@ -1467,7 +1723,7 @@ private fun QualityPanel(
 
         Spacer(Modifier.height(6.dp))
         Text(
-            "「确定」切换 · 「三横键」关闭",
+            "↑↓ 选台/选线路 · ←→ 换分类 · 确定键选中 · 三横键关闭",
             color = Ink.TextFaint,
             fontSize = Txt.Tiny,
         )

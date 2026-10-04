@@ -108,12 +108,45 @@ def fetch(url, timeout=25):
 
 
 def fetch_bytes(url, timeout=15, limit=4 * 1024 * 1024):
+    """
+    下载一段字节，**带总时长上限**。
+
+    ⚠️ 踩过的坑：原来直接 `r.read(limit)` —— 如果服务器只发一点数据
+    但**不关闭连接**（直播流很常见），read 会一直挂着。
+    实测表现：exe 吃满 972MB 内存、CPU 只用了 55 秒、扫描永远不结束。
+
+    修法：改成自己 recv 循环，每收一块检查一次剩余时间，
+    超时立刻断开。这样最坏情况也只是慢，不会挂死。
+    """
+    import socket
+    deadline = time.time() + timeout
     req = urllib.request.Request(url)
     req.add_header('User-Agent', UA)
     req.add_header('Accept', '*/*')
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read(limit)
+            chunks = []
+            total = 0
+            while total < limit:
+                left = deadline - time.time()
+                if left <= 0:
+                    break
+                try:
+                    r.fp.raw._sock.settimeout(min(left, 5.0)) \
+                        if hasattr(r.fp, 'raw') else None
+                except Exception:
+                    pass
+                try:
+                    b = r.read(min(256 * 1024, limit - total))
+                except (socket.timeout, TimeoutError):
+                    break
+                except Exception:
+                    break
+                if not b:
+                    break
+                chunks.append(b)
+                total += len(b)
+            return b''.join(chunks) if chunks else None
     except Exception:
         return None
 
@@ -129,6 +162,22 @@ def parse_m3u(text):
             out.append((name, s))
             name = None
     return out
+
+
+def _kill_tree(proc):
+    """杀掉进程及其子进程（ffmpeg 超时后必须清干净，否则孤儿进程继续吃内存）。"""
+    import signal
+    try:
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)],
+                           capture_output=True, timeout=10)
+        else:
+            proc.kill()
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
 
 
 def absolute(base, rel):
@@ -212,10 +261,29 @@ def decode_check(url, timeout=35):
         '-frames:v', str(FRAMES),
         '-q:v', '4', '-y', tmpl,
     ]
+    # ⚠️ 为什么不用 subprocess.run(timeout=...)
+    #
+    # 实测踩坑：`-rw_timeout` 只在**完全收不到数据**时才触发。
+    # 有些源会一直涓流式发数据，ffmpeg 就永远读下去，
+    # 内存越吃越多（实测涨到 600MB+ 还在涨），扫描永不结束。
+    #
+    # 所以这里改成自己起进程 + 墙钟硬超时 + 超时后**杀进程树**
+    # （ffmpeg 可能派生子进程，只杀父进程会留下孤儿继续吃内存）。
+    proc = None
     try:
-        subprocess.run(cmd, capture_output=True, timeout=timeout + 25)
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+        )
+        try:
+            proc.wait(timeout=timeout + 15)
+        except subprocess.TimeoutExpired:
+            _kill_tree(proc)
+            return False, '解码超时', {}
     except Exception:
-        return False, '解码超时', {}
+        if proc is not None:
+            _kill_tree(proc)
+        return False, '解码失败', {}
 
     fs = [os.path.join(TMP, 'dc_%d_%d.jpg' % (tag, i))
           for i in range(1, FRAMES + 1)]

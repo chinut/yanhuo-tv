@@ -105,6 +105,15 @@ fun LiveScreen(
     // 默认看第一个分组（老电视「打开就是台」）
     var selectedGroup by remember { mutableIntStateOf(0) }
 
+    // 频道分类（用户要求）：全部 / 央视 / 地方台 / IPTV
+    //
+    // 和下面的地区分组构成**两级筛选**：
+    //   第一级选分类，第二级选该分类下的地区分组。
+    // 「全部」下第二级就是原来的全部分组，行为不变。
+    var category by remember {
+        mutableStateOf(com.chinut.bawantv.live.LiveCatalog.Category.All)
+    }
+
     suspend fun reload() {
         loading = true
         val loaded = withContext(Dispatchers.IO) {
@@ -165,7 +174,28 @@ fun LiveScreen(
     fun uniqueCount(list: List<LiveChannel>): Int =
         list.map { LiveCatalog.normalizeName(it.name) }.distinct().size
 
-    val rawShown: List<LiveChannel> = groups.getOrNull(selectedGroup)?.channels.orEmpty()
+    // ---------- 两级筛选 ----------
+    //
+    // 先按分类把「分组」筛一遍，再在筛出来的分组里选第几个。
+    // 这样第二级永远是"当前分类下的分组"，不会串台。
+    val catGroups: List<LiveGroup> = remember(groups, category) {
+        if (category == com.chinut.bawantv.live.LiveCatalog.Category.All) {
+            groups
+        } else {
+            groups.mapNotNull { g ->
+                val kept = g.channels.filter {
+                    com.chinut.bawantv.live.LiveCatalog.categoryOf(it) == category
+                }
+                if (kept.isEmpty()) null else g.copy(channels = kept)
+            }
+        }
+    }
+
+    // 分类变了就把第二级归零（否则可能指向一个已不存在的分组）
+    LaunchedEffect(category) { selectedGroup = 0 }
+
+    val rawShown: List<LiveChannel> =
+        catGroups.getOrNull(selectedGroup)?.channels.orEmpty()
 
     /**
      * 网格里同名频道只显示一次。
@@ -195,8 +225,8 @@ fun LiveScreen(
     }
 
     // 分组下标失效时回到第一个分组
-    LaunchedEffect(groups.size) {
-        if (groups.isNotEmpty() && selectedGroup >= groups.size) selectedGroup = 0
+    LaunchedEffect(catGroups.size) {
+        if (catGroups.isNotEmpty() && selectedGroup >= catGroups.size) selectedGroup = 0
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -239,7 +269,29 @@ fun LiveScreen(
 
         Spacer(Modifier.height(14.sdp))
 
-        // ---------- 分组 chips ----------
+        // ---------- 第一级：分类 ----------
+        val catSplit = remember(allChannels) {
+            com.chinut.bawantv.live.LiveCatalog.splitByCategory(allChannels)
+        }
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.sdp),
+            contentPadding = PaddingValues(end = 24.sdp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(com.chinut.bawantv.live.LiveCatalog.Category.entries.size) { i ->
+                val cat = com.chinut.bawantv.live.LiveCatalog.Category.entries[i]
+                val n = catSplit[cat]?.size ?: 0
+                GroupChip(
+                    text = "${cat.label} $n",
+                    selected = cat == category,
+                    onClick = { category = cat },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.sdp))
+
+        // ---------- 第二级：该分类下的地区分组 ----------
         val chipListState = rememberLazyListState()
         LazyRow(
             state = chipListState,
@@ -247,8 +299,8 @@ fun LiveScreen(
             contentPadding = PaddingValues(end = 24.sdp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            items(groups.size) { i ->
-                val g = groups[i]
+            items(catGroups.size) { i ->
+                val g = catGroups[i]
                 GroupChip(
                     text = "${g.name} ${uniqueCount(g.channels)}",
                     selected = i == selectedGroup,

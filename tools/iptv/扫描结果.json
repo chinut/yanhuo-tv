@@ -1,0 +1,117 @@
+{
+ "scanned_at": "2026-10-04 09:20:27",
+ "tested": 33,
+ "ok": 10,
+ "channels": {
+  "湖南卫视": [
+   {
+    "url": "https://txmov2.a.kwimgs.com/bs3/video-hls/5199687338554291078_hlsb.m3u8",
+    "size_dev": 0.57,
+    "kbps": 3312,
+    "std": 63.4,
+    "diff": 57.3,
+    "avg_diff": 27.81,
+    "frames": 6
+   }
+  ],
+  "青海卫视": [
+   {
+    "url": "https://hls-qhmh.lanzhousobey.cn/qhmh/mhds.m3u8",
+    "size_dev": 0.13,
+    "kbps": 3872,
+    "std": 56.8,
+    "diff": 51.04,
+    "avg_diff": 34.92,
+    "frames": 6
+   }
+  ],
+  "延边卫视": [
+   {
+    "url": "https://srs.iyb983.cn:443/video/CYS/index.m3u8",
+    "size_dev": 0.06,
+    "kbps": 4633,
+    "std": 45.5,
+    "diff": 34.1,
+    "avg_diff": 13.4,
+    "frames": 6
+   }
+  ],
+  "浙江卫视": [
+   {
+    "url": "http://ali-m-l.cztv.com/channels/lantian/channel001/1080p.m3u8",
+    "size_dev": 0.1,
+    "kbps": 3690,
+    "std": 29.8,
+    "diff": 2.82,
+    "avg_diff": 0.56,
+    "frames": 6
+   }
+  ],
+  "安多卫视": [
+   {
+    "url": "https://liveout.xntv.tv/a65jur/96iln2.m3u8",
+    "size_dev": 0.04,
+    "kbps": 1134,
+    "std": 61.6,
+    "diff": 8.97,
+    "avg_diff": 4.77,
+    "frames": 6
+   }
+  ],
+  "内蒙古卫视": [
+   {
+    "url": "http://play1-qk.nmtv.cn/live/1769652018126032.m3u8",
+    "size_dev": 0.34,
+    "kbps": 3909,
+    "std": 71.6,
+    "diff": 105.79,
+    "avg_diff": 44.3,
+    "frames": 6
+   }
+  ],
+  "东方卫视4K": [
+   {
+    "url": "https://bp-resource-dfl.bestv.cn/148/3/video.m3u8",
+    "size_dev": 0.11,
+    "kbps": 2724,
+    "std": 43.2,
+    "diff": 14.98,
+    "avg_diff": 5.24,
+    "frames": 6
+   }
+  ],
+  "黑龙江卫视": [
+   {
+    "url": "https://idclive.hljtv.com:4430/live/hljws_own.m3u8",
+    "size_dev": 0.33,
+    "kbps": 4820,
+    "std": 41.0,
+    "diff": 34.81,
+    "avg_diff": 6.96,
+    "frames": 6
+   }
+  ],
+  "人间卫视": [
+   {
+    "url": "https://5ddce30eb4b55.streamlock.net/bltvhd/bltv1/chunklist_w511254805.m3u8",
+    "size_dev": 0.21,
+    "kbps": 2863,
+    "std": 33.1,
+    "diff": 5.41,
+    "avg_diff": 3.07,
+    "frames": 6
+   }
+  ],
+  "福建海峡卫视": [
+   {
+    "url": "http://38.64.72.148:80/hls/modn/list/4009/playlist.m3u8",
+    "size_dev": 0.39,
+    "kbps": 2908,
+    "std": 58.7,
+    "diff": 36.11,
+    "avg_diff": 19.54,
+    "frames": 6
+   }
+  ]
+ }
+}
