@@ -740,14 +740,17 @@ private fun HomeEntryCard(
                         model = layerA,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        // 取景偏上图：竖版海报塞进横条卡片，人脸在上三分之一，
+                        // 取中间那条会把脸切掉（用户反馈过"只剩脖子和身子"）
+                        alignment = androidx.compose.ui.BiasAlignment(0f, -0.36f),
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
                                 alpha = aAlpha
-                                scaleX = 1.28f
-                                scaleY = 1.28f
-                                translationX = -46f
-                                translationY = 30f
+                                // 轻微放大即可：Crop 本身已经放大过一次，
+                                // 再乘大倍数会把窗口推出人脸区
+                                scaleX = 1.15f
+                                scaleY = 1.15f
                             },
                     )
                 }
@@ -757,14 +760,13 @@ private fun HomeEntryCard(
                         model = layerB,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        alignment = androidx.compose.ui.BiasAlignment(0f, -0.36f),
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
                                 alpha = bAlpha
-                                scaleX = 1.28f
-                                scaleY = 1.28f
-                                translationX = -46f
-                                translationY = 30f
+                                scaleX = 1.15f
+                                scaleY = 1.15f
                             },
                     )
                 }
