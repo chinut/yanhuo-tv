@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -153,7 +154,30 @@ fun ImmersiveHome(
         )
     }
 
-    LaunchedEffect(Unit) {
+    // 配置指纹：老电视模式 / 主源 / 自定义源地址 变了就重新预热。
+    //
+    // ⚠️ 原来这里是 `LaunchedEffect(Unit)` —— 只在首次组合时跑一次，
+    // **之后永不重跑**。所以用户在设置里换了主源，频道列表一动不动
+    // （用户实测：「切换下面的源……但实际上他什么都没有影响」）。
+    //
+    // `revision` 是 AppPrefs 里每次改设置都会 +1 的 StateFlow：
+    // 读它能让这个 Composable 在配置变化时重组。
+    // 再配合 configKey，就只在**真的影响直播源**时才重拉
+    // （改音量/HUD 不会白重拉一次频道表）。
+    //
+    // 手机二维码调试页保存走的是 `AppPrefs.applyRemote()`，
+    // 它结尾同样调 `touch()` → revision 变化 → 这里同样会重拉。
+    val prefsRev by prefs.revision.collectAsState()
+    val liveConfigKey = remember(prefsRev) {
+        com.chinut.bawantv.ui.HomeWarmup.configKey()
+    }
+
+    LaunchedEffect(liveConfigKey) {
+        // 配置变了 → 先作废旧结果，再重新预热。
+        // （warmUp 内部也会自查 warmKey，这里是双保险。）
+        com.chinut.bawantv.ui.HomeWarmup.reset()
+        runCatching { com.chinut.bawantv.ui.HomeWarmup.warmUp(context) }
+
         // 开屏期间已经预热过了，直接用结果（省掉几百毫秒的解析）。
         // 万一没预热到（例如直接跳过了开屏），这里自己兜底算一次。
         val warmedGroups = com.chinut.bawantv.ui.HomeWarmup.groups()

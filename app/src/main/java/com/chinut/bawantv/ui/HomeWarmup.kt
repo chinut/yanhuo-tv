@@ -65,6 +65,14 @@ object HomeWarmup {
     @Volatile
     private var warmKey: String = ""
 
+    /**
+     * 当前配置的指纹（**对外开放**）。
+     *
+     * 界面层用它做 `LaunchedEffect` 的 key —— 配置一变就重新预热。
+     * 只包含影响直播源的三个字段，所以改音量/HUD 之类不会白重拉频道表。
+     */
+    fun configKey(): String = keyOf()
+
     /** 当前配置的指纹。 */
     private fun keyOf(): String {
         val p = prefs
