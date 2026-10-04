@@ -1,95 +1,60 @@
 @echo off
 chcp 65001 >nul
-setlocal enabledelayedexpansion
+setlocal
 
 REM =====================================================================
-REM  IPTV source scanner launcher
+REM YanhuoTV IPTV source scanner launcher
 REM
-REM  NOTE: keep this file ASCII-only outside of echo lines.
-REM  cmd.exe parses .bat using the OEM codepage; UTF-8 Chinese inside
-REM  REM comments gets executed as commands.
-REM  Also MUST use CRLF line endings or cmd mis-parses lines.
+REM NOTE: keep this file ASCII-only inside REM lines.
+REM cmd.exe parses .bat with the OEM codepage, so UTF-8 Chinese inside
+REM REM comments gets executed as commands. Also MUST use CRLF endings.
 REM =====================================================================
 
-set "SCRIPT=%~dp0iptv_scan.py"
-set "PY="
+cd /d "%~dp0"
+set "EXE=%~dp0焰火TV直播源扫描器.exe"
 
 echo.
 echo ======================================================================
-echo   IPTV 源扫描器
+echo   焰火TV 直播源扫描器
 echo ======================================================================
 echo.
-echo   它会：把你家的直播源逐个用播放器真解一遍，
-echo         只保留**真的能出画面**的，过滤掉打不开和花屏的。
+echo   它会把每个直播源真的用播放器解一遍，验证：
+echo      画面有内容（不是黑屏/纯色）
+echo      画面在动（直播一定是动的）
 echo.
-echo   第一次运行会自动安装需要的组件（约 30MB，一两分钟）。
+echo   只保留通过验证的，生成「直播源.m3u」给你导进电视。
+echo.
+echo   耗时通常 15~50 分钟，屏幕会一直滚动进度 - 不是卡住了。
+echo.
+echo   建议在看电视的时候别跑，它会占一部分带宽。
 echo.
 echo ======================================================================
 echo.
 
-if not exist "%SCRIPT%" (
-    echo   找不到 iptv_scan.py
+if not exist "%EXE%" (
+    echo   找不到「焰火TV直播源扫描器.exe」
     echo   请确认它和本文件在同一个文件夹里。
     echo.
     pause
     exit /b 1
 )
 
-REM ---------- 找 Python ----------
-where python >nul 2>nul
-if not errorlevel 1 set "PY=python"
-
-if not defined PY (
-    where py >nul 2>nul
-    if not errorlevel 1 set "PY=py"
-)
-
-if not defined PY (
-    echo   没有找到 Python。
-    echo.
-    echo   请先安装 Python（免费）：
-    echo       https://www.python.org/downloads/
-    echo.
-    echo   安装时**一定要勾选** "Add Python to PATH" 这个选项，
-    echo   然后重新双击本文件。
-    echo.
-    pause
-    exit /b 1
-)
-
-echo   Python: %PY%
-echo.
-
-REM ---------- 装依赖 ----------
-"%PY%" -c "import imageio_ffmpeg, PIL" >nul 2>nul
-if errorlevel 1 (
-    echo   正在安装组件，请稍等（一两分钟）……
-    echo.
-    "%PY%" -m pip install --upgrade pip >nul 2>nul
-    "%PY%" -m pip install imageio-ffmpeg pillow
-    if errorlevel 1 (
-        echo.
-        echo   安装失败。请手动运行下面这行，然后重试：
-        echo       %PY% -m pip install imageio-ffmpeg pillow
-        echo.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo   组件装好了。
-    echo.
-)
-
-REM ---------- 跑 ----------
-"%PY%" "%SCRIPT%" %*
+"%EXE%" %*
 
 echo.
 echo ======================================================================
 echo   扫描结束
 echo ======================================================================
 echo.
-echo   结果文件（在本文件夹里）：
-echo      iptv_result.json    ^<- 把这个发给我
-echo      iptv_可用源.m3u     ^<- 也可以直接填进 App 试
+echo   生成的文件（在本文件夹里）：
+echo.
+echo     直播源.m3u
+echo        把这个拷到 U 盘，插到电视上
+echo        电视上：设置 - 直播源 - 选择文件 - 选中它
+echo.
+echo     扫描结果.json
+echo        想让我帮你看结果就发这个
+echo.
+echo ======================================================================
 echo.
 pause

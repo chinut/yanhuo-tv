@@ -1,42 +1,34 @@
 """
-IPTV 源扫描器 —— 给朋友在家里电脑上跑，把结果发回来。
+焰火TV 直播源扫描器（电脑版 v2）
 
-# 为什么需要一个"外人友好"的工具
+在电脑上扫描 IPTV 直播源，只保留**真的能看**的，生成一个文件给电视导入。
 
-IPTV 源是**运营商 + 地区**限定的：
-电信的源在移动宽带上多半不通，广东的源在北京可能不通。
-所以"在我电脑上测可用"毫无意义 —— **必须在朋友家那条宽带上测**。
+# 为什么要单独做一个电脑版
 
-这个脚本就是干这个的。设计目标是**没有任何技术背景的人也能跑起来**。
+电视端也能扫，但它只有一帧解码的余量（要测"画面在动"得解多帧、很慢），
+**测不出"静止的假频道"**。电脑上跑得快，判据可以做得更强。
 
-# 判据（这是整个工具的核心）
+# 判据（四层，逐层淘汰）
 
-我前面几轮踩过的坑，全在这里纠正了：
+1. **格式合法**：m3u8 能取到、以 #EXTM3U 开头；master 能下钻到分片列表
+2. **分片可下载**：连续取 4 个分片都成功，且每个 > 20KB
+3. **码率合理**：分片大小稳定（波动 < 60%），估算码率在 150~8000 kbps
+4. **真解码 + 画面在动**（关键）：
+   · 从流中间（-ss 6s）**间隔 1 秒取 6 帧**
+   · 每帧的灰度标准差 std > 10（画面有内容，不是纯色/黑屏）
+   · **相邻帧的平均差 > 2.0**（画面真的在动 —— 直播一定是动的）
+   · 帧间差异不能全都一样（排除"同一画面重复"的假流）
 
-| 错误判据 | 后果 |
-|---|---|
-| HTTP 200 就算可用 | 央视加密源也能取到，但永远花屏 |
-| ffmpeg 能解码就算可用 | 音频源、灰帧也能通过 |
-| 解出一帧就算可用 | **灰色空帧也能通过**（真实踩过） |
+第 4 层是核心。实测数据对照：
 
-**唯一有效的判据**（已在大批真实数据上验证）：
-
-1. 有视频轨道
-2. 解出 3 帧
-3. **std > 10** —— 不是纯色/灰屏
-4. **帧差 > 1.5** —— 画面在动（直播一定是动的）
-
-区分度很大：央视加密源 std 0.0~1.7、帧差 0.00；
-正常 IPTV 源 std 23~60、帧差 2~47。
+    真频道:  std 22~103, 帧差 1.5~30
+    假频道:  std 30~68,  帧差 0.00     ← 静止画面/台标卡
+    坏数据:  解不出帧                   ← 花屏加密/数据损坏
 
 # 用法
 
-    run.bat            （双击，自动装依赖并运行）
-
-或者：
-
-    python iptv_scan.py --list "你的播放列表.m3u"
-    python iptv_scan.py                       （用内置的公开源列表）
+    run.bat                    双击即用
+    iptv_scan.py --list x.m3u  用你自己的源文件
 """
 import argparse
 import concurrent.futures as cf
@@ -51,67 +43,61 @@ import time
 import urllib.request
 from collections import defaultdict
 
-# ---------------- 依赖检查（给朋友看的友好提示）----------------
-
-try:
-    import imageio_ffmpeg
-except ImportError:
-    print()
-    print('=' * 70)
-    print('  缺少组件，请先运行（双击 run.bat 会自动装）：')
-    print('      pip install imageio-ffmpeg pillow')
-    print('=' * 70)
-    sys.exit(1)
-
-try:
-    from PIL import Image, ImageChops, ImageStat
-except ImportError:
-    print()
-    print('  缺少 Pillow，请运行： pip install pillow')
-    sys.exit(1)
+import imageio_ffmpeg
+from PIL import Image, ImageChops, ImageStat
 
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
 TMP = tempfile.gettempdir()
-HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, 'iptv_result.json')
+HERE = os.path.dirname(os.path.abspath(
+    sys.executable if getattr(sys, 'frozen', False) else __file__))
 
-# ---------------- 内置的公开源列表 ----------------
-# 这些都是社区维护的，但**可用性因地区/运营商而异** —— 所以必须实测。
-BUILTIN_LISTS = [
-    ('vbskycn/iptv',
-     'https://raw.githubusercontent.com/vbskycn/iptv/master/tv/iptv4.m3u'),
-    ('vbskycn/iptv (jsDelivr 镜像)',
-     'https://cdn.jsdelivr.net/gh/vbskycn/iptv@master/tv/iptv4.m3u'),
-    ('iptv-org 中国',
-     'https://iptv-org.github.io/iptv/countries/cn.m3u'),
-    ('YanG-1989/m3u',
-     'https://raw.githubusercontent.com/YanG-1989/m3u/main/Gather.m3u'),
-    ('Kimentanm/aptv',
-     'https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u'),
-    ('best-fan/iptv-sources',
-     'https://raw.githubusercontent.com/best-fan/iptv-sources/main/cn_all.m3u'),
-    ('zhangbin0301/iptv2025',
-     'https://raw.githubusercontent.com/zhangbin0301/iptv2025/main/iptv.m3u'),
-    ('jiandantv/IPTV2025',
-     'https://raw.githubusercontent.com/jiandantv/IPTV2025/main/iptv4.m3u'),
-    # 下面这些是常见的"本地运营商"源列表，命中率取决于地区
-    ('常用 IPTV 汇总 A',
-     'https://raw.githubusercontent.com/imDazui/Tvlist-awesome-m3u-m3u8/'
-     'master/m3u/%E5%A4%AE%E8%A7%86%E5%8F%B0.m3u'),
+# ==================== 判据阈值 ====================
+MIN_STD = 10.0         # 画面必须有内容（不是纯色/黑屏）
+MIN_DIFF = 2.0         # 相邻帧必须有变化（直播一定是动的）
+MIN_SEG = 20 * 1024    # 分片至少这么大
+MAX_SIZE_DEV = 0.60    # 分片大小波动上限
+FRAMES = 6             # 取几帧
+
+# ==================== 内置源列表 ====================
+LISTS = [
+    ('vbskycn/iptv', 'https://raw.githubusercontent.com/vbskycn/iptv/master/tv/iptv4.m3u'),
+    ('vbskycn 镜像', 'https://cdn.jsdelivr.net/gh/vbskycn/iptv@master/tv/iptv4.m3u'),
+    ('iptv-org 中国', 'https://iptv-org.github.io/iptv/countries/cn.m3u'),
+    ('YanG-1989/m3u', 'https://raw.githubusercontent.com/YanG-1989/m3u/main/Gather.m3u'),
+    ('Kimentanm/aptv', 'https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u'),
+    ('best-fan/iptv', 'https://raw.githubusercontent.com/best-fan/iptv-sources/main/cn_all.m3u'),
+    ('best-fan 镜像', 'https://cdn.jsdelivr.net/gh/best-fan/iptv-sources@main/cn_all.m3u'),
+    ('zhangbin0301', 'https://raw.githubusercontent.com/zhangbin0301/iptv2025/main/iptv.m3u'),
+    ('jiandantv', 'https://raw.githubusercontent.com/jiandantv/IPTV2025/main/iptv4.m3u'),
 ]
 
-# 判据阈值（和我的实测数据对齐）
-MIN_STD = 10.0        # 画面必须有细节（纯色图 std≈0）
-MIN_DIFF = 1.5        # 帧间必须有变化（静帧/灰屏 ≈0）
+
+# ---------- 安全输出 ----------
+#
+# ⚠️ 踩过的坑：中文 Windows 的终端默认是 GBK（cp936），
+# 往 stdout 打 emoji（如 ✅）会抛 UnicodeEncodeError 直接崩掉程序。
+# 打包成 exe 后更明显 —— 实测就是这样崩的。
+#
+# 所以这里：优先把 stdout 切到 UTF-8，切不动就退化成"忽略无法编码的字符"。
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 
 
-def log(msg):
-    print(msg, flush=True)
+def log(msg=''):
+    try:
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        # 兜底：去掉无法编码的字符再打
+        enc = getattr(sys.stdout, 'encoding', None) or 'utf-8'
+        print(msg.encode(enc, 'replace').decode(enc, 'replace'), flush=True)
 
 
-def fetch_text(url, timeout=25):
+def fetch(url, timeout=25):
     req = urllib.request.Request(url)
     req.add_header('User-Agent', UA)
     try:
@@ -121,8 +107,18 @@ def fetch_text(url, timeout=25):
         return ''
 
 
+def fetch_bytes(url, timeout=15, limit=4 * 1024 * 1024):
+    req = urllib.request.Request(url)
+    req.add_header('User-Agent', UA)
+    req.add_header('Accept', '*/*')
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read(limit)
+    except Exception:
+        return None
+
+
 def parse_m3u(text):
-    """解析 m3u：返回 [(频道名, 地址)]。同时支持带属性的 EXTINF。"""
     out, name = [], None
     for line in text.split('\n'):
         s = line.strip()
@@ -135,136 +131,190 @@ def parse_m3u(text):
     return out
 
 
-def verify(url, timeout=25):
-    """
-    三重验证：有视频轨道 + 不灰 + 画面在动。
+def absolute(base, rel):
+    if rel.startswith('http'):
+        return rel
+    if rel.startswith('/'):
+        m = re.match(r'^(https?://[^/]+)', base)
+        return (m.group(1) if m else '') + rel
+    return base.rsplit('/', 1)[0] + '/' + rel
 
-    返回 dict（可用）或 None（不可用）。
-    """
+
+# ==================== 四层验证 ====================
+def verify(url):
+    """返回 (是否可用, 说明, 详情dict)。"""
+    detail = {}
+
+    # ---- 1) 格式合法 ----
+    text = fetch(url)
+    if not text:
+        return False, '取不到 m3u8', detail
+    if not text.lstrip().startswith('#EXTM3U'):
+        return False, '返回的不是 m3u8', detail
+
+    base, body = url, text
+    if '#EXT-X-STREAM-INF' in body:
+        if not re.search(r'RESOLUTION=|VIDEO=', body, re.I):
+            return False, 'master 里没有视频轨（可能纯音频）', detail
+        sub = next((l.strip() for l in body.split('\n')
+                    if l.strip() and not l.startswith('#')), None)
+        if not sub:
+            return False, 'master 里没有子列表', detail
+        base = absolute(base, sub)
+        body = fetch(base) or ''
+        if not body.lstrip().startswith('#EXTM3U'):
+            return False, '子列表取不到', detail
+
+    # ---- 2) 分片可下载 ----
+    segs = [l.strip() for l in body.split('\n')
+            if l.strip() and not l.startswith('#')][:4]
+    if len(segs) < 2:
+        return False, '分片太少', detail
+
+    sizes = []
+    for rel in segs:
+        data = fetch_bytes(absolute(base, rel))
+        if data is None:
+            return False, '分片下载失败', detail
+        sizes.append(len(data))
+    if min(sizes) < MIN_SEG:
+        return False, '分片过小（%dKB）' % (min(sizes) // 1024), detail
+
+    # ---- 3) 码率合理 ----
+    avg = sum(sizes) / len(sizes)
+    dev = max(abs(s - avg) for s in sizes) / avg
+    detail['size_dev'] = round(dev, 2)
+    if dev > MAX_SIZE_DEV:
+        return False, '分片大小波动过大（%.0f%%）' % (dev * 100), detail
+    kbps = int(avg * 8 / 4 / 1000)      # 假设 4 秒一片
+    detail['kbps'] = kbps
+    if not (150 <= kbps <= 8000):
+        return False, '码率异常（%d kbps）' % kbps, detail
+
+    # ---- 4) 真解码 + 画面在动 ----
+    ok, why, d = decode_check(url)
+    detail.update(d)
+    if not ok:
+        return False, why, detail
+    return True, 'ok', detail
+
+
+def decode_check(url, timeout=35):
+    """间隔取 6 帧，验证「有内容」且「画面在动」。"""
     tag = abs(hash(url)) % 10 ** 9
-    out = os.path.join(TMP, 'iptv_%d_%%d.jpg' % tag)
+    tmpl = os.path.join(TMP, 'dc_%d_%%d.jpg' % tag)
     cmd = [
         FFMPEG, '-hide_banner', '-loglevel', 'error',
         '-user_agent', UA,
         '-rw_timeout', str(timeout * 1_000_000),
-        '-ss', '4',            # 跳过开头（有些流开头是空画面）
-        '-i', url,
-        '-frames:v', '3',      # 解 3 帧
-        '-q:v', '4', '-y', out,
+        '-ss', '6', '-i', url,
+        '-vf', 'fps=1',
+        '-frames:v', str(FRAMES),
+        '-q:v', '4', '-y', tmpl,
     ]
     try:
-        subprocess.run(cmd, capture_output=True, timeout=timeout + 20)
+        subprocess.run(cmd, capture_output=True, timeout=timeout + 25)
     except Exception:
-        return None
+        return False, '解码超时', {}
 
-    frames = [os.path.join(TMP, 'iptv_%d_%d.jpg' % (tag, i))
-              for i in (1, 2, 3)]
-    frames = [f for f in frames
-              if os.path.exists(f) and os.path.getsize(f) > 0]
+    fs = [os.path.join(TMP, 'dc_%d_%d.jpg' % (tag, i))
+          for i in range(1, FRAMES + 1)]
+    fs = [f for f in fs if os.path.exists(f) and os.path.getsize(f) > 0]
     try:
-        if len(frames) < 2:
-            return None
-        imgs = [Image.open(f).convert('L') for f in frames]
-        std = ImageStat.Stat(imgs[0]).stddev[0]
+        if len(fs) < 3:
+            return False, '解不出足够帧（%d）' % len(fs), {}
+
+        imgs = [Image.open(f).convert('L') for f in fs]
+        stds = [ImageStat.Stat(im).stddev[0] for im in imgs]
         diffs = [ImageStat.Stat(ImageChops.difference(a, b)).mean[0]
                  for a, b in zip(imgs, imgs[1:])]
+        max_std = max(stds)
         max_diff = max(diffs)
-        if std > MIN_STD and max_diff > MIN_DIFF:
-            return {
-                'std': round(std, 1),
-                'diff': round(max_diff, 2),
-                'size': max(os.path.getsize(f) for f in frames),
-            }
-        return None
+        avg_diff = sum(diffs) / len(diffs)
+
+        d = {'std': round(max_std, 1), 'diff': round(max_diff, 2),
+             'avg_diff': round(avg_diff, 2), 'frames': len(fs)}
+
+        if max_std < MIN_STD:
+            return False, '画面近乎纯色（std=%.1f）' % max_std, d
+        if max_diff < MIN_DIFF:
+            return False, '画面静止（帧差=%.2f）' % max_diff, d
+        if len(set(round(x, 1) for x in diffs)) == 1 and max_diff < 4:
+            return False, '画面重复（帧差恒定 %.2f）' % max_diff, d
+        return True, 'ok', d
     finally:
-        for f in frames:
+        for f in fs:
             try:
                 os.remove(f)
             except Exception:
                 pass
 
 
-def fmt_name(n):
-    """把频道名规整一下，去掉码率标注之类，方便归类。"""
-    s = re.sub(r'\s*[\(\（][^)\）]*[)\）]\s*', ' ', n)
-    s = re.sub(r'\s+', ' ', s).strip()
-    return s
-
-
+# ==================== 主流程 ====================
 def main():
     ap = argparse.ArgumentParser(
-        description='IPTV 源扫描器 —— 测出你家网络下真正能看的源')
+        description='焰火TV 直播源扫描器 —— 测出真正能看的源')
     ap.add_argument('--list', action='append', default=[],
-                    help='你自己的 m3u 文件或网址（可重复指定）')
-    ap.add_argument('--filter', default='',
-                    help='只测名字含这个词的频道，例如 --filter CCTV')
-    ap.add_argument('--max-per-channel', type=int, default=6,
-                    help='每个频道最多测几个地址（默认 6）')
-    ap.add_argument('--jobs', type=int, default=6,
-                    help='并发数（默认 6；网络差就调小）')
+                    help='你自己的 m3u 文件或网址（可重复）')
+    ap.add_argument('--filter', default='', help='只测名字含这个词的频道')
+    ap.add_argument('--max-per-channel', type=int, default=4)
+    ap.add_argument('--jobs', type=int, default=6)
+    ap.add_argument('--no-builtin', action='store_true',
+                    help='不用内置的公开源列表')
     args = ap.parse_args()
 
-    log('=' * 70)
-    log('  IPTV 源扫描器')
-    log('=' * 70)
-    log('')
-    log('  它做的事：把直播源逐个用播放器真解一遍，')
-    log('  只保留**真的能出画面**的（不是"地址能打开"就算）。')
-    log('')
-    log('  耗时取决于源的数量，通常 10~40 分钟。')
-    log('  屏幕会一直有进度输出，不是卡住了。')
-    log('')
+    log('=' * 72)
+    log('  焰火TV 直播源扫描器')
+    log('=' * 72)
+    log()
+    log('  它会把每个源**真的解码一遍**，验证「画面有内容」且「画面在动」。')
+    log('  只保留通过验证的，生成一个文件给你导进电视。')
+    log()
+    log('  耗时取决于源的数量，通常 15~50 分钟。')
+    log('  屏幕会一直有进度输出 —— 不是卡住了。')
+    log()
 
-    # ---------- 收集候选 ----------
-    sources = list(args.list) + [u for _, u in BUILTIN_LISTS]
-    labels = {}
-    for lab, u in BUILTIN_LISTS:
-        labels[u] = lab
+    sources = list(args.list)
+    if not args.no_builtin:
+        sources += [u for _, u in LISTS]
 
     cands = defaultdict(list)
     for url in sources:
         if os.path.exists(url):
             text = io.open(url, encoding='utf-8', errors='replace').read()
-            lab = os.path.basename(url)
+            label = os.path.basename(url)
         else:
-            text = fetch_text(url)
-            lab = labels.get(url, url[:40])
+            text = fetch(url)
+            label = next((n for n, u in LISTS if u == url), url[:44])
         if not text:
-            log('  [跳过] %s（取不到）' % lab)
+            log('  [跳过] %s（取不到，可能被墙）' % label)
             continue
-        items = parse_m3u(text)
         kept = 0
-        for n, u in items:
-            if '.m3u8' not in u and '.flv' not in u and '.ts' not in u:
+        for n, u in parse_m3u(text):
+            if '.m3u8' not in u and '.flv' not in u:
                 continue
-            nm = fmt_name(n)
+            nm = re.sub(r'\s*[\(\（][^)\）]*[)\）]\s*', ' ', n).strip()
             if args.filter and args.filter.lower() not in nm.lower():
                 continue
             if u not in cands[nm]:
                 cands[nm].append(u)
                 kept += 1
-        log('  [读取] %-32s 共 %4d 条，收下 %d 条' % (lab, len(items), kept))
+        log('  [读取] %-24s 收下 %d 条' % (label[:24], kept))
 
     if not cands:
-        log('')
-        log('  ❌ 没有拿到任何候选地址。')
-        log('     如果全部显示"取不到"，可能是网络访问 GitHub 受限。')
-        log('     解决办法：用 --list 指定你自己下载的 m3u 文件。')
+        log()
+        log('  [X] 没拿到任何候选。若全部"取不到"，是访问 GitHub 受限 ——')
+        log('     用 --list 指定你自己下载的 m3u 文件。')
         return 1
 
-    total = sum(min(len(v), args.max_per_channel) for v in cands.values())
-    log('')
-    log('  候选频道 %d 个，准备测试 %d 个地址'
-        % (len(cands), total))
-    log('')
-
-    # ---------- 逐个验证 ----------
-    tasks = []
-    for n, urls in cands.items():
-        for u in urls[:args.max_per_channel]:
-            tasks.append((n, u))
+    tasks = [(n, u) for n, urls in cands.items()
+             for u in urls[:args.max_per_channel]]
+    log()
+    log('  候选频道 %d 个，待测 %d 个地址' % (len(cands), len(tasks)))
+    log()
 
     good = defaultdict(list)
+    reasons = defaultdict(int)
     done = 0
     t0 = time.time()
     with cf.ThreadPoolExecutor(max_workers=args.jobs) as ex:
@@ -273,66 +323,63 @@ def main():
             n, u = futs[f]
             done += 1
             try:
-                r = f.result()
-            except Exception:
-                r = None
-            if r:
-                good[n].append((u, r))
-                log('  ✅ %-26s std=%-6s 帧差=%-6s %s'
-                    % (n[:26], r['std'], r['diff'], u[:58]))
+                ok, why, d = f.result()
+            except Exception as e:
+                ok, why, d = False, type(e).__name__, {}
+            if ok:
+                good[n].append((u, d))
+                log('  [OK] %-24s std=%-6s 帧差=%-6s %s'
+                    % (n[:24], d.get('std'), d.get('diff'), u[:52]))
+            else:
+                reasons[re.sub(r'[\d\.]+', 'N', why)[:30]] += 1
             if done % 25 == 0:
                 el = time.time() - t0
-                left = el / done * (len(tasks) - done)
-                log('  …… %d/%d  已找到 %d 个可用  预计还要 %.0f 分钟'
+                log('  …… %d/%d  已找到 %d  预计还要 %.0f 分钟'
                     % (done, len(tasks), sum(len(v) for v in good.values()),
-                       left / 60))
+                       el / done * (len(tasks) - done) / 60))
 
-    # ---------- 输出 ----------
-    log('')
-    log('=' * 70)
+    log()
+    log('=' * 72)
     log('  扫描完成')
-    log('=' * 70)
-    log('')
-    log('  可用频道 %d 个，可用地址 %d 条'
-        % (len(good), sum(len(v) for v in good.values())))
-    log('')
-    if good:
-        log('  有这些频道能看：')
-        for n in sorted(good, key=lambda x: (-len(good[x]), x)):
-            log('    %-30s %d 个源' % (n[:30], len(good[n])))
-    else:
-        log('  ⚠️ 一个可用的都没有。')
-        log('     可能原因：')
-        log('       · 公开源列表在你这条宽带上都不通（很常见）')
-        log('       · 需要你自己运营商的源，请用 --list 指定')
+    log('=' * 72)
+    total = sum(len(v) for v in good.values())
+    log('  可用频道 %d 个 / 可用地址 %d 条（共测 %d）'
+        % (len(good), total, len(tasks)))
+    log()
+    if reasons:
+        log('  淘汰原因分布：')
+        for r, c in sorted(reasons.items(), key=lambda x: -x[1])[:8]:
+            log('     %-34s %d' % (r, c))
+        log()
 
-    # JSON（给我分析用，包含完整信息）
-    result = {
-        'scanned_at': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'total_tested': len(tasks),
-        'total_ok': sum(len(v) for v in good.values()),
-        'channels': {
-            n: [{'url': u, **r} for u, r in v] for n, v in good.items()
-        },
-    }
-    with io.open(OUT, 'w', encoding='utf-8') as fp:
-        json.dump(result, fp, ensure_ascii=False, indent=1)
+    json_path = os.path.join(HERE, '扫描结果.json')
+    with io.open(json_path, 'w', encoding='utf-8') as fp:
+        json.dump({
+            'scanned_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'tested': len(tasks),
+            'ok': total,
+            'channels': {n: [{'url': u, **d} for u, d in v]
+                         for n, v in good.items()},
+        }, fp, ensure_ascii=False, indent=1)
 
-    # m3u（可直接填进 App 的「自定义直播源地址」）
-    m3u_path = os.path.join(HERE, 'iptv_可用源.m3u')
+    m3u_path = os.path.join(HERE, '直播源.m3u')
     with io.open(m3u_path, 'w', encoding='utf-8', newline='\n') as fp:
         fp.write('#EXTM3U\n')
         for n in sorted(good):
-            # 同一频道按码率/大小从低到高（老电视先用省资源的）
-            for u, r in sorted(good[n], key=lambda x: x[1].get('size', 0)):
-                fp.write('#EXTINF:-1 group-title="IPTV",%s\n' % n)
+            for u, d in sorted(good[n], key=lambda x: x[1].get('kbps', 9999)):
+                fp.write('#EXTINF:-1 group-title="扫描源",%s\n' % n)
                 fp.write(u + '\n')
 
-    log('')
-    log('  生成了两个文件（在脚本同一个文件夹里）：')
-    log('     iptv_result.json    ← 把这个发给我')
-    log('     iptv_可用源.m3u     ← 也可以直接填进 App 试')
-    log('')
+    log('  生成两个文件（在本程序同一个文件夹）：')
+    log('     直播源.m3u      ← **把这个导进电视**（设置 → 直播源 → 选择文件）')
+    log('     扫描结果.json   ← 想发给我看也可以')
+    log()
+    if good:
+        log('  能看的频道：')
+        for n in sorted(good, key=lambda x: (-len(good[x]), x))[:40]:
+            d0 = good[n][0][1]
+            log('     %-26s %d 个源  %s kbps'
+                % (n[:26], len(good[n]), d0.get('kbps', '?')))
     return 0
 
 
@@ -340,6 +387,6 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except KeyboardInterrupt:
-        log('')
+        log()
         log('  已手动中断。')
         sys.exit(1)
