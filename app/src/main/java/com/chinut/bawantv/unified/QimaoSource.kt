@@ -68,6 +68,41 @@ object QimaoSource : VideoSource {
     private const val TAG = "BawanQimao"
     private const val API = "https://xiaoqi.icofun.cn/API/qimao_duanju.php"
 
+    /**
+     * 纯 HTTP 兜底地址。
+     *
+     * ⚠️ 为什么需要它：服务器证书由 **Let's Encrypt 的 `YR1`** 签发，
+     * 而 **Android 9 的系统根证书库里没有对应的 CA** ——
+     * 电视上握手直接失败：
+     *
+     *     SSLHandshakeException: CertPathValidatorException:
+     *     Trust anchor for certification path not found.
+     *
+     * 实测这个接口 **纯 HTTP 也返回 200**，所以老设备退回 HTTP 即可。
+     *
+     * 为什么不用"放宽证书校验"：那是全局性地接受任意证书，
+     * 引入中间人风险。退回 HTTP 的代价小得多 ——
+     * 这个接口只返回公开的短剧元数据和播放直链，不传任何用户信息。
+     */
+    private const val API_PLAIN = "http://xiaoqi.icofun.cn/API/qimao_duanju.php"
+
+    /**
+     * 取接口文本：**https 优先，证书类失败就退回 http**。
+     *
+     * 返回值同时带"实际用了哪个协议"，便于自检里显示。
+     */
+    private suspend fun fetch(api: String, query: String): Pair<String?, String> {
+        val q = if (query.isEmpty()) "" else "?$query"
+        // 先试 https
+        runCatching { Net.get(api + q, ua = Http.UA_MOBILE) }
+            .getOrNull()?.let { return it to "https" }
+        // https 失败（含证书验不过）→ 退回 http
+        val plain = runCatching {
+            Net.get(API_PLAIN + q, ua = Http.UA_MOBILE)
+        }.getOrNull()
+        return plain to (if (plain != null) "http(降级)" else "都失败")
+    }
+
     private const val FILE_NAME = "qimao_list.tsv"
 
     /**
@@ -186,25 +221,26 @@ object QimaoSource : VideoSource {
      * 结论写进 `PlayDiag.probeResult`，手机调试页会显示。
      */
     suspend fun probe(): String = withContext(Dispatchers.IO) {
-        val url = "$API?name=%E6%80%BB%E8%A3%81&page=1"
-        val result = runCatching {
-            val req = okhttp3.Request.Builder().url(url)
+        // 分两步测，把"https 为什么失败"和"http 能不能救"都说清楚
+        val httpsErr = runCatching {
+            val req = okhttp3.Request.Builder().url("$API?name=%E6%80%BB%E8%A3%81&page=1")
                 .header("User-Agent", Http.UA_MOBILE)
                 .build()
             Http.client.newCall(req).execute().use { r ->
-                val body = r.body?.string().orEmpty()
-                // ⚠️ 必须压成一行：响应是多行 JSON，
-                // 直接塞进报告会把手机页那张卡片撑乱（实测踩到）。
-                val oneLine = body.replace(Regex("\\s+"), " ").trim()
-                "HTTP ${r.code}，返回 ${body.length} 字符" +
-                    if (oneLine.isNotEmpty()) "，开头=${oneLine.take(70)}" else ""
+                val b = r.body?.string().orEmpty()
+                "HTTP ${r.code}，返回 ${b.length} 字符"
             }
         }.getOrElse { e ->
             // 异常类名是关键：UnknownHostException=DNS，
-            // SocketTimeoutException=超时，SSLException=TLS/劫持
-            "${e.javaClass.simpleName}: ${e.message?.take(120)}"
+            // SocketTimeoutException=超时，SSLHandshakeException=证书
+            "${e.javaClass.simpleName}（${e.message?.take(90)}）"
         }
-        val line = "短剧接口 $result"
+        val (plain, _) = fetch(API, "name=%E6%80%BB%E8%A3%81&page=1")
+        val line = buildString {
+            append("https: ").append(httpsErr)
+            append(" ｜ http: ")
+            append(if (plain != null) "可用（${plain.length} 字符）" else "也不可用")
+        }
         com.chinut.bawantv.core.PlayDiag.probeResult = line
         android.util.Log.i(TAG, "接口自检 → $line")
         line
@@ -351,11 +387,12 @@ object QimaoSource : VideoSource {
         //   · 返回了非 JSON（运营商插页、错误页）
         //   · JSON 结构变了（接口改版）
         // 结果用户在电视上只看到"0 部"，我什么都查不到。
-        val text = Net.get(url, ua = Http.UA_MOBILE)
+        val (text, via) = fetch(API, "name=${enc(keyword)}&page=$page")
         if (text == null) {
-            android.util.Log.w(TAG, "搜索「$keyword」取不到响应（网络/DNS/超时）")
+            android.util.Log.w(TAG, "搜索「$keyword」取不到响应（网络/DNS/超时，https 和 http 都失败）")
             return emptyList()
         }
+        if (via != "https") android.util.Log.i(TAG, "搜索「$keyword」走了 $via")
         val parsed = runCatching {
             JSONObject(text).getJSONObject("data").getJSONArray("list")
         }
@@ -390,7 +427,8 @@ object QimaoSource : VideoSource {
 
     /** 取详情 + 全集直链。 */
     private suspend fun detail(seriesId: String): Detail? {
-        val text = Net.get("$API?id=$seriesId", ua = Http.UA_MOBILE) ?: return null
+        val (text, _) = fetch(API, "id=$seriesId")
+        if (text == null) return null
         val d = runCatching { JSONObject(text).getJSONObject("data") }.getOrNull() ?: return null
         val ep = ArrayList<Episode>()
 
