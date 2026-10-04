@@ -29,8 +29,8 @@ android {
         targetSdk = 36
         // v1.0.15：修直播黑屏 —— 只有在硬解**真的出画面**后才隐藏网页，
         //          12 秒内没出画面就退回网页保底（上一版一起播就隐藏，失败即全黑）
-        versionCode = 80
-        versionName = "1.6.2"
+        versionCode = 81
+        versionName = "1.7.0"
     }
 
     // TV 端只需要这几种 ABI（盒子/电视基本都是 arm，模拟器是 x86_64）

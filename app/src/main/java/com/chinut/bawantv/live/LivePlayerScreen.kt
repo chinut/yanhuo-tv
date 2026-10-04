@@ -1661,49 +1661,30 @@ private fun QualityPanel(
         )
         Spacer(Modifier.height(10.sdp))
 
-        // ---------- 主源切换（A / B / AB）----------
+        // ---------- 主源：只读展示，不在这里改 ----------
         //
-        // 用户要求：「在直播播放页面中点击三横线时用户自己选择主源」。
-        // A = 内置引擎（网页 + 直连），B = 开源源（全直连，轻），
-        // AB = 两个都加载。点了会重新拉频道表。
-        // 老电视模式开了就不给主源切换 —— 那个模式下只有一个正确选择
-        // （GitHub 直连源），给他别的选项就是自相矛盾（用户指出过）。
-        if (!oldTvMode) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.sdp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("主源", color = Ink.TextTertiary, fontSize = Txt.Tiny)
-                Spacer(Modifier.width(4.sdp))
-                com.chinut.bawantv.live.LivePreset.entries.forEach { p ->
-                    val on = p == preset
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.sdp))
-                            .background(
-                                if (on) Ink.Accent.copy(alpha = 0.45f)
-                                else Color.White.copy(alpha = 0.06f)
-                            )
-                            .border(
-                                width = if (on) 2.sdp else 0.sdp,
-                                color = if (on) Ink.AccentBright else Color.Transparent,
-                                shape = RoundedCornerShape(10.sdp),
-                            )
-                            .clickable { onPreset(p) }
-                            .padding(vertical = 7.sdp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            p.label,
-                            color = if (on) Color.White else Ink.TextTertiary,
-                            fontSize = Txt.Caption,
-                            fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-                        )
-                    }
-                }
-            }
+        // ⚠️ 这里原来是一排可点的 A/B/AB 按钮。用户指出问题：
+        //
+        //   「清晰度和线路应该是跟随设置的源 而不应该列出来，
+        //     列出来的应该是这个频道拥有的源和清晰度」
+        //
+        // 确实如此 —— 把"全局主源设置"和"本频道的源"并排成两排按钮，
+        // 用户根本分不清哪个是"我现在用的"。而且老电视模式下这一排
+        // 会被藏掉，面板结构随模式变，更糊涂。
+        //
+        // 现在主源**跟随设置、只显示一行**；列表里专注本频道的源。
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("主源", color = Ink.TextTertiary, fontSize = Txt.Tiny)
+            Spacer(Modifier.width(6.sdp))
+            Text(
+                if (oldTvMode) "老电视模式 · GitHub 源"
+                else preset.label + "（在设置里改）",
+                color = Color.White.copy(alpha = 0.82f),
+                fontSize = Txt.Caption,
+            )
         }
 
         Spacer(Modifier.height(10.sdp))
@@ -1858,9 +1839,12 @@ private fun QualityPanel(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        // 网页源没有码率信息，就按类型如实标注
-                        if (LiveCatalog.isWebPage(url)) "线路 ${i + 1}（网页播放）"
-                        else "线路 ${i + 1}（直连流）",
+                        // 第一个是这个频道的"主地址"，也就是**跟着主源设置走**的那个；
+                        // 其余是它自己的备用源。这么标用户一眼能区分。
+                        //
+                        // 网页源没有码率信息，就按类型如实标注。
+                        (if (i == 0) "源 1 · 跟随设置" else "源 ${i + 1}") +
+                            (if (LiveCatalog.isWebPage(url)) "（网页播放）" else "（直连流）"),
                         color = Color.White,
                         fontSize = Txt.Label,
                         fontWeight = if (isCursor || isActive) FontWeight.Bold else FontWeight.Normal,
