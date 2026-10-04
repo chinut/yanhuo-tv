@@ -1,6 +1,7 @@
 package com.chinut.bawantv.ui
 
 import android.content.Context
+import com.chinut.bawantv.live.LiveCache
 import com.chinut.bawantv.live.LiveCatalog
 import com.chinut.bawantv.live.LiveChannel
 import com.chinut.bawantv.live.LiveGroup
@@ -109,18 +110,55 @@ object HomeWarmup {
             // 改成 `load(...)`：它会按 preset + oldTvMode 选源。
             // 主源是 GitHub 时这里就会去拉开源源（有 12 秒预算，失败退回内置）。
             runCatching {
-                // prefs 是同包（ui）里的顶层 val，直接用即可
+                // ---------- 先试磁盘缓存（不管新不新鲜）----------
+                //
+                // 用户诉求：「直播的频道每次不要加载那么长时间」。
+                //
+                // 缓存命中时这一步几乎是瞬时的（读一个几百 KB 的文件），
+                // 所以开屏能立刻拿到频道表，不用等网络。
+                //
+                // 注意：**过期也用**。频道表本来就极少变，先让用户看到东西，
+                // 鲜度交给下面第 4 步在后台补刷。
                 val prefs = prefs
-                val groups = LiveCatalog.load(
+                val preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)
+                val cachedSnap = LiveCache.load(
+                    context,
+                    LiveCache.keyOf(
+                        presetName = preset.name,
+                        oldTvMode = prefs.oldTvMode,
+                        customSourceUrl = prefs.liveSourceUrl,
+                        hasImported = LiveCatalog.hasImported(context),
+                    ),
+                )
+                if (cachedSnap != null) {
+                    groupsCache = cachedSnap.groups
+                    allChannelsCache = cachedSnap.channels
+                    android.util.Log.i(
+                        "BawanWarmup",
+                        "开屏走频道磁盘缓存：${cachedSnap.channels.size} 个频道" +
+                            "（新鲜=${cachedSnap.isFresh()}）",
+                    )
+                }
+
+                // ---------- 再走正常加载（缓存没命中／已过期时是唯一来源）----------
+                //
+                // ⚠️ 这里原来用 `LiveCatalog.builtin(context)` —— 那是**内置表**
+                // （央视网/省市台网页），完全没看主源设置。结果不管用户选
+                // 「GitHub 源」还是开了老电视模式，首页预览永远是央视网
+                // （用户反馈过）。
+                //
+                // 改成 `loadWithChannels(...)`：它会按 preset + oldTvMode 选源，
+                // 而且内部**先看磁盘缓存** —— 命中就完全不联网、不重解析 assets。
+                val (groups, flat) = LiveCatalog.loadWithChannels(
                     context = context,
                     customSourceUrl = prefs.liveSourceUrl,
-                    preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset),
+                    preset = preset,
                     oldTvMode = prefs.oldTvMode,
                 )
                 groupsCache = groups
-                // 跨分组去重 + 央视置顶排序：交给 LiveCatalog 统一处理，
+                // 扁平表已由 LiveCatalog 统一算好（跨分组去重 + 央视置顶排序），
                 // 免得首页和播放页两边顺序不一致（那样上下键换台会跳来跳去）
-                allChannelsCache = LiveCatalog.flattenForZapping(groups)
+                allChannelsCache = flat
             }
 
             // 2) 短剧海报（给首页短剧块铺背景用）

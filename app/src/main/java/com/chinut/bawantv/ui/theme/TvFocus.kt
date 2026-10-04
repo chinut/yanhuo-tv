@@ -143,6 +143,15 @@ class TvFocusManager {
     }
 
     /** 单次几何导航（不涉及滚动）。 */
+    /**
+     * 重叠判定的容差（像素，dp 转来的实际值）。
+     *
+     * 相邻格子之间有间距（padding），边缘未必严格对齐；
+     * 卡片宽度不一时更是如此。允许一点"负重叠"，
+     * 免得明明在同一列却因为差几像素被判成不同列。
+     */
+    private val OVERLAP_TOL = 24f
+
     private fun step(direction: Direction): Boolean {
         val cur = items[focusedKey] ?: run {
             moveTo(items.keys.firstOrNull())
@@ -164,6 +173,18 @@ class TvFocusManager {
         val cx = origin.center.x
         val cy = origin.center.y
 
+        // ---------- 几何导航：必须先"同行/同列"（用重叠判定）----------
+        //
+        // ⚠️ 这里原来是「交叉轴错位扣分」（score = main + cross * 2.5f），
+        // 只是让错位的候选**分值更高**，并没有排除它们。
+        // 于是按上时若正上方是空位，就会斜着跳到别的列 ——
+        // 用户原话：「有时候以为会向上但是他跑左边去了」。
+        //
+        // 现在改成硬条件：上下移动要求**横向重叠**（同一列），
+        // 左右移动要求**纵向重叠**（同一行）。找不到就不动，
+        // 交给上层滚动处理，绝不乱跳。
+        val vertical = direction == Direction.Up || direction == Direction.Down
+
         var best: Item? = null
         var bestScore = Float.MAX_VALUE
         items.values.forEach { cand ->
@@ -180,10 +201,21 @@ class TvFocusManager {
             }
             if (!mainOk) return@forEach
 
-            val main = if (direction == Direction.Left || direction == Direction.Right) abs(dx) else abs(dy)
-            val cross = if (direction == Direction.Left || direction == Direction.Right) abs(dy) else abs(dx)
-            // 交叉轴错位重罚：保证「同一行 / 同一列」优先，不会斜着跳
-            val score = main + cross * 2.5f
+            // ---------- 重叠判定 ----------
+            val overlap = if (vertical) {
+                // 同一列：横向区间要有交集（留容差，因为格间有间距、
+                // 卡片宽度不一时边缘未必严格对齐）
+                minOf(origin.right, r.right) - maxOf(origin.left, r.left)
+            } else {
+                // 同一行：纵向区间要有交集
+                minOf(origin.bottom, r.bottom) - maxOf(origin.top, r.top)
+            }
+            if (overlap < -OVERLAP_TOL) return@forEach
+
+            val main = if (vertical) abs(dy) else abs(dx)
+            val cross = if (vertical) abs(dx) else abs(dy)
+            // 重叠越多越"正对"，给一个小的优先级奖励（不是硬条件）
+            val score = main + cross * 0.6f - overlap * 0.05f
             if (score < bestScore) {
                 bestScore = score
                 best = cand

@@ -3,6 +3,9 @@ package com.chinut.bawantv.live
 import kotlinx.coroutines.async
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.chinut.bawantv.core.Http
 import com.chinut.bawantv.core.Net
 import java.net.URLDecoder
@@ -206,7 +209,71 @@ object LiveCatalog {
         customSourceUrl: String,
         preset: LivePreset = LivePreset.Default,
         oldTvMode: Boolean = false,
-    ): List<LiveGroup> {
+    ): List<LiveGroup> =
+        loadWithChannels(context, customSourceUrl, preset, oldTvMode).first
+
+    /**
+     * 一次把**分组**和**扁平表**都给出来（首页两个都要用）。
+     *
+     * 顺便带**磁盘缓存** —— 这让频道冷启动从
+     * 「每次重解析 544 个频道 + 每次去拉 GitHub 超时 12 秒」
+     * 变成「读一个几百 KB 的文件」。
+     *
+     * 用户原话：「通常来说用户安装完 app 且首次设置完成后基本不会动设置，
+     * 那么我希望直播的频道每次不要加载那么长时间，
+     * 有没有什么机制可以让用户的频道可以加载得快一点」
+     *
+     * @param forceRefresh 跳过缓存直接重算（设置页"重新加载"用）
+     * @return (分组, 扁平表)
+     */
+    suspend fun loadWithChannels(
+        context: Context,
+        customSourceUrl: String,
+        preset: LivePreset = LivePreset.Default,
+        oldTvMode: Boolean = false,
+        forceRefresh: Boolean = false,
+    ): Pair<List<LiveGroup>, List<LiveChannel>> {
+        // ---------- 缓存指纹 ----------
+        //
+        // 必须把影响结果的**每个**输入都算进去：换主源、开关老电视模式、
+        // 改自定义网址。少算一个就会出现"设置改了但列表没变"
+        // （这个 bug 用户反馈过 —— 见 HomeWarmup 里那段注释）。
+        val cacheKey = LiveCache.keyOf(
+            presetName = preset.name,
+            oldTvMode = oldTvMode,
+            customSourceUrl = customSourceUrl,
+            hasImported = hasImported(context),
+        )
+
+        // ---------- 统一收口：落盘 + 算扁平表 + 返回 ----------
+        //
+        // load() 里有 5 个返回点，一个个改必然漏，
+        // 所以全部走这个局部函数。
+        fun done(groups: List<LiveGroup>): Pair<List<LiveGroup>, List<LiveChannel>> {
+            val flat = flattenForZapping(groups)
+            // 落盘放后台：这是 IO，用户没必要等它（订阅里报错也不影响这次返回）
+            CoroutineScope(Dispatchers.IO).launch {
+                runCatching { LiveCache.save(context, groups, flat, cacheKey) }
+            }
+            return groups to flat
+        }
+
+        // ---------- 1) 先看磁盘缓存 ----------
+        if (!forceRefresh) {
+            val snap = LiveCache.load(context, cacheKey)
+            if (snap != null) {
+                android.util.Log.i(
+                    TAG,
+                    "频道表走磁盘缓存：${snap.groups.size} 组 / ${snap.channels.size} 个频道" +
+                        "（新鲜=${snap.isFresh()}）",
+                )
+                return snap.groups to snap.channels
+            }
+        } else {
+            android.util.Log.i(TAG, "强制刷新，跳过频道缓存")
+        }
+
+        // ---------- 2) 缓存没命中：走原来的老路 ----------
         val builtin = builtin(context)
 
         // ---------- 先算出"引擎"部分 ----------
@@ -253,7 +320,7 @@ object LiveCatalog {
                         TAG,
                         "用本地导入的源：${custom.sumOf { it.channels.size }} 个频道",
                     )
-                    return mergeAlternates(merged)
+                    return done(mergeAlternates(merged))
                 }
             }
             android.util.Log.w(TAG, "本地导入的文件解析不出频道，退回内置")
@@ -261,18 +328,18 @@ object LiveCatalog {
 
         // 2) 自定义网址
         val url = customSourceUrl.trim()
-        if (url.isEmpty()) return engine
+        if (url.isEmpty()) return done(engine)
 
-        val text = Net.get(url, ua = Http.UA_MOBILE) ?: return engine
+        val text = Net.get(url, ua = Http.UA_MOBILE) ?: return done(engine)
         val custom = parse(text)
-        if (custom.isEmpty()) return engine
+        if (custom.isEmpty()) return done(engine)
 
         val merged = ArrayList<LiveGroup>(custom.size + engine.size)
         custom.forEach { g ->
             merged.add(g.copy(name = "自定义 · ${g.name}"))
         }
         merged.addAll(engine)
-        return mergeAlternates(merged)
+        return done(mergeAlternates(merged))
     }
 
     /**
