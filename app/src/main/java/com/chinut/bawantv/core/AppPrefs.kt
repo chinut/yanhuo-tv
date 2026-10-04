@@ -289,7 +289,31 @@ class AppPrefs(context: Context) {
         KEY_HW_DECODE to hardwareDecode.toString(),
         KEY_SHOW_HUD to showChannelHud.toString(),
         KEY_TOKEN to debugToken,
+        // ---------- 补全：手机网页要能显示和修改这些 ----------
+        KEY_OLD_TV to oldTvMode.toString(),
+        KEY_LIVE_PRESET to livePreset,
+        KEY_LIVE_QUALITY to liveQuality.toString(),
+        KEY_MEM_HUD to showMemoryHud.toString(),
+        KEY_MEM_LOG to logMemory.toString(),
+        KEY_DEBUG_ON to debugEnabled.toString(),
+        KEY_PORT to debugPort.toString(),
+        KEY_PARENTAL_ON to parentalEnabled.toString(),
+        KEY_PARENTAL_PIN to parentalPin,
+        KEY_PARENTAL_BLOCK to parentalBlockedWords,
+        KEY_PARENTAL_ALLOW to parentalAllowedWords,
     )
+
+    /**
+     * HTML 勾选框的兜底解析。
+     *
+     * 浏览器对没写 value 的 checkbox 发的是 `"on"`，而 Kotlin 的
+     * `"on".toBoolean()` 是 **false** —— 曾导致手机页所有开关都存不进去。
+     * 网页端已经用 JS 改写成 "true"/"false"，这里再兜一层：
+     * 万一 JS 没执行（老设备 WebView），也不至于把开关存反。
+     */
+    private fun htmlBool(s: String): Boolean =
+        s.equals("true", true) || s.equals("on", true) ||
+            s.equals("1", true) || s.equals("yes", true)
 
     /** 供手机网页调试模式批量写入。 */
     fun applyRemote(map: Map<String, String>) {
@@ -297,15 +321,51 @@ class AppPrefs(context: Context) {
         map[KEY_DOMAIN]?.let { e.putString(KEY_DOMAIN, it) }
         map[KEY_LIVE_SRC]?.let { e.putString(KEY_LIVE_SRC, it) }
         map[KEY_UA]?.let { e.putString(KEY_UA, it) }
-        map[KEY_AUTO_PICK]?.let { e.putBoolean(KEY_AUTO_PICK, it.toBoolean()) }
-        map[KEY_AUTO_DOMAIN]?.let { e.putBoolean(KEY_AUTO_DOMAIN, it.toBoolean()) }
+        map[KEY_AUTO_PICK]?.let { e.putBoolean(KEY_AUTO_PICK, htmlBool(it)) }
+        map[KEY_AUTO_DOMAIN]?.let { e.putBoolean(KEY_AUTO_DOMAIN, htmlBool(it)) }
         map[KEY_DDYS_PAGE_SIZE]?.toIntOrNull()?.let { e.putInt(KEY_DDYS_PAGE_SIZE, it.coerceIn(12, 50)) }
-        map[KEY_WEB_FALLBACK]?.let { e.putBoolean(KEY_WEB_FALLBACK, it.toBoolean()) }
-        map[KEY_AUTO_UPDATE]?.let { e.putBoolean(KEY_AUTO_UPDATE, it.toBoolean()) }
-        map[KEY_AUTO_LAST]?.let { e.putBoolean(KEY_AUTO_LAST, it.toBoolean()) }
-        map[KEY_HW_DECODE]?.let { e.putBoolean(KEY_HW_DECODE, it.toBoolean()) }
-        map[KEY_SHOW_HUD]?.let { e.putBoolean(KEY_SHOW_HUD, it.toBoolean()) }
+        map[KEY_WEB_FALLBACK]?.let { e.putBoolean(KEY_WEB_FALLBACK, htmlBool(it)) }
+        map[KEY_AUTO_UPDATE]?.let { e.putBoolean(KEY_AUTO_UPDATE, htmlBool(it)) }
+        map[KEY_AUTO_LAST]?.let { e.putBoolean(KEY_AUTO_LAST, htmlBool(it)) }
+        map[KEY_HW_DECODE]?.let { e.putBoolean(KEY_HW_DECODE, htmlBool(it)) }
+        map[KEY_SHOW_HUD]?.let { e.putBoolean(KEY_SHOW_HUD, htmlBool(it)) }
         map[KEY_TOKEN]?.let { e.putString(KEY_TOKEN, it) }
+        // ---------- 补全：以前手机网页改不了这些 ----------
+        map[KEY_OLD_TV]?.let { e.putBoolean(KEY_OLD_TV, htmlBool(it)) }
+        map[KEY_LIVE_PRESET]?.let { e.putString(KEY_LIVE_PRESET, it) }
+        map[KEY_LIVE_QUALITY]?.toIntOrNull()?.let {
+            e.putInt(KEY_LIVE_QUALITY, it.coerceIn(0, 4))
+        }
+        map[KEY_MEM_HUD]?.let { e.putBoolean(KEY_MEM_HUD, htmlBool(it)) }
+        map[KEY_MEM_LOG]?.let { e.putBoolean(KEY_MEM_LOG, htmlBool(it)) }
+        map[KEY_DEBUG_ON]?.let { e.putBoolean(KEY_DEBUG_ON, htmlBool(it)) }
+        map[KEY_PORT]?.toIntOrNull()?.let {
+            e.putInt(KEY_PORT, it.coerceIn(1024, 65535))
+        }
+        map[KEY_PARENTAL_ON]?.let { e.putBoolean(KEY_PARENTAL_ON, htmlBool(it)) }
+        map[KEY_PARENTAL_PIN]?.let { e.putString(KEY_PARENTAL_PIN, it) }
+        map[KEY_PARENTAL_BLOCK]?.let { e.putString(KEY_PARENTAL_BLOCK, it) }
+        map[KEY_PARENTAL_ALLOW]?.let { e.putString(KEY_PARENTAL_ALLOW, it) }
+        // 网页表单里的名字（见 DebugWebServer 的 name="xxx"）和 KEY_ 常量不一样，
+        // 这里做一次翻译，省得两边硬编码对不上。
+        map["old_tv"]?.let { e.putBoolean(KEY_OLD_TV, htmlBool(it)) }
+        map["live_preset"]?.let { e.putString(KEY_LIVE_PRESET, it) }
+        map["live_quality"]?.toIntOrNull()?.let {
+            e.putInt(KEY_LIVE_QUALITY, it.coerceIn(0, 4))
+        }
+        map["mem_hud"]?.let { e.putBoolean(KEY_MEM_HUD, htmlBool(it)) }
+        map["mem_log"]?.let { e.putBoolean(KEY_MEM_LOG, htmlBool(it)) }
+        map["debug_on"]?.let { e.putBoolean(KEY_DEBUG_ON, htmlBool(it)) }
+        map["port"]?.toIntOrNull()?.let {
+            e.putInt(KEY_PORT, it.coerceIn(1024, 65535))
+        }
+        map["parental_on"]?.let { e.putBoolean(KEY_PARENTAL_ON, htmlBool(it)) }
+        map["parental_pin"]?.let { e.putString(KEY_PARENTAL_PIN, it) }
+        map["parental_block"]?.let { e.putString(KEY_PARENTAL_BLOCK, it) }
+        map["parental_allow"]?.let { e.putString(KEY_PARENTAL_ALLOW, it) }
+        map["page_size"]?.toIntOrNull()?.let {
+            e.putInt(KEY_DDYS_PAGE_SIZE, it.coerceIn(12, 50))
+        }
         e.apply()
         touch()
     }

@@ -856,6 +856,7 @@ fun SettingsScreen(
                         "™ᴰ  ⃔ ᥬ💀ᩤ  ⃕ 兔" to "提供测试环境",
                         "夙丶夜" to "提供开发建议",
                         "Bawan_xw" to "提供软件初期规则命名",
+                        "彬" to "提供短视频接入方案",
                     )
                     credits.forEach { (who, what) ->
                         Row(

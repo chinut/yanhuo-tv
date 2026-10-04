@@ -421,9 +421,15 @@ h1{font-size:22px;margin:4px 0 2px;letter-spacing:1px}
 .card h2{font-size:15px;margin:0 0 4px;color:var(--accent)}
 .hint{color:var(--dim);font-size:12.5px;margin:0 0 10px}
 label{display:block;font-size:13px;color:var(--dim);margin:10px 0 5px}
-input[type=text],input[type=password],input[type=number],textarea{
+input[type=text],input[type=password],input[type=number],textarea,select{
  width:100%;background:#0e1222;border:1px solid var(--line);border-radius:11px;color:var(--txt);
  padding:11px 12px;font-size:15px;font-family:inherit}
+/* select 在下拉箭头处留出空间，并按深色主题渲染 */
+select{appearance:none;-webkit-appearance:none;
+ background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+ background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;
+ background-size:6px 6px,6px 6px;background-repeat:no-repeat;padding-right:38px}
+select option{background:#161b2e;color:var(--txt)}
 textarea{min-height:96px;resize:vertical;line-height:1.5}
 .row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line)}
 .row:last-child{border-bottom:none}
@@ -486,6 +492,37 @@ ${if (error != null) """<div class="err">⚠️ ${esc(error)}</div>""" else ""}
   <label class="switch"><input type="checkbox" name="hw_decode" ${if (p.hardwareDecode) "checked" else ""}><i class="slider"></i></label></div>
  <div class="row"><span>换台显示台标浮层</span>
   <label class="switch"><input type="checkbox" name="show_hud" ${if (p.showChannelHud) "checked" else ""}><i class="slider"></i></label></div>
+ <div class="row"><span>老电视模式<br><small style="color:var(--dim)">用直连源替代网页播放，减轻老设备负担</small></span>
+  <label class="switch"><input type="checkbox" name="old_tv" ${if (p.oldTvMode) "checked" else ""}><i class="slider"></i></label></div>
+ <label>主源（老电视模式关闭时生效）</label>
+ <select name="live_preset">
+  <option value="Default" ${if (p.livePreset == "Default") "selected" else ""}>内置频道</option>
+  <option value="OpenSource" ${if (p.livePreset == "OpenSource") "selected" else ""}>GitHub 源</option>
+  <option value="Both" ${if (p.livePreset == "Both") "selected" else ""}>双源</option>
+ </select>
+ <label>直播画质</label>
+ <select name="live_quality">
+  <option value="0" ${if (p.liveQuality == 0) "selected" else ""}>自动</option>
+  <option value="1" ${if (p.liveQuality == 1) "selected" else ""}>流畅</option>
+  <option value="2" ${if (p.liveQuality == 2) "selected" else ""}>标清</option>
+  <option value="3" ${if (p.liveQuality == 3) "selected" else ""}>高清</option>
+  <option value="4" ${if (p.liveQuality == 4) "selected" else ""}>超清</option>
+ </select>
+ <div class="row"><span>显示内存浮层<br><small style="color:var(--dim)">看占用，排查卡顿用</small></span>
+  <label class="switch"><input type="checkbox" name="mem_hud" ${if (p.showMemoryHud) "checked" else ""}><i class="slider"></i></label></div>
+</div>
+
+<div class="card">
+ <h2>家长控制</h2>
+ <p class="hint">打开后按密码进入设置；屏蔽词里的内容不会出现在片库里。屏蔽词/白名单用逗号分隔。</p>
+ <div class="row"><span>启用家长控制</span>
+  <label class="switch"><input type="checkbox" name="parental_on" ${if (p.parentalEnabled) "checked" else ""}><i class="slider"></i></label></div>
+ <label>密码（4 位数字）</label>
+ <input type="text" inputmode="numeric" name="parental_pin" value="${esc(p.parentalPin)}" placeholder="1234" maxlength="8">
+ <label>屏蔽词</label>
+ <input type="text" name="parental_block" value="${esc(p.parentalBlockedWords)}" placeholder="恐怖,暴力">
+ <label>白名单（只允许这些）</label>
+ <input type="text" name="parental_allow" value="${esc(p.parentalAllowedWords)}" placeholder="动画,少儿">
 </div>
 
 <div class="card">
@@ -494,12 +531,55 @@ ${if (error != null) """<div class="err">⚠️ ${esc(error)}</div>""" else ""}
   <label class="switch"><input type="checkbox" name="auto_update" ${if (p.autoCheckUpdate) "checked" else ""}><i class="slider"></i></label></div>
  <label>调试服务端口</label>
  <input type="number" name="port" value="${p.debugPort}" min="1024" max="65535">
+ <div class="row"><span>允许手机调试<br><small style="color:var(--dim)">关闭后不再自动启动局域网服务</small></span>
+  <label class="switch"><input type="checkbox" name="debug_on" ${if (p.debugEnabled) "checked" else ""}><i class="slider"></i></label></div>
  <label>手机网页口令（留空则不需要口令）</label>
  <input type="password" name="debug_token" value="${esc(token)}" placeholder="设置后手机端需填写">
+ <div class="row"><span>记录内存日志</span>
+  <label class="switch"><input type="checkbox" name="mem_log" ${if (p.logMemory) "checked" else ""}><i class="slider"></i></label></div>
+ <label>影视每页条数（12–50）</label>
+ <input type="number" name="page_size" value="${p.ddysPageSize}" min="12" max="50">
 </div>
 
 <button type="submit">保存到电视</button>
 </form>
+
+<script>
+// ---------- 勾选框必须转成 true / false ----------
+//
+// HTML 的 checkbox 不带 value 时，浏览器发的是 "on"，
+// 而后端是 `it.toBoolean()` —— Kotlin 里 "on".toBoolean() === false。
+// 结果就是**所有开关都不生效**（实测：勾上「老电视模式」保存后还是关的）。
+//
+// 这里在提交前把每个 checkbox 改写成明确的 true / false：
+//   · 勾上   → value="true"
+//   · 没勾上 → 也补一个 "false"（否则后端收不到这个 key，会保持原值）
+document.querySelector('form').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  var fd = new FormData(ev.target);
+  ev.target.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+    fd.set(cb.name, cb.checked ? 'true' : 'false');
+  });
+  var btn = ev.target.querySelector('button[type=submit]');
+  if (btn) { btn.disabled = true; btn.textContent = '正在保存…'; }
+  fetch('/save', { method: 'POST', body: new URLSearchParams(fd) })
+    .then(function (r) {
+      if (btn) { btn.textContent = '已保存 ✓'; btn.disabled = false; }
+      // 顶部闪一条提示，不整页跳转（手机上跳转会像卡住了）
+      var t = document.createElement('div');
+      t.textContent = r.ok ? '已保存到电视 ✓' : '保存失败，请重试';
+      t.style.cssText = 'position:fixed;left:14px;right:14px;bottom:14px;padding:14px;'
+        + 'border-radius:14px;text-align:center;font-size:15px;z-index:99;'
+        + 'background:' + (r.ok ? '#1f6f4a' : '#7a2230') + ';color:#fff';
+      document.body.appendChild(t);
+      setTimeout(function () { t.remove(); }, 1800);
+      if (btn) setTimeout(function () { btn.textContent = '保存到电视'; }, 1800);
+    })
+    .catch(function () {
+      if (btn) { btn.textContent = '保存失败，重试'; btn.disabled = false; }
+    });
+});
+</script>
 
 <div class="card">
  <h2>说明</h2>
