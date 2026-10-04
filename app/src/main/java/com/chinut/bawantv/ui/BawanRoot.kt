@@ -302,13 +302,13 @@ fun BawanRoot(
                     // 列表页根本没有入口）。所以这里回首页，
                     // 直接把选中的频道交给全屏播放浮层 —— 不再有"列表页"这一步。
                     section = TopSection.Home
-                    com.chinut.bawantv.ui.HomeWarmup.groups()
-                        ?.flatMap { it.channels }
+                    // ⚠️ 用 allChannels()（已按"央视置顶 + 频道号"排过序），
+                    // 不要自己 flatMap groups —— 那样会绕过排序。
+                    com.chinut.bawantv.ui.HomeWarmup.allChannels()
                         ?.firstOrNull()
                         ?.let { ch ->
                             livePlaying = ch
-                            livePlaylist = com.chinut.bawantv.ui.HomeWarmup.groups()
-                                ?.flatMap { it.channels }
+                            livePlaylist = com.chinut.bawantv.ui.HomeWarmup.allChannels()
                                 ?: listOf(ch)
                             android.util.Log.i(
                                 "BawanRoute",

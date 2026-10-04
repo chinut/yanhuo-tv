@@ -412,15 +412,15 @@ object LiveCatalog {
      * （StreamCache / SourceDoctor）用着，改成只认编号会让 4K 台和普通台串味。
      */
     fun channelKeyOf(name: String): String {
-        val s = normalizeName(name)
+        val s = stripResolution(normalizeName(name))
         if (!s.startsWith("cctv")) return s
 
         // 1) 真 4K / 8K：`cctv4k…` / `cctv8k…`
         //
-        // 注意这里必须要求 k 后面**还有内容**：
-        //   `CCTV-8K HD` → cctv8khd   （真 8K）✅
-        //   `CCTV-4 K`   → cctv4k     （这是**监控版**，k 后面没东西）
-        // 两者归一化后都是 cctv4k/cctv8k 开头，只能靠"k 后面还有没有字符"区分。
+        // 这里要求 k 后面**还有内容**：
+        //   `CCTV-8K HD` → `cctv8k`   （真 8K）✅
+        //   `CCTV-4 K`   → `cctv4k`   （**监控版**，k 后面没东西）
+        // 两者归一化后一样，只能靠"k 后面还有没有字符"区分。
         Regex("^cctv([48])k(.)").find(s)?.let {
             return "cctv" + it.groupValues[1] + "k"
         }
@@ -428,7 +428,7 @@ object LiveCatalog {
         Regex("^cctv([48])k$").find(s)?.let {
             return "cctv" + it.groupValues[1] + "k"
         }
-        // 3) 监控版后缀：纯编号后面紧跟一个 k（`CCTV-4 K` / `CCTV-8 K` / `CCTV1 K`）
+        // 3) 监控版后缀：纯编号后面紧跟一个 k（`CCTV-4 K` / `CCTV-8 K`）
         Regex("^cctv(\\d+)k$").find(s)?.let {
             return "cctv" + it.groupValues[1]
         }
@@ -438,8 +438,25 @@ object LiveCatalog {
         }
         // 5) 其余按频道号
         Regex("^cctv(\\d+)").find(s)?.let { return "cctv" + it.groupValues[1] }
+        // 6) 非编号的 CCTV 台（风云剧场 / Storm Music / 怀旧剧场 …）
+        //    也归央视区（不然它们会掉到地方台后面，破坏"置顶一定是 CCTV"）
         return s
     }
+
+    /**
+     * 剥掉分辨率 / 清晰度标记。
+     *
+     * 踩过的坑：`CCTV-9 (576i)` 归一化后是 `cctv9576i`，
+     * 匹配不上 `^cctv(\d+)` → 落不到央视区、**没有置顶**。
+     * 同类还有 `CCTV-10 HD` → `cctv10hd`。
+     *
+     * 顺序要紧：先剥"数字+i/p"（576i / 1080p），再剥纯字母（hd / sd / s）。
+     * 注意**不能**在这里剥 4k/8k —— 那是频道身份，不是清晰度标记。
+     */
+    private fun stripResolution(s: String): String = s
+        .replace(Regex("(\\d{3,4})(i|p)?$"), "")
+        .replace(Regex("(hd|sd|s)" + "$"), "")
+        .replace(Regex("(hd|sd)(?=[^a-z])"), "")
 
     /**
      * 央视台的排序权重。
@@ -470,8 +487,11 @@ object LiveCatalog {
         Regex("^cctv(\\d+)").find(k)?.let {
             return it.groupValues[1].toDouble()
         }
-        // 非编号台（CCTV 风云剧场 / CGTN / CCTV-Storm Music …）排在编号台之后
+        // 非编号的 CCTV 台（风云剧场 / Storm Music / 怀旧剧场 …）
+        // **也算央视**，排在编号台之后、地方台之前 ——
+        // 这样"置顶的一定是 CCTV"才成立（用户要求）。
         if (k.startsWith("cctv")) return 91.0
+        // CGTN 是中国国际电视台，也算央视系，排在 CCTV 之后
         if (k.startsWith("cgtn")) return 92.0
         return null
     }
