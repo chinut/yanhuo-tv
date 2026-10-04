@@ -19,6 +19,7 @@
        versionCode: 23
        versionName: 1.0.22
 """
+import io
 import argparse
 import ctypes
 import json
