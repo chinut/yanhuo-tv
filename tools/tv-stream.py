@@ -104,6 +104,24 @@ class Recorder(threading.Thread):
         self.exe = ffmpeg_exe()
         self.seq = 0
         self.last_stat = ''
+        self.batch = []
+        self.batch_avail = 0.0
+
+    def publish(self):
+        """把当前攒到的帧交给播放器（可以多次调用，每次给一批）。"""
+        if not self.batch:
+            return
+        payload = (self.batch, self.batch_avail)
+        self.batch = []
+        while self.q.qsize() > 1:
+            try:
+                self.q.get_nowait()
+            except queue.Empty:
+                break
+        try:
+            self.q.put_nowait(payload)
+        except queue.Full:
+            pass
 
     def run(self):
         w, h = (int(x) for x in SIZE.split('x'))
@@ -143,40 +161,52 @@ class Recorder(threading.Thread):
                 continue
             size = os.path.getsize(local)
 
-            # 3) 解码
-            r = subprocess.run(
+            # 3) 边解边喂 —— 第一帧出来就开始显示，不等整段解完
+            #
+            # 这是压缩"感知延迟"的关键：原来等整段解完才播，
+            # 白等了整整一段视频的时间（约 4 秒）。
+            avail_at = time.time() - t0   # "录+拉"实际耗时，用来算播放节奏
+            proc = subprocess.Popen(
                 [self.exe, '-hide_banner', '-loglevel', 'error',
                  '-i', local, '-f', 'rawvideo', '-pix_fmt', 'rgb24',
                  '-an', '-sn', 'pipe:1'],
-                capture_output=True, timeout=240,
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             )
-            data = r.stdout
-            frames = []
-            for i in range(0, len(data) - fb + 1, fb):
-                frames.append(
-                    np.frombuffer(data[i:i + fb], dtype=np.uint8).reshape(h, w, 3))
+            self.batch = []          # 当前正在攒的段
+            self.batch_avail = avail_at
+            n_frames = 0
             try:
-                os.remove(local)
+                while not self.stop_evt.is_set():
+                    buf = proc.stdout.read(fb)
+                    if not buf or len(buf) < fb:
+                        break
+                    self.batch.append(
+                        np.frombuffer(buf, dtype=np.uint8).reshape(h, w, 3))
+                    n_frames += 1
+                    # 攒够 6 帧就交出第一批（约 0.5 秒画面，够开始播了）
+                    if n_frames == 6:
+                        self.publish()
             except Exception:
                 pass
-
-            self.last_stat = '录 %.1fs / 拉+解 %.1fs / %d 帧 / %.1f fps / %.2fMB' % (
-                t_rec, time.time() - t0 - t_rec, len(frames),
-                len(frames) / SEGMENT_SEC, size / 1048576)
-
-            if frames:
-                # 带上真实循环耗时：播放时据此算每帧间隔（见文件顶部注释）
-                payload = (frames, time.time() - t0)
-                # 丢掉积压的旧段，只保留最新（避免越跟越慢）
-                while self.q.qsize() > 1:
-                    try:
-                        self.q.get_nowait()
-                    except queue.Empty:
-                        break
+            finally:
                 try:
-                    self.q.put_nowait(payload)
-                except queue.Full:
+                    proc.kill()
+                except Exception:
                     pass
+                try:
+                    os.remove(local)
+                except Exception:
+                    pass
+
+            # 剩下的帧也要交出去（覆盖前面 publish 之后新攒的）
+            self.publish()
+
+            # avail_at = 录 + 拉 的实际耗时（不含解码，解码是边解边播的）
+            self.last_stat = (
+                '录 %.1fs / 拉+首帧 %.1fs / %d 帧 / %.1f fps / %.2fMB'
+                % (t_rec, max(0.0, avail_at - t_rec), n_frames,
+                   n_frames / max(0.1, avail_at), size / 1048576)
+            )
 
 
 class Remote:
@@ -271,11 +301,15 @@ class App:
     def pull_frames(self):
         while not self.stop_evt.is_set():
             try:
-                frames, cycle_sec = self.q.get(timeout=1.0)
+                frames, avail_sec = self.q.get(timeout=1.0)
                 self.frames = frames
                 self.idx = 0
-                # 每帧间隔 = 循环耗时 / 帧数 → 播完正好等于录制速度
-                self.frame_ms = max(1, int(cycle_sec * 1000 / max(1, len(frames))))
+                # 每帧间隔 = "录+拉"耗时 / 帧数
+                #
+                # ⚠️ 这里用的是 avail_sec（录制+拉取的实际耗时），
+                # **不含**"白等播放"的时间 —— 原来用整段循环耗时会算出偏大的
+                # 间隔，导致画面动作看起来比真实慢。
+                self.frame_ms = max(1, int(avail_sec * 1000 / max(1, len(frames))))
             except queue.Empty:
                 pass
 
