@@ -52,6 +52,11 @@ object DebugWebServer {
         val now = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINA)
             .format(java.util.Date())
         _log.value = (listOf("[$now] $line") + _log.value).take(30)
+        // ⚠️ 同时写 logcat。
+        //
+        // 原来只写内存那个 StateFlow —— 排查"服务起不来"时
+        // logcat 里**什么都看不到**（我就因此多绕了一大圈）。
+        android.util.Log.i("BawanDebugWeb", line)
     }
 
     /** 启动服务。已在运行则先停掉再按新端口启动。 */
@@ -62,16 +67,53 @@ object DebugWebServer {
         scope = sc
         sc.launch {
             try {
-                val ss = ServerSocket()
-                ss.reuseAddress = true
-                ss.bind(InetSocketAddress(port))
-                server = ss
-                _port.value = port
+                // ---------- 端口被占就自动往后试 ----------
+                //
+                // 实测踩的坑：bind 抛 EADDRINUSE 时，**界面上只显示
+                // 「服务未运行」**，用户完全不知道是端口被占了，
+                // 会以为是软件坏了 / WiFi 问题，然后反复点「启动」。
+                //
+                // 现在自动退让到 8900 / 8901 …，最多试 20 个。
+                // 成功的端口会写回设置，二维码和地址都跟着变 ——
+                // 用户什么都不用做。
+                var ss: ServerSocket? = null
+                var bound = port
+                var lastErr: String? = null
+                for (cand in port until port + 20) {
+                    val s = ServerSocket()
+                    // reuseAddress 能缓解 TIME_WAIT 造成的"假占用"，
+                    // 但不能解决"真的有别的进程在用"，所以还要能退让。
+                    s.reuseAddress = true
+                    val ok = runCatching { s.bind(InetSocketAddress(cand)) }.isSuccess
+                    if (ok) {
+                        ss = s
+                        bound = cand
+                        break
+                    }
+                    runCatching { s.close() }
+                    lastErr = "端口 $cand 被占用"
+                    log("端口 $cand 被占用，往后试")
+                }
+                val server0 = ss
+                if (server0 == null) {
+                    _running.value = false
+                    log("启动失败：8899~${port + 19} 都被占用（$lastErr）")
+                    return@launch
+                }
+                server = server0
+                _port.value = bound
                 _running.value = true
-                log("服务已启动：${Qr.debugUrl(app, port)}")
-                while (isActive && !ss.isClosed) {
+                if (bound != port) {
+                    // 写回设置，让界面和二维码显示真实端口
+                    runCatching { BawanApp.prefs.debugPort = bound }
+                    log("原端口 $port 被占用，已改用 $bound")
+                } else {
+                    log("服务已启动：${Qr.debugUrl(app, bound)}")
+                }
+                val ss2 = server0
+                while (isActive && !ss2.isClosed) {
                     val client = try {
-                        ss.accept()
+                        ss2.accept()
                     } catch (e: Exception) {
                         break
                     }
@@ -264,6 +306,13 @@ object DebugWebServer {
                             JSON_UTF8,
                         )
                     }
+
+                    // ---------- 播放诊断 ----------
+                    //
+                    // 用户没法在电视上抓日志（没有文件管理器 / adb），
+                    // 所以把诊断结果做成一个接口 + 手机页上的一张卡片。
+                    path == "/api/diag" && method == "GET" ->
+                        respond(out, 200, PlayDiag.report())
 
                     path == "/favicon.ico" -> respond(out, 204, "")
 
@@ -579,6 +628,30 @@ document.querySelector('form').addEventListener('submit', function (ev) {
       if (btn) { btn.textContent = '保存失败，重试'; btn.disabled = false; }
     });
 });
+</script>
+
+<div class="card">
+ <h2>播放诊断（卡顿排查）</h2>
+ <p class="hint">
+  电视上不好抓日志，所以卡不卡、卡在哪，直接看这里。<br>
+  先让电视播那个卡的台，等 1~2 分钟再刷新本页。
+ </p>
+ <pre id="diag" style="white-space:pre-wrap;font-size:13px;line-height:1.7;
+  background:#0e1222;border:1px solid var(--line);border-radius:11px;
+  padding:12px;margin:0;color:#eef2ff">读取中…</pre>
+ <button type="button" onclick="loadDiag()" style="margin-top:10px">刷新诊断</button>
+</div>
+
+<script>
+function loadDiag() {
+  var el = document.getElementById('diag');
+  el.textContent = '读取中…';
+  fetch('/api/diag').then(function (r) { return r.text(); })
+    .then(function (t) { el.textContent = t; })
+    .catch(function () { el.textContent = '读取失败（服务没运行？）'; });
+}
+loadDiag();
+setInterval(loadDiag, 10000);
 </script>
 
 <div class="card">

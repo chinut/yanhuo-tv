@@ -656,6 +656,16 @@ fun LivePlayerScreen(
     //
     // 每条都带 videoFormat 的宽高码率，能直接看出跑在哪一档。
     LaunchedEffect(index, sourceIndex) {
+        // 起播时告诉诊断模块：在放哪个台、第几条源、走网页还是直连
+        runCatching {
+            com.chinut.bawantv.core.PlayDiag.onReady(
+                name = current.name,
+                url = current.url,
+                srcIndex = sourceIndex,
+                srcTotal = candidatesOf(current).size,
+                web = useWeb,
+            )
+        }
         // ---------- 卡顿统计 ----------
         //
         // 为什么要它：用户反馈"每隔几秒卡零点几秒"，但光看每 3 秒一条的
@@ -680,11 +690,34 @@ fun LivePlayerScreen(
                     goneMs += 1
                     stalls += 1
                 }
-                lastPos = nowPos
                 val st0 = player.playbackState
                 if (st0 == Player.STATE_BUFFERING && prevState != Player.STATE_BUFFERING) {
                     rebuf += 1
                 }
+                fun stName(s: Int) = when (s) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "?"
+                }
+                val st0Name = stName(st0)
+                val prevStName = stName(prevState)
+                // 把采样喂给诊断模块（手机调试页会显示这些数据）
+                runCatching {
+                    com.chinut.bawantv.core.PlayDiag.onTick(
+                        state = st0Name,
+                        posMs = nowPos,
+                        bufMs = player.bufferedPosition,
+                        rateKbps = (player.videoFormat?.bitrate ?: 0) / 1000,
+                        w = player.videoFormat?.width ?: 0,
+                        h = player.videoFormat?.height ?: 0,
+                        prevPosMs = lastPos,
+                        playing = player.isPlaying,
+                        prevState = prevStName,
+                    )
+                }
+                lastPos = nowPos
                 prevState = st0
                 ticks += 1
                 if (ticks % 10 == 0) {
