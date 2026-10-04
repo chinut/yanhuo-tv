@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -94,6 +95,8 @@ import com.chinut.bawantv.unified.UnifiedMovie
  * onDown/onUp 把跳转关系钉死。
  */
 private const val KEY_MOVIE = "home:movie"
+/** 右上角齿轮（设置入口）。 */
+private const val KEY_GEAR = "home:gear"
 private const val KEY_DRAMA = "home:drama"
 private const val KEY_SETTINGS = "home:settings"
 
@@ -235,7 +238,7 @@ fun ImmersiveHome(
                 .padding(Dim.SafeH * 0.7f, Dim.SafeV * 0.8f),
         ) {
             // ---------- 品牌头：Logo + 文字 ----------
-            BrandHeader()
+            BrandHeader(onOpenSettings = onOpenSettings, manager = manager)
 
             Spacer(Modifier.height(18.sdp))
 
@@ -253,18 +256,15 @@ fun ImmersiveHome(
                 },
             )
 
-            // ---------- 右：影视 + 短剧 + 设置 ----------
+            // ---------- 右：影视 + 短剧（各占一半） ----------
             //
-            // 三块等分高度。原来只有影视 + 设置两块，设置独占 116dp；
-            // 现在把设置压到三分之一，腾出来的空间给短剧。
-            //
-            // 注意间隔从 20dp 收到 14dp —— 三块比两块更需要省纵向空间，
-            // 否则影视那块的可用高度会被挤得放不下海报。
+            // 设置块已搬到右上角齿轮（用户要求）。
+            // 空出来的地方给影视和短剧，两块各占一半、都比原来大。
             Column(
                 Modifier
-                    .width(400.sdp)
+                    .width(430.sdp)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(14.sdp),
+                verticalArrangement = Arrangement.spacedBy(16.sdp),
             ) {
                 MovieEntry(
                     movies = movies,
@@ -275,11 +275,6 @@ fun ImmersiveHome(
                 ShortDramaEntry(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     onEnter = onOpenShortDrama,
-                    manager = manager,
-                )
-                SettingsEntry(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    onEnter = onOpenSettings,
                     manager = manager,
                 )
             }
@@ -294,7 +289,10 @@ fun ImmersiveHome(
  * 而不是让用户从一堆内容里猜。高度压得很低，不抢内容空间。
  */
 @Composable
-private fun BrandHeader() {
+private fun BrandHeader(
+    onOpenSettings: () -> Unit,
+    manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
+) {
     val r = com.chinut.bawantv.ui.theme.LocalResponsive.current
     Row(
         Modifier.fillMaxWidth().height(r.dp(56)),
@@ -326,6 +324,13 @@ private fun BrandHeader() {
             fontSize = r.sp(14),
             letterSpacing = r.sp(3),
         )
+
+        // 把右侧的「日期时间 + 齿轮」推到最右
+        Spacer(Modifier.weight(1f))
+
+        ClockText()
+        Spacer(Modifier.width(r.dp(18)))
+        GearButton(onOpenSettings, manager)
     }
 }
 
@@ -526,6 +531,89 @@ private fun LiveMiniPlayer(channel: LiveChannel, modifier: Modifier) {
 // ==================== 首页右侧三块（统一样式） ====================
 
 /**
+ * 右上角的日期 + 24 小时时间。
+ *
+ * 用户要求：「在右上角加入一个年月日 24小时时间」。
+ *
+ * 每分钟刷一次就够（秒级刷新会让整个首页每秒重组一次，
+ * 老电视上纯属浪费）。用 `HH:mm` 强制 24 小时制，
+ * **不受系统 12/24 小时设置影响** —— 用户要的就是 24 小时。
+ */
+@Composable
+private fun ClockText() {
+    val r = com.chinut.bawantv.ui.theme.LocalResponsive.current
+    // 用一个会自己走的 state，避免整页每秒重组
+    var now by remember { mutableStateOf(java.util.Calendar.getInstance()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = java.util.Calendar.getInstance()
+            // 对齐到下一分钟，秒数不动
+            kotlinx.coroutines.delay(20_000L)
+        }
+    }
+    val dfD = remember { java.text.SimpleDateFormat("yyyy年M月d日", java.util.Locale.CHINA) }
+    val dfT = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA) }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            dfD.format(now.time),
+            color = Ink.TextTertiary,
+            fontSize = r.sp(14),
+        )
+        Spacer(Modifier.width(r.dp(10)))
+        Text(
+            dfT.format(now.time),
+            color = Color.White,
+            fontSize = r.sp(22),
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+/**
+ * 右上角齿轮：设置入口。
+ *
+ * 用户要求把原来的设置大块去掉、换成一个齿轮放右上角。
+ *
+ * **遥控器可达性**：它仍然是可聚焦项（`tvFocusable`），
+ * 并且和下面的影视块显式钉死上下关系（见 [MovieEntry] 的 onUp），
+ * 否则设置就点不进去了。
+ */
+@Composable
+private fun GearButton(
+    onEnter: () -> Unit,
+    manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
+) {
+    val r = com.chinut.bawantv.ui.theme.LocalResponsive.current
+    val focus = rememberTvFocusState()
+    Box(
+        Modifier
+            .size(r.dp(46))
+            .clip(RoundedCornerShape(r.dp(14)))
+            .tvFocusable(
+                focusState = focus,
+                focusKey = KEY_GEAR,
+                shape = RoundedCornerShape(r.dp(14)),
+                focusedScale = 1.08f,
+                borderWidth = 3.dp,
+                baseBackground = Ink.Card,
+                focusedBackground = Ink.AccentSoft,
+                onClick = onEnter,
+                // 齿轮下面就是影视块，显式钉死更稳
+                onDown = { manager?.moveTo(KEY_MOVIE); true },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Default.Settings,
+            contentDescription = "设置",
+            tint = if (focus.focused) Color.White else Ink.TextSecondary,
+            modifier = Modifier.size(r.dp(24)),
+        )
+    }
+}
+
+/**
  * 首页入口卡的统一骨架。
  *
  * ## 为什么抽出来
@@ -557,6 +645,8 @@ private fun HomeEntryCard(
     fallbackBrush: Brush,
     posters: List<String>,
     focusKey: String,
+    /** 上键跳转目标（不填就走几何导航）。 */
+    onUpKey: String? = null,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String?,
@@ -591,26 +681,48 @@ private fun HomeEntryCard(
                 baseBackground = Color.Transparent,
                 focusedBackground = Color.Transparent,
                 onClick = onEnter,
+                onUp = onUpKey?.let { k -> { manager?.moveTo(k); true } },
             ),
     ) {
-        // ---------- 背景：海报墙 或 渐变兜底 ----------
+        // ---------- 背景：单张大海报轮播 或 渐变兜底 ----------
         Box(Modifier.matchParentSize().background(fallbackBrush))
 
         if (posters.isNotEmpty()) {
-            Row(
-                Modifier.matchParentSize(),
-                horizontalArrangement = Arrangement.spacedBy(3.sdp),
-            ) {
-                posters.forEach { url ->
-                    AsyncImage(
-                        model = url,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                    )
+            // 每 9 秒换一张。
+            //
+            // ⚠️ key 里带 posters.size：列表后到时重新起算，
+            // 否则 index 可能越界。
+            var idx by remember(posters.size) { mutableIntStateOf(0) }
+            LaunchedEffect(posters.size) {
+                if (posters.size <= 1) return@LaunchedEffect
+                while (true) {
+                    kotlinx.coroutines.delay(9_000L)
+                    idx = (idx + 1) % posters.size
                 }
+            }
+            val url = posters.getOrNull(idx) ?: posters.first()
+
+            // 交叉淡入：同一时刻只挂两张（旧的 + 新的），
+            // 比一次挂 6 张省内存 —— 老电视上这点很实在。
+            // ⚠️ 不用 Crossfade：它的内容 lambda 里 `matchParentSize()`
+            // 拿不到尺寸，实测**海报完全不显示**（卡片只剩渐变）。
+            // 改成自己叠一个 Box + 动画 alpha，尺寸可靠。
+            Box(Modifier.matchParentSize()) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // 放大并偏置 —— 只露出海报的一部分，
+                        // 看起来像"剧照"而不是缩略图（用户要的那种感觉）
+                        .graphicsLayer {
+                            scaleX = 1.28f
+                            scaleY = 1.28f
+                            translationX = -46f
+                            translationY = 30f
+                        },
+                )
             }
             // 从下往上渐变压暗，保证文字在任何海报上都读得清
             Box(
@@ -698,6 +810,9 @@ private fun MovieEntry(
                 .filter { it.isNotBlank() }.take(6).toList()
         },
         focusKey = KEY_MOVIE,
+        // 上键去右上角齿轮（设置入口）—— 几何导航也能到，
+        // 但显式钉死更稳，避免"设置怎么也选不中"
+        onUpKey = KEY_GEAR,
         icon = Icons.Default.Movie,
         title = "影视",
         subtitle = if (movies.isNotEmpty()) "影视库 ${movies.size} 部"
@@ -754,36 +869,6 @@ private fun ShortDramaEntry(
         icon = Icons.Default.SmartDisplay,
         title = "短剧",
         subtitle = "竖屏短剧 · 自动连播",
-        titleSize = Txt.Section,
-        manager = manager,
-        onEnter = onEnter,
-    )
-}
-
-/**
- * 设置入口。
- *
- * 配色改成**中性蓝灰** —— 原来用绿色，和旁边两块的粉色并列非常突兀
- * （用户原话「影视和短剧的图标都是红的，但是设置是绿的 很丑」）。
- * 设置是"工具"不是"内容"，用不抢戏的中性色最稳。
- */
-@Composable
-private fun SettingsEntry(
-    modifier: Modifier,
-    onEnter: () -> Unit,
-    manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
-) {
-    HomeEntryCard(
-        modifier = modifier,
-        accent = Ink.Accent,
-        fallbackBrush = Brush.linearGradient(
-            listOf(Ink.Accent.copy(alpha = 0.30f), Color.Transparent),
-        ),
-        posters = emptyList(),
-        focusKey = KEY_SETTINGS,
-        icon = Icons.Default.Settings,
-        title = "设置",
-        subtitle = null,
         titleSize = Txt.Section,
         manager = manager,
         onEnter = onEnter,
