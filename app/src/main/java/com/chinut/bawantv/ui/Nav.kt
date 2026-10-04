@@ -18,7 +18,6 @@ enum class TopSection(
     val subtitle: String,
 ) {
     Home("home", "首页", Icons.Default.Whatshot, "推荐与入口"),
-    Live("live", "直播", Icons.Default.LiveTv, "央视 · 卫视 · 地方台"),
     Vod("vod", "影视", Icons.Default.Movie, "电影 · 电视剧 · 综艺"),
     ShortDrama("shortdrama", "短剧", Icons.Default.SmartDisplay, "竖屏短剧 · 自动连播"),
     Settings("settings", "设置", Icons.Default.Settings, "接口 · 域名 · 手机调试"),

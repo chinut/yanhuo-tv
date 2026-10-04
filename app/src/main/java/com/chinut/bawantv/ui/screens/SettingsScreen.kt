@@ -98,37 +98,6 @@ fun SettingsScreen(
 
     var editing by remember { mutableStateOf<EditTarget?>(null) }
 
-    // ---------- 导入 m3u 文件 ----------
-    //
-    // 为什么需要：用户的 IPTV 源往往是**文件**（运营商给的、朋友发来的），
-    // 让他在电视上用遥控器敲一个长网址不现实。
-    //
-    // 用系统的文件选择器（SAF）—— 它是独立窗口，但那是系统自己的界面，
-    // 用户在里面的操作由系统处理，选完回来我们才接管。所以没有
-    // "Compose Dialog 吞按键"那个问题。
-    var importMsg by remember { mutableStateOf("") }
-
-
-    var importedCount by remember {
-        mutableIntStateOf(
-            if (com.chinut.bawantv.live.LiveCatalog.hasImported(context)) 1 else 0
-        )
-    }
-    val pickM3u = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts
-            .OpenDocument(),
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val n = com.chinut.bawantv.live.LiveCatalog.importFrom(context, uri)
-        if (n > 0) {
-            importedCount = n
-            importMsg = "已导入 $n 个频道，重启直播后生效"
-            toast(context, "导入成功：$n 个频道")
-        } else {
-            importMsg = "导入失败：这个文件里没有识别到频道"
-            toast(context, "导入失败，请确认是 m3u / txt 频道表")
-        }
-    }
     var showQr by remember { mutableStateOf(false) }
     var resolvedDomain by remember { mutableStateOf(Ddys.activeBase) }
 
@@ -212,37 +181,13 @@ fun SettingsScreen(
                 // （实测按 15 次下键都落不到）。放最上面就绕开了这个问题。
                 SettingsCard(
                     title = "直播源",
-                    subtitle = "选主源（默认引擎 / 开源源），或导入运营商给的 m3u 文件",
+                    subtitle = "GitHub 源每天自动同步一次；换主源在这里，或播放中按三横键",
                     accent = Ink.Green,
                 ) {
-                    TvRow(
-                        label = if (importedCount > 0) {
-                            "已导入 $importedCount 个频道"
-                        } else {
-                            "还没有导入自定义源"
-                        },
-                        hint = if (importedCount > 0) {
-                            "导入的源优先于下面的「直播源地址」，也优先于内置频道表"
-                        } else {
-                            "导入后优先于内置频道表；想换回来点「清除」"
-                        },
-                        hintColor = if (importedCount > 0) Ink.Green else Ink.TextFaint,
-                        actionText = if (importedCount > 0) "重新导入" else "选择文件",
-                    ) {
-                        pickM3u.launch(
-                            arrayOf(
-                                "application/vnd.apple.mpegurl",
-                                "audio/x-mpegurl",
-                                "application/x-mpegURL",
-                                "text/plain",
-                                "*/*",
-                            )
-                        )
-                    }
                     // ---------- 老电视模式 ----------
                     //
                     // 用户要求的一个开关。它同时做两件事：
-                    //   1. 主源默认切到「开源源」（全是直连 m3u8，
+                    //   1. 主源默认切到「GitHub 源」（全是直连 m3u8，
                     //      不跑 WebView，老电视的 CPU/内存压力小得多）
                     //   2. 开源源里同台多条时优先挑**低分辨率**那条
                     //
@@ -254,7 +199,7 @@ fun SettingsScreen(
                         checked = prefs.oldTvMode,
                     ) {
                         prefs.oldTvMode = it
-                        // 打开时如果主源还是「默认引擎」，自动切到开源源
+                        // 打开时如果主源还是「内置频道」，自动切到 GitHub 源
                         if (it && prefs.livePreset ==
                             com.chinut.bawantv.live.LivePreset.Default.name
                         ) {
@@ -268,17 +213,12 @@ fun SettingsScreen(
                     // B = best-fan/iptv-sources 开源源（每日自动检测，全直连）
                     // AB = 两个都加载，播放页里自己挑
                     TvRow(
-                        label = "直播主源",
-                        hint = when (com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)) {
-                            com.chinut.bawantv.live.LivePreset.Default ->
-                                "A 默认引擎：内置频道表（覆盖面广，央视走网页播放）"
-                            com.chinut.bawantv.live.LivePreset.OpenSource ->
-                                "B 开源源：每日自动检测的直连源（轻，含 CCTV-1~17）"
-                            com.chinut.bawantv.live.LivePreset.Both ->
-                                "AB 两个都用：并行加载，播放中按三横键自己挑"
-                        },
+                        label = "主源",
+                        hint = com.chinut.bawantv.live.LivePreset
+                            .of(prefs.livePreset).hint,
                         hintColor = Ink.TextTertiary,
-                        actionText = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset).short,
+                        actionText = com.chinut.bawantv.live.LivePreset
+                            .of(prefs.livePreset).label,
                     ) {
                         val all = com.chinut.bawantv.live.LivePreset.entries
                         val cur = all.indexOf(
@@ -289,22 +229,6 @@ fun SettingsScreen(
                             com.chinut.bawantv.live.LivePreset.of(prefs.livePreset).label)
                     }
 
-                    if (importedCount > 0) {
-                        TvRow(
-                            label = "清除导入的源",
-                            hint = "回到内置频道表",
-                            actionText = "清除",
-                        ) {
-                            com.chinut.bawantv.live.LiveCatalog.clearImported(context)
-                            importedCount = 0
-                            importMsg = "已清除导入的源"
-                            toast(context, "已清除")
-                        }
-                    }
-                    if (importMsg.isNotBlank()) {
-                        Spacer(Modifier.height(6.sdp))
-                        Text(importMsg, color = Ink.Amber, fontSize = Txt.Tiny)
-                    }
                 }
 
                 SettingsCard(
@@ -463,8 +387,6 @@ fun SettingsScreen(
                         label = "开机自动播放上次频道",
                         hint = "像老电视一样，打开就在台上",
                         checked = prefs.autoPlayLastChannel,
-                        upKey = if (importedCount > 0) "set:clearImport"
-                        else "set:importM3u",
                         downKey = "set:channelHud",
                         focusKey = "set:autoLast",
                     ) { prefs.autoPlayLastChannel = it }

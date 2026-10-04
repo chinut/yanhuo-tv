@@ -1591,7 +1591,7 @@ private fun QualityPanel(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        p.short,
+                        p.label,
                         color = if (on) Color.White else Ink.TextTertiary,
                         fontSize = Txt.Caption,
                         fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,

@@ -33,15 +33,41 @@ import android.content.Context
  *
  * 这样对用户来说只有一个概念：这台电视老，就打开它。
  */
-enum class LivePreset(val label: String, val short: String) {
-    /** A：App 内置频道表（默认引擎）。 */
-    Default("默认引擎", "A"),
+enum class LivePreset(
+    /** 界面上显示的名字（给用户看的，必须说人话）。 */
+    val label: String,
+    /** 一行说明，讲清楚这个选项到底会给到什么。 */
+    val hint: String,
+) {
+    /**
+     * 内置频道：App 自带的频道表。
+     *
+     * 走电视台网页（WebView）+ 内置直连源，覆盖面广，但网页播放对老电视吃力。
+     */
+    Default(
+        "内置频道",
+        "App 自带频道表，台最多；央视等走网页播放，老电视可能吃力",
+    ),
 
-    /** B：best-fan/iptv-sources 开源源。 */
-    OpenSource("开源源", "B"),
+    /**
+     * GitHub 源：best-fan/iptv-sources，每天自动检测更新。
+     *
+     * 全是直连 m3u8，不跑网页，所以轻。含 CCTV-1~17 + 卫视。
+     */
+    OpenSource(
+        "GitHub 源",
+        "每天自动同步的直连源（含 CCTV-1~17），轻快，推荐老电视",
+    ),
 
-    /** AB：两边并行加载，用户自己挑主源。 */
-    Both("两个都用", "AB");
+    /**
+     * 双源：两边都加载。
+     *
+     * 台最多，但要拉两份列表，启动慢一点、占内存多一些。
+     */
+    Both(
+        "双源",
+        "内置 + GitHub 一起加载，台最全；启动稍慢",
+    );
 
     companion object {
         fun of(name: String?): LivePreset =
@@ -91,6 +117,17 @@ object OpenSourceCatalog {
         val date: String = "",
     )
 
+    /**
+     * 拉取的整体时间预算。
+     *
+     * 12 秒：正常情况下 4 个文件 2~4 秒就拉完；12 秒还没完基本就是被墙了，
+     * 再等下去只会让用户对着转圈。宁可退回内置表，也不能不给画面。
+     */
+    private const val TOTAL_BUDGET_MS = 12_000L
+
+    /** 单个文件的超时（比全局默认的 12s/20s 收窄很多）。 */
+    private const val ONE_TIMEOUT_S = 5L
+
     @Volatile private var cached: Snapshot? = null
     @Volatile private var cacheAt: Long = 0L
     private const val CACHE_MS = 10 * 60 * 1000L
@@ -107,12 +144,26 @@ object OpenSourceCatalog {
     suspend fun load(context: Context, preferLowRes: Boolean = true): Snapshot? {
         cachedOrNull()?.let { return it }
 
+        // ⚠️ 总时长预算。
+        //
+        // 实测踩坑：OkHttp 是 connect 12s + read 20s，而这个列表有 4 个文件。
+        // 如果 GitHub 被墙，串行拉完最坏要 80 秒 —— 期间频道表是空的，
+        // 用户看到永久「正在读取频道表…」，遥控器按什么都没反应（真实反馈）。
+        //
+        // 所以给整体加一个预算：超了就放弃，让调用方退回内置表。
+        // 单个请求的超时在下面单独收窄（见 fetchOne）。
+        val deadline = System.currentTimeMillis() + TOTAL_BUDGET_MS
+
         for (base in listOf(BASE, MIRROR)) {
+            if (System.currentTimeMillis() > deadline) {
+                android.util.Log.w(TAG, "拉取超出总时长预算，放弃")
+                break
+            }
             val groups = ArrayList<LiveGroup>()
             var date = ""
             for (f in FILES) {
-                val text = runCatching { Net.get(base + f) }.getOrNull()
-                if (text.isNullOrBlank()) continue
+                if (System.currentTimeMillis() > deadline) break
+                val text = fetchOne(base + f) ?: continue
                 if (date.isEmpty()) {
                     date = Regex("#DATE:\\s*(.+)").find(text)
                         ?.let { it.groupValues[1].trim() }.orEmpty()
@@ -140,6 +191,29 @@ object OpenSourceCatalog {
         android.util.Log.w(TAG, "开源源全部拉取失败（GitHub 和镜像都不通）")
         return null
     }
+
+    /**
+     * 拉一个文件，用**收窄过的超时**。
+     *
+     * 默认的 Http.client 是 connect 12s / read 20s —— 对"拉个小文本列表"
+     * 来说太长了。这里单独建一个短超时的 client（复用连接池/拦截器）。
+     */
+    private suspend fun fetchOne(url: String): String? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val cli = com.chinut.bawantv.core.Http.client.newBuilder()
+                    .connectTimeout(ONE_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(ONE_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val req = okhttp3.Request.Builder()
+                    .url(url)
+                    .header("User-Agent", com.chinut.bawantv.core.Http.UA_DESKTOP)
+                    .build()
+                cli.newCall(req).execute().use { r ->
+                    if (r.isSuccessful) r.body?.string() else null
+                }
+            }.getOrNull()
+        }
 
     /** 解析中间结构：台名 → 该台的所有 (地址, 分辨率)。 */
     private class Entry(val url: String, val res: Int)

@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chinut.bawantv.live.LiveChannel
 import com.chinut.bawantv.live.LivePlayerScreen
-import com.chinut.bawantv.ui.screens.LiveScreen
 import com.chinut.bawantv.ui.screens.SettingsScreen
 import com.chinut.bawantv.ui.screens.UnifiedVideoScreen
 import com.chinut.bawantv.ui.screens.UpdateDialog
@@ -86,7 +85,9 @@ fun BawanRoot(
     var section by remember {
         mutableStateOf(
             when (debugRoute) {
-                "live" -> TopSection.Live
+                // "live" 原来指向直播**列表页**，那个页面已删除
+                // （首页点直播是直接全屏，列表页根本没有入口）。
+                // 现在调试路由 "live" 交给下面的 live_play 处理起播。
                 "vod", "vod_search" -> TopSection.Vod
                 "settings" -> TopSection.Settings
                 else -> TopSection.Home
@@ -95,8 +96,6 @@ fun BawanRoot(
     }
     var livePlaying by remember { mutableStateOf<LiveChannel?>(null) }
     var livePlaylist by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
-    // 换主源后强制直播页重新加载频道表
-    var liveReloadToken by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var focusEpoch by remember { mutableIntStateOf(0) }
 
     /**
@@ -113,7 +112,6 @@ fun BawanRoot(
     var pendingUnified by remember { mutableStateOf<com.chinut.bawantv.unified.UnifiedMovie?>(null) }
 
     /** 调试用：进直播后是否自动起播第一个频道。 */
-    var debugLivePlay by remember { mutableStateOf(false) }
 
     /** 调试用：进详情后是否自动起播第一集。 */
     var debugAutoPlay by remember { mutableStateOf(false) }
@@ -273,7 +271,6 @@ fun BawanRoot(
             override fun onReceive(c: android.content.Context?, i: android.content.Intent?) {
                 val route = i?.getStringExtra("route").orEmpty()
                 val target = when (route) {
-                    "live" -> TopSection.Live
                     "vod", "vod_search" -> TopSection.Vod
                     "settings" -> TopSection.Settings
                     "home" -> TopSection.Home
@@ -301,11 +298,24 @@ fun BawanRoot(
                     //
                     // 和 vod_autoplay 同理：验证播放页时要可靠抵达，
                     // 不能靠"下、下、确定"这种盲按（经常落错位置）。
-                    section = TopSection.Live
-                    debugLivePlay = true
-                    debugPlayTrigger++
+                    // ⚠️ 直播**列表页已删除**（首页点直播是直接全屏，
+                    // 列表页根本没有入口）。所以这里回首页，
+                    // 直接把选中的频道交给全屏播放浮层 —— 不再有"列表页"这一步。
+                    section = TopSection.Home
+                    com.chinut.bawantv.ui.HomeWarmup.groups()
+                        ?.flatMap { it.channels }
+                        ?.firstOrNull()
+                        ?.let { ch ->
+                            livePlaying = ch
+                            livePlaylist = com.chinut.bawantv.ui.HomeWarmup.groups()
+                                ?.flatMap { it.channels }
+                                ?: listOf(ch)
+                            android.util.Log.i(
+                                "BawanRoute",
+                                "广播跳转 → live 直接起播 " + ch.name,
+                            )
+                        }
                     focusEpoch++
-                    android.util.Log.i("BawanRoute", "广播跳转 → live 自动起播")
                 } else if (route == "vod_autoplay") {
                     // 调试：进详情后**自动起播第一集**。
                     // 用来可靠地抵达播放页 —— 盲按方向键选剧集按钮经常失败，
@@ -484,25 +494,6 @@ fun BawanRoot(
                                     },
                                 )
 
-                            // key(liveReloadToken)：换主源后强制重建 LiveScreen，
-                            // 这样它的 LaunchedEffect(Unit) 会重新跑 → 重新拉频道表。
-                            // 比传一层 reloadToken 参数进去简单，也不容易漏。
-                            TopSection.Live -> androidx.compose.runtime.key(liveReloadToken) {
-                            LiveScreen(
-                                debugAutoPlayFirst = debugLivePlay,
-                                entryKey = FocusKeys.entry(TopSection.Live.route),
-                                onPlayingChanged = { ch, list ->
-                                    livePlaying = ch
-                                    livePlaylist = list
-                                },
-                                // 返回键回首页（首页就是那个大直播画面）
-                                onBack = {
-                                    section = TopSection.Home
-                                    focusEpoch++
-                                },
-                            )
-                            }
-
                             TopSection.Vod -> com.chinut.bawantv.ui.screens.UnifiedVideoScreen(
                                 entryKey = FocusKeys.entry(TopSection.Vod.route),
                                 pendingMovie = pendingUnified,
@@ -628,11 +619,14 @@ fun BawanRoot(
                     onChannelChange = { picked ->
                         livePlaying = picked
                     },
-                    // 菜单里换了主源 → 重新拉频道表，并回到直播列表页
+                    // 菜单里换了主源 → 关掉播放器回首页。
+                    //
+                    // 首页的直播预览会自己拉频道表（见 ImmersiveHome 的
+                    // LaunchedEffect），所以回去之后就是新主源的台。
+                    // 列表页已删除，不再有"回列表页重新加载"这一步。
                     onReloadCatalog = {
                         livePlaying = null
                         livePlaylist = emptyList()
-                        liveReloadToken++
                         focusEpoch++
                     },
                 )
