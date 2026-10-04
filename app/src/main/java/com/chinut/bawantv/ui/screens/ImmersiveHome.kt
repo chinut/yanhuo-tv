@@ -71,6 +71,8 @@ import com.chinut.bawantv.live.LiveCatalog
 import com.chinut.bawantv.live.LiveChannel
 import com.chinut.bawantv.live.RecentLive
 import com.chinut.bawantv.live.TvWebPlayerView
+import com.chinut.bawantv.ui.theme.glassCard
+import com.chinut.bawantv.ui.theme.focusRing
 import com.chinut.bawantv.ui.theme.AmbientBackdrop
 import com.chinut.bawantv.ui.theme.Dim
 import com.chinut.bawantv.ui.theme.FocusKeys
@@ -231,7 +233,16 @@ fun ImmersiveHome(
         }
     }
 
-    AmbientBackdrop(Modifier.fillMaxSize(), accent = Ink.Accent, secondary = Ink.Pink) {
+    // ---------- 背景：电影感自然风光 ----------
+    //
+    // 换掉原来的 `AmbientBackdrop`（4 团模糊色斑 + 无限漂移动画）。
+    // 调研报告把那种做法列为 P1 反模式：紫蓝网格渐变是公认的"AI 味"标志，
+    // 而且 Google 明文要求"不要调整用户不直接交互的背景元素"。
+    //
+    // 新背景是**静态**渐变，配色取自用户给的 5 张电影感风光参考图
+    // （逐张取样：暗调 V≈0.3、低饱和 S≈0.3、最亮处在上中 22%）。
+    // 详见 [com.chinut.bawantv.ui.theme.CinematicBackdrop]。
+    com.chinut.bawantv.ui.theme.CinematicBackdrop(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -242,9 +253,17 @@ fun ImmersiveHome(
 
             Spacer(Modifier.height(18.sdp))
 
+            // ---------- 三条并排：1 大 + 2 窄 ----------
+            //
+            // 用户批准的布局（比例来自参考图，且**经 Google 官方网格校验通过**）：
+            //   大卡 842px ÷ 2 = 421dp  ≈ 官方"2 卡片宽 412dp"
+            //   边距 127px ÷ 2 = 63.5dp ≈ 官方建议 58–64dp
+            //
+            // ⚠️ 这个比例是**对的，别改**。调研报告的结论原文：
+            //    「你的布局是可测量地正确的 —— 不要让人"修"它」
             Row(
                 Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(20.sdp),
+                horizontalArrangement = Arrangement.spacedBy(16.sdp),
             ) {
             // ---------- 左：直播画面，占绝大部分 ----------
             LiveHero(
@@ -262,7 +281,7 @@ fun ImmersiveHome(
             // 空出来的地方给影视和短剧，两块各占一半、都比原来大。
             Column(
                 Modifier
-                    .width(430.sdp)
+                    .width(380.sdp)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(16.sdp),
             ) {
@@ -345,26 +364,21 @@ private fun LiveHero(
     // 需要它来做「下 → 影视」的显式跳转（几何导航在这里会挑错目标）
     val manager = com.chinut.bawantv.ui.theme.LocalTvFocusManager.current
 
+    // 大卡圆角 48dp —— Material 的 `CornerExtraLarge` 是 28dp，
+    // 在 density 2.0 的 1080p 电视上就是 56px；这里取 48dp 略收一点更稳。
+    val heroShape = RoundedCornerShape(48.dp)
+
     Box(
         modifier
-            .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius), strong = true)
-            .shadow(
-                elevation = if (focus.focused) 30.sdp else 10.sdp,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                spotColor = Ink.AccentBright.copy(alpha = if (focus.focused) 0.7f else 0.18f),
-            )
-            // 选中框：明确的**实心亮边**。
-            // 之前只有光晕，在电视上认不出来（老人尤其看不出哪个被选中）。
-            .focusBorder(
-                visible = focus.focused,
-                cornerRadius = Dim.BigRadius,
-                color = Ink.AccentBright,
-                width = 4.sdp,
-            )
+            .glassCard(shape = heroShape, focused = focus.focused)
+            // 选中框：**白色实边 + 黑色辉光**，这是 Google TV 公布的焦点默认值。
+            // 之前是品牌蓝光晕 + 4dp 彩边 —— 在蓝色系海报上会"消失"，
+            // 用户反复强调过焦点必须一眼看得见（家里有老人）。
+            .focusRing(focused = focus.focused, shape = heroShape)
             .tvFocusable(
                 focusState = focus,
                 focusKey = focusKey,
-                shape = RoundedCornerShape(Dim.BigRadius),
+                shape = heroShape,
                 focusedScale = 1.0f,
                 glow = false,
                 borderWidth = 0.dp,
@@ -382,9 +396,10 @@ private fun LiveHero(
         if (channel != null) {
             LiveMiniPlayer(
                 channel = channel,
+                // 裁切圆角必须和外壳的 48dp 对齐，否则播放器会顶出圆角
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(Dim.BigRadius)),
+                    .clip(RoundedCornerShape(48.dp)),
             )
         } else {
             Box(Modifier.fillMaxSize().background(Color.Black))
@@ -395,10 +410,15 @@ private fun LiveHero(
             Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .height(190.sdp)
+                .height(210.sdp)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))
+                        // 官方 scrim：顶部全透、底部接近不透明，保证白字可读
+                        listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.30f),
+                            Color.Black.copy(alpha = 0.82f),
+                        )
                     )
                 )
         )
@@ -656,25 +676,18 @@ private fun HomeEntryCard(
 ) {
     val focus = rememberTvFocusState()
 
+    // 窄卡圆角 40dp（大卡是 48dp —— 官方说圆角**不随宽度等比缩放**，
+    // 所以两者相近而不是成比例）
+    val cardShape = RoundedCornerShape(40.dp)
+
     Box(
         modifier
-            .clip(RoundedCornerShape(Dim.BigRadius))
-            .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius))
-            .shadow(
-                elevation = if (focus.focused) 28.sdp else 8.sdp,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                spotColor = accent.copy(alpha = if (focus.focused) 0.70f else 0.16f),
-            )
-            .focusBorder(
-                visible = focus.focused,
-                cornerRadius = Dim.BigRadius,
-                color = accent,
-                width = 4.sdp,
-            )
+            .glassCard(shape = cardShape, focused = focus.focused)
+            .focusRing(focused = focus.focused, shape = cardShape)
             .tvFocusable(
                 focusState = focus,
                 focusKey = focusKey,
-                shape = RoundedCornerShape(Dim.BigRadius),
+                shape = cardShape,
                 focusedScale = 1.0f,
                 glow = false,
                 borderWidth = 0.dp,
