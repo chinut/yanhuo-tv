@@ -209,7 +209,18 @@ fun UnifiedVideoScreen(
     val cardKeyPrefix = "vod:card:"
 
     val typePanelItems = remember(typeOptions) {
-        listOf("搜索") + listOf("全部") + typeOptions
+        // ⚠️ 必须**去重**。
+        //
+        // `typeOptions` 是各内容源的分类名拼起来的，不同源会有**同名分类**
+        // （"电影动作"在两个源里都叫这个）。不去重的话面板上会出现两格同名项，
+        // 用户看着像"焦点停在同一个选项上"或"选中了空选项"（用户反馈过）。
+        //
+        // 顺带过滤空白项：空字符串会画成一格**没有文字**的选项 ——
+        // 那才是字面意义上的"焦点选中空选项"。
+        (listOf("搜索", "全部") + typeOptions)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
     }
 
     // 调试入口：--es dsh_route vod_search 时直接进搜索态。
@@ -420,8 +431,12 @@ fun UnifiedVideoScreen(
             //
             // ⚠️ 必须和绘制那边**同一个算法**。我第一版这里写成 `row * 2 + col`
             // （行优先），而绘制是列优先，两边对不上 → 光标会跳到没画出来的格子上
-            // （表现：按 ↓ 高亮消失，因为算出来的索引没有对应的 UI）。
-            val rows = (n + 1) / 2
+            // （表现：按 ↓ 高亮消失）。
+            //
+            // ⚠️ rows 用 `n / 2`（向下取整）**不是** `(n+1)/2`。
+            // 后者在 n 为奇数时会让右列最后一行没人 → 画面上是个空格子，
+            // 而键盘按索引算就会"焦点选中空选项"（用户反馈）。
+            val rows = n / 2
             var row = typeCursor % rows
             var col = typeCursor / rows
             when (dir) {
@@ -655,7 +670,9 @@ fun UnifiedVideoScreen(
                 // 为什么不用"隔一个摆"（左 0,2,4… 右 1,3,5…）：
                 // 那样两列长度不等（左 6 / 右 5），行号在两列里含义不同，
                 // 光标推进看起来像乱跳，用户会觉得"表格被折叠了"。
-                val rows = (typePanelItems.size + 1) / 2
+                // rows = n/2（向下取整）：奇数项时右列比左列多一项，
+                // **两列都不会有空格子**（用 ceil 就会在右列底部留一个空位）
+                val rows = typePanelItems.size / 2
                 Row(horizontalArrangement = Arrangement.spacedBy(10.sdp)) {
                     listOf(0, 1).forEach { col ->
                         Column(Modifier.weight(1f)) {
