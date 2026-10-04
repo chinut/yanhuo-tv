@@ -111,6 +111,30 @@ object OpenSourceCatalog {
         "cn_pay_status.m3u8",
     )
 
+    /**
+     * iptv-search.com 的补充源。
+     *
+     * ## 为什么要加它
+     *
+     * 实测 best-fan 的 182 个地址只有 22 个能播，而且**缺 CCTV15/16/17**。
+     * iptv-search 那边（917 个里 21 个能播）恰好补上了这三个央视台 ——
+     * 尤其是 CCTV16 奥林匹克，之前一直找不到源。
+     *
+     * ## 它是怎么工作的
+     *
+     * 分类页里每个频道有 `data-hash`；POST `/api/channels/m3u`
+     * （body: `{channels:[{hash,name,logo,group}]}`，**每次上限 10 个**）
+     * 会返回 m3u，里面的地址是站内 `/live/fav/...`，但**能直接播**。
+     *
+     * ## 为什么不在这里做
+     *
+     * 那个流程要「抓页面 → 批量 POST → 再验证」，而且实测可用率只有 2%。
+     * 在电视上跑这些纯属浪费 CPU 和内存（用户已经明确反对在电视上扫描）。
+     * 所以**只把实测能播的嵌进 assets**（见 iptv_verified.m3u），
+     * 这里不再实时拉取。
+     */
+    private val IPTV_SEARCH_NOTE = "见 assets/live/iptv_verified.m3u" 
+
     data class Snapshot(
         val groups: List<LiveGroup>,
         val from: String,

@@ -1,461 +1,96 @@
 #EXTM3U
-# 内置 IPTV 直连源 —— 全部经 ffmpeg 真解码验证（6 帧 + 画面在动）
-# 用户自己扫描或导入的源优先级更高，会覆盖这一份。
+# 实测能播的 IPTV 直连源（与 iptv_verified.m3u 同源，保持一致）。
+#
+# 判据：ffmpeg 真解码 —— 解 5 帧 + std>10（有内容）+ 帧差>1.5（画面在动）。
+# 来源：best-fan/iptv-sources + iptv-search.com，但**只保留实测通过的**。
+#
+# 实测可用率：best-fan 22/182（12%）、iptv-search 21/917（2%）。
+# 所以不要相信"网站说有"，只相信这里验证过的。
+#
+# 目前缺：CCTV2 / 5 / 6 / 7 / 10 / 11 / 12 / 14（两个站都没有可用源）。
+#EXTINF:-1 group-title="IPTV",CCTV1
+http://120.40.39.246:352/newlive/live/hls/1/live.m3u8
+#EXTINF:-1 group-title="IPTV",CCTV3
+http://183.10.180.81:9901/tsfile/live/0003_1.m3u8?key=txiptv&playlive=1&authid=0
+#EXTINF:-1 group-title="IPTV",CCTV-4 中文国际
+https://live-play-hls.cctvnews.cctv.com/CCTVChannel/channel_cctv4_mbd.m3u8?auth_key=1791097200-1-b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c-1d69bbcbdea2dd8281d3dc59f42e8f50&yid=b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c
+#EXTINF:-1 group-title="IPTV",CCTV4
+http://58.56.162.102:4466/newlive/live/hls/4/live.m3u8
+#EXTINF:-1 group-title="IPTV",CCTV8
+http://63.141.230.178:82/gslb/zbdq5.m3u8?id=cctv8k
+#EXTINF:-1 group-title="IPTV",CCTV-9 纪录
+https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=92574abd34750c4b083d993636811947
+#EXTINF:-1 group-title="IPTV",CCTV9
+https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=04d0734a39c43ac7409c482c75ab83eb
 #EXTINF:-1 group-title="IPTV",CCTV13
-http://ali-m-l.cztv.com/channels/lantian/channel21/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",CGTN
-http://english-livetx.cgtn.com/hls/yypdyyctzb_hd.m3u8
-#EXTINF:-1 group-title="IPTV",熊猫直播
-https://gcwbndali.v.myalicdn.com/gcwbnd/ipanda1000_2/index.m3u8
-#EXTINF:-1 group-title="IPTV",东南卫视
-http://live.zohi.tv/video/s10001-fztv-3/index.m3u8
-#EXTINF:-1 group-title="IPTV",湖南卫视
-https://txmov2.a.kwimgs.com/bs3/video-hls/5199687338554291078_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",青海卫视
-https://hls-qhmh.lanzhousobey.cn/qhmh/mhds.m3u8
+http://101.66.199.13:9901/tsfile/live/0013_1.m3u8?key=txiptv&playlive=0&authid=0
+#EXTINF:-1 group-title="IPTV",CCTV15 音乐
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/2cf1face
+#EXTINF:-1 group-title="IPTV",CCTV16 奥林匹克
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/f5e84d38
+#EXTINF:-1 group-title="IPTV",CCTV-17 (1080p)
+http://74.91.26.218:82/live/cctv17hd.m3u8
+#EXTINF:-1 group-title="IPTV",CCTV17 农业农村
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/3c0716e8
+#EXTINF:-1 group-title="IPTV",山东教育卫视
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/b15ba807
+#EXTINF:-1 group-title="IPTV",山西卫视
+http://119.39.9.8:9901/tsfile/live/0118_1.m3u8
+#EXTINF:-1 group-title="IPTV",广东卫视
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/452e39db
+#EXTINF:-1 group-title="IPTV",延边卫视
+https://srs.iyb983.cn/video/CYS/index.m3u8
 #EXTINF:-1 group-title="IPTV",延边卫视
 https://srs.iyb983.cn:443/video/CYS/index.m3u8
+#EXTINF:-1 group-title="IPTV",新疆卫视
+http://38.75.136.137:98/gslb/dsdqpub/xjws.m3u8?auth=testpub
+#EXTINF:-1 group-title="IPTV",江西卫视
+http://112.27.5.218:9901/tsfile/live/faacts/0138_1.m3u8?key=txiptv&playlive=1&authid=0
+#EXTINF:-1 group-title="IPTV",江西卫视
+http://63.141.230.178:82/gslb/zbdq5.m3u8?id=jxwshd
 #EXTINF:-1 group-title="IPTV",浙江卫视
-http://ali-m-l.cztv.com/channels/lantian/channel001/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",安多卫视
-https://liveout.xntv.tv/a65jur/96iln2.m3u8
-#EXTINF:-1 group-title="IPTV",黑龙江卫视
-https://idclive.hljtv.com:4430/live/hljws_own.m3u8
-#EXTINF:-1 group-title="IPTV",山东教育
-https://test1.live.sdetv.com.cn/live/dianshizhibo/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",苏州4K
-https://tylive.kan0512.com/norecord/csztv4k_4k.m3u8
-#EXTINF:-1 group-title="IPTV",东方卫视4K
-https://bp-resource-dfl.bestv.cn/148/3/video.m3u8
-#EXTINF:-1 group-title="IPTV",人间卫视
-https://5ddce30eb4b55.streamlock.net/bltvhd/bltv1/chunklist_w511254805.m3u8
-#EXTINF:-1 group-title="IPTV",人在囧途
-https://vip.ffzy-play.com/20221018/1953_2d6ba500/index.m3u8
-#EXTINF:-1 group-title="IPTV",倩女幽魂人间道
-http://jsmov2.a.yximgs.com/bs3/video-hls/5250634317044855747_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",人在囧途之港囧
-https://vip.ffzy-play7.com/20230112/11082_fde1a94d/index.m3u8
-#EXTINF:-1 group-title="IPTV",哈尔滨影视
-http://stream.hrbtv.net/yspd/sd/live.m3u8?zheild
-#EXTINF:-1 group-title="IPTV",倩女幽魂妖魔道
-http://jsmov2.a.yximgs.com/bs3/video-hls/5232901391302199073_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",倩女幽魂道道道
-http://jsmov2.a.yximgs.com/bs3/video-hls/5216294367991385255_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",我不是药神
-https://vip.ffzy-play1.com/20221018/478_c3afed66/index.m3u8
-#EXTINF:-1 group-title="IPTV",寒战
-https://vip.ffzy-play6.com/20221019/157_bf0740ee/index.m3u8
-#EXTINF:-1 group-title="IPTV",拆弹专家1
-https://vip.ffzy-online.com/20221015/719_80ff87c2/index.m3u8
-#EXTINF:-1 group-title="IPTV",浙江教科影视
-https://ali-m-l.cztv.com/channels/lantian/channel004/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",拆弹专家2
-https://vip.ffzy-online.com/20221015/722_e32c42bc/index.m3u8
-#EXTINF:-1 group-title="IPTV",让子弹飞
-https://vip.ffzy-play7.com/20230116/11563_b9f44814/index.m3u8
-#EXTINF:-1 group-title="IPTV",龙门飞甲
-http://jsmov2.a.yximgs.com/bs3/video-hls/5203346449046555193_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",南国都市
-https://tencentplay.gztv.com/live/nanguodushi.m3u8?txSecret=550af55c0ea34ce492748481415b6dfa&txTime=1903e7b17de
-#EXTINF:-1 group-title="IPTV",四川科教
-http://182.150.115.21:8030/pcgacg/pcgacg_0.m3u8
-#EXTINF:-1 group-title="IPTV",浙江少儿
-https://ali-m-l.cztv.com/channels/lantian/channel008/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",韩国EBS少儿
-http://ebsonairios.ebs.co.kr/ebsutablet500k/tablet500k/playlist.m3u8
+http://101.66.199.13:9901/tsfile/live/0124_1.m3u8?key=txiptv&playlive=0&authid=0
+#EXTINF:-1 group-title="IPTV",浙江卫视
+http://ali-xwl.cztv.com/live/channel01720Plxw.m3u8
+#EXTINF:-1 group-title="IPTV",深圳卫视
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/2e6586f6
+#EXTINF:-1 group-title="IPTV",西藏卫视
+http://59.39.89.130:60901/tsfile/live/0125_4.m3u8?key=txiptv&playlive=1&authid=0
+#EXTINF:-1 group-title="IPTV",辽宁卫视
+http://204.12.221.218:8181/3m1080p/lnws.m3u8
+#EXTINF:-1 group-title="IPTV",陕西卫视
+http://192.151.150.154/live/snwshd.m3u8
 #EXTINF:-1 group-title="IPTV",万荣综合
-http://60.222.246.220:19433/hls1.m3u8
-#EXTINF:-1 group-title="IPTV",东莞新闻综合
-https://stream.sun0769.com/dgrtv1/mp4tv1_800/index.m3u8
-#EXTINF:-1 group-title="IPTV",东莞生活资讯
-https://stream.sun0769.com/dgrtv1/mp4tv2_800/index.m3u8
-#EXTINF:-1 group-title="IPTV",乐至综合
-http://175.155.106.72:89/live1/live1.m3u8?zsicd
-#EXTINF:-1 group-title="IPTV",云和新闻综合
-http://l.cztvcloud.com/channels/lantian/SXyunhe1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",云霄综合
-https://live.zzyxxw.com:2443/live/xwzh.m3u8
-#EXTINF:-1 group-title="IPTV",九台综合
-http://stream10.jlntv.cn/jiutaitv/sd/live.m3u8
-#EXTINF:-1 group-title="IPTV",井研综合
-http://tvfile.jyrmt.cn/nmip-media/channellive/channel104452/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",余姚新闻综合
-http://l.cztvcloud.com/channels/lantian/SXyuyao1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",余姚综合
-https://l.cztvcloud.com/channels/lantian/SXyuyao1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",余杭未来E
-http://l.cztvcloud.com/channels/lantian/SXyuhang3/720p.m3u8
-#EXTINF:-1 group-title="IPTV",余杭综合
-http://l.cztvcloud.com/channels/lantian/SXyuhang1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",兵团五师双河新闻综合
-http://liveout.btzx.com.cn/62ds9e/4nxdih.m3u8?fbl=
-#EXTINF:-1 group-title="IPTV",兰溪新闻综合
-http://l.cztvcloud.com/channels/lantian/SXlanxi1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",剑阁综合
-https://m3u8.channel.dzsm.com/nmip-media/channellive/channel105549/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",兵团八师石河子新闻综合
-http://124.88.144.73:1935/live/xwzh/playlist.m3u8?zxinjd
-#EXTINF:-1 group-title="IPTV",南宁都市生活
-http://615bbf179ba53515dccad7b1da5d1ad9.livehwc3.cn/hls.nntv.cn/nnlive/WLSH_24.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=2598844eaee8a4265e706fc14b3fc11d
-#EXTINF:-1 group-title="IPTV",南京教科
-http://nklive.nbs.cn/hls/75b3c462-b831-4de7-a34b-5d3221db2069/index.m3u8
-#EXTINF:-1 group-title="IPTV",可克达拉综合
-http://file.loulannews.cn/nmip-media/channellive/channel103824/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",哈尔滨新闻综合
-http://stream.hrbtv.net/xwzh/sd/live.m3u8?zheild
-#EXTINF:-1 group-title="IPTV",句容生活
-http://jrlive.jrntv.com/live/_definst_/shenghuos/playlist.m3u8?%E5%85%B3%E6%B3%A8%E5%BE%AE%E4%BF%A1%E5%85%AC%E4%BC%97%E5%8F%B7[%E6%99%B4%E5%9B%AD]
-#EXTINF:-1 group-title="IPTV",哈尔滨生活
-http://stream.hrbtv.net/shpd/sd/live.m3u8?zheild
-#EXTINF:-1 group-title="IPTV",名山综合
-https://m3u8channel-bx.yunxya.com/nmip-media/channellive/channel104666/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",固镇新闻
-http://www.guzhenm.com:7001/hls/hd-live.m3u8
-#EXTINF:-1 group-title="IPTV",奎屯哈萨克语
-http://218.84.12.186:8002/hls/main/playlist.m3u8?zxinjd
-#EXTINF:-1 group-title="IPTV",太谷新闻综合
-https://p2.vzan.com/slowlive/596867413819827251/live.m3u8?zbid=1725814272&tpid=1516989100&type=0
-#EXTINF:-1 group-title="IPTV",夹江新闻综合
-http://tvfile.jjrm.org.cn/nmip-media/channellive/channel106282/playlist.m3u8?zsicd
-#EXTINF:-1 group-title="IPTV",安徽导视
-http://dspdhls.appcoo.com:8888/live/dspd/index.m3u8
-#EXTINF:-1 group-title="IPTV",常熟民生
-http://3gvod.zjgonline.com.cn:1935/live/_definst_/shehuishenghuo_app/chunklist.m3u8
-#EXTINF:-1 group-title="IPTV",广元公共
-https://m3u8.channel.dzsm.com/nmip-media/channellive/channel101257/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",广元综合
-https://m3u8.channel.dzsm.com/nmip-media/channellive/channel100999/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",平遥新闻综合
-https://tntgjhjb.live.sxmty.com/live/hls/3a4585ac11ec4e1bb07b419101b370c3/baf63e2b313440c2a25d7859f9b73b05-1.m3u8?zshanxd
-#EXTINF:-1 group-title="IPTV",广州新闻
-http://tencentplay.gztv.com/live/xinwen.m3u8?txSecret=d2c2db0b598c02ec1b5623728434d367&txTime=18d57929bd3
-#EXTINF:-1 group-title="IPTV",广安公共
-http://live1.gatv.com.cn:85/live/GGPD_ggpdzm.m3u8
-#EXTINF:-1 group-title="IPTV",广州综合
-https://tencentplay.gztv.com/live/zonghes.m3u8?txSecret=439b0fd2cf766b363c93a59cbcbe1370&txTime=18d00acf488
-#EXTINF:-1 group-title="IPTV",广德生活
-https://live.gdtv.ah.cn/live/newsTV.m3u8
-#EXTINF:-1 group-title="IPTV",广西国际
-https://hlscdn.liangtv.cn/live/0234c48e0bc24fe1b41b9999a253e581/1075ee38e04f490690f6a36a16e09c79.m3u8
-#EXTINF:-1 group-title="IPTV",庆元综合
-http://l.cztvcloud.com/channels/lantian/SXqingyuan1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",庆元新闻综合
-http://l.cztvcloud.com/channels/lantian/SXqingyuan1/720p.m3u8?fbl=
-#EXTINF:-1 group-title="IPTV",开化国家公园
-http://l.cztvcloud.com/channels/lantian/SXkaihua2/720p.m3u8
-#EXTINF:-1 group-title="IPTV",开化新闻综合
-http://l.cztvcloud.com/channels/lantian/SXkaihua1/720p.m3u8?zzhed
-#EXTINF:-1 group-title="IPTV",文成新闻综合
-http://l.cztvcloud.com/channels/lantian/SXwencheng1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",怀仁综合
-https://1yp7hc5p.live.sxmty.com/live/hls/bff8529922344209985b6e49baa9555a/efa2543628fc4a7ea93d3d6c975f77dc-1.m3u8
-#EXTINF:-1 group-title="IPTV",文成综合
-http://l.cztvcloud.com/channels/lantian/SXwencheng1/720p.m3u8?zzhed?
-#EXTINF:-1 group-title="IPTV",德惠综合
-http://stream11.jlntv.cn/dehuitv/sd/live.m3u8
-#EXTINF:-1 group-title="IPTV",新昌生活
-http://l.cztvcloud.com/channels/lantian/SXxinchang2/720p.m3u8
-#EXTINF:-1 group-title="IPTV",新昌新闻综合
-https://l.cztvcloud.com/channels/lantian/SXxinchang1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",新野综合
-http://tvpull.dxhmt.cn:9081/tv/11329-1.m3u8
-#EXTINF:-1 group-title="IPTV",新闻综合
-https://m3u8channel.yunxya.com/nmip-media/channellive/channel100028/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",普陀电视台
-https://l.cztvcloud.com/channels/lantian/SXputuo1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",朝天综合
-https://m3u8.channel.dzsm.com/nmip-media/channellive/channel104601/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",晋江电视台
-http://stream.jinjiang.tv/1/sd/live.m3u8?zfud
-#EXTINF:-1 group-title="IPTV",武义新闻综合
-http://l.cztvcloud.com/channels/lantian/SXwuyi1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",梨园
-https://dxtx.hntv.tv/live/lypd.m3u8?txSecret=10c771842a0be59e8b575d765173ec96&txTime=7B923E0A&wsSecret=41543190cdf375f1c73207222bb96542&wsTime=1769313549
-#EXTINF:-1 group-title="IPTV",武进生活
-http://live.wjyanghu.com/live/CH2.m3u8
-#EXTINF:-1 group-title="IPTV",武进新闻
-https://live.wjyanghu.com/live/CH1.m3u8
-#EXTINF:-1 group-title="IPTV",永城综合
-http://tvpull.dxhmt.cn:9081/tv/11481-1.m3u8
-#EXTINF:-1 group-title="IPTV",汾西综合
-https://qmmqvzoz.live.sxmty.com/live/hls/f24f8a390c084386a564074c9260100c/be3fdf07606145739ab2c4b80fe0136a.m3u8?zshanxd
-#EXTINF:-1 group-title="IPTV",沐川综合
-http://file.ysxtv.cn/cms/videos/nmip-media/channellive/channel4/playlist.m3u8?zsicd
-#EXTINF:-1 group-title="IPTV",江夏新闻综合
-http://59.175.226.142:280/gb28181/xwzh.m3u8?zhubd
-#EXTINF:-1 group-title="IPTV",泸县新闻综合
-http://lxfile.lxxcb.cn:80/nmip-media/channellive/channel103799/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",洞头综合
-http://l.cztvcloud.com/channels/lantian/SXdongtou1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江休闲台
-http://ali-m-l.cztv.com/channels/lantian/channel006/720p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江公共新闻
-http://ali-m-l.cztv.com/channels/lantian/channel007/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江国际
-https://ali-m-l.cztv.com/channels/lantian/channel010/1080p.m3u8?
-#EXTINF:-1 group-title="IPTV",浙江教科
-http://ali-m-l.cztv.com/channels/lantian/channel004/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江教育
-http://ali-m-l.cztv.com/channels/lantian/channel04/720p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江数码时代
-http://ali-m-l.cztv.com/channels/lantian/channel12/720p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江新闻
-http://ali-m-l.cztv.com/channels/lantian/channel007/720p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江民生
-https://ali-m-l.cztv.com/channels/lantian/channel006/1080p.m3u8?
-#EXTINF:-1 group-title="IPTV",浙江民生休闲
-https://ali-m-l.cztv.com/channels/lantian/channel006/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江经济
-http://ali-m-l.cztv.com/channels/lantian/channel03/720p.m3u8
-#EXTINF:-1 group-title="IPTV",浙江经视
-http://ali-m-l.cztv.com/channels/lantian/channel003/720p.m3u8
-#EXTINF:-1 group-title="IPTV",海宁新闻综合
-https://p2hs.vzan.com/slowlive/317913155078575177/live.m3u8
-#EXTINF:-1 group-title="IPTV",浙江钱江都市
-http://ali-xwl.cztv.com/live/channel021080Plxw.m3u8
-#EXTINF:-1 group-title="IPTV",湖州文化娱乐
-http://hzcm-live.media.hugd.com/613c47f0ab0d4eaa98b21378d0db6ded/0051d31c9dd543a7825eea4e49675b2a.m3u8?auth_key=2277598059-0a5ebfa1c0dc4671b42a60810fc37039-0-fa625b7d1feab612062453c12e3c8887
-#EXTINF:-1 group-title="IPTV",湖州新闻综合
-http://hzcm-live.media.hugd.com/3f5fa7d64c7c46a38c6bd8ad35e836cc/65128273761b4731ae53729ea6dcf932.m3u8?auth_key=2277598215-9d21c15111244bea8d298c361d31a72e-0-d031198f58d44b0e91ba2e3f3b188865
-#EXTINF:-1 group-title="IPTV",湖州公共民生
-http://hzcm-live.media.hugd.com/1e6b554b9ab74513958c0e1ffe664d22/9acaa7634309494cb29a85eb12136607.m3u8?auth_key=2272900830-9a2389b8bf4e49d580d4ad807423d326-0-ea78a5c7a678c436263582d368f5009e
-#EXTINF:-1 group-title="IPTV",涟水电视台综合
-http://live1.habctv.com/ggpdsl/sd/live.m3u8
-#EXTINF:-1 group-title="IPTV",淮安影院娱乐
-http://live1.habctv.com/ysylsl/sd/live.m3u8
-#EXTINF:-1 group-title="IPTV",滨海新闻综合
-http://traffic.jbh.tjbh.com/live/bhtv10/playlist.m3u8
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/5e08a38a
+#EXTINF:-1 group-title="IPTV",世界地理
+http://183.10.180.81:9901/tsfile/live/1008_1.m3u8?key=txiptv&playlive=1&authid=0
+#EXTINF:-1 group-title="IPTV",东方影视
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/4c229a27
+#EXTINF:-1 group-title="IPTV",东方购物
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/daa09d27
+#EXTINF:-1 group-title="IPTV",东方购物一台
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/af68a3d2
+#EXTINF:-1 group-title="IPTV",东方购物一台
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/c89f5335
+#EXTINF:-1 group-title="IPTV",六师五家渠新闻综合
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/f878601a
+#EXTINF:-1 group-title="IPTV",兴安盟新闻综合
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/dc9f97e7
+#EXTINF:-1 group-title="IPTV",嘉荫综合
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/b58ef78f
+#EXTINF:-1 group-title="IPTV",庆安综合
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/ffed3db8
+#EXTINF:-1 group-title="IPTV",扶余综合
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/5a609934
+#EXTINF:-1 group-title="IPTV",洮南综合
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/8bd4e03b
+#EXTINF:-1 group-title="IPTV",焦作综合
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/175fa440
 #EXTINF:-1 group-title="IPTV",玛纳斯综合
-http://218.84.127.245:1026/hls/main1/playlist.m3u8?zxinjd,
-#EXTINF:-1 group-title="IPTV",福州生活
-http://live.zohi.tv:80/video/s10001-fztv-3/index.m3u8
-#EXTINF:-1 group-title="IPTV",绍兴公共
-http://live.shaoxing.com.cn/video/s10001-sxtv2/index.m3u8
-#EXTINF:-1 group-title="IPTV",绍兴电视台公共
-http://live.shaoxing.com.cn/video/s10001-sxtv2/index.m3u8?%E5%85%B3%E6%B3%A8%E5%BE%AE%E4%BF%A1%E5%85%AC%E4%BC%97%E5%8F%B7[%E6%99%B4%E5%9B%AD]
-#EXTINF:-1 group-title="IPTV",缙云新闻综合
-http://l.cztvcloud.com/channels/lantian/SXjinyun1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",缙云综合
-http://l.cztvcloud.com/channels/lantian/SXjinyun1/720p.m3u8?zzhed?
-#EXTINF:-1 group-title="IPTV",舒兰新闻综合
-http://stream8.jlntv.cn/shulan/sd/live.m3u8?_upt=332db6421699196585
-#EXTINF:-1 group-title="IPTV",苏州文化生活
-https://live-auth.51kandianshi.com/szgd/csztv3.m3u8
-#EXTINF:-1 group-title="IPTV",苏州新闻综合
-https://live-auth.51kandianshi.com/szgd/csztv1.m3u8
-#EXTINF:-1 group-title="IPTV",苏州生活资讯
-https://live-auth.51kandianshi.com/szgd/csztv5.m3u8
-#EXTINF:-1 group-title="IPTV",苏州社会经济
-https://live-auth.51kandianshi.com/szgd/csztv2.m3u8
-#EXTINF:-1 group-title="IPTV",荥阳综合
-http://tvpull.dxhmt.cn:9081/tv/10182-1.m3u8
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/3a0a545c
+#EXTINF:-1 group-title="IPTV",第一剧场
+http://183.10.180.81:9901/tsfile/live/1082_1.m3u8?key=txiptv&playlive=1&authid=0
 #EXTINF:-1 group-title="IPTV",荥经综合
-https://m3u8channel-yj.yunxya.com/nmip-media/channellive/channel101140/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",萧山新闻综合
-https://l.cztvcloud.com/channels/lantian/SXxiaoshan1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",萧山生活
-https://l.cztvcloud.com/channels/lantian/SXxiaoshan2/720p.m3u8
-#EXTINF:-1 group-title="IPTV",萧山综合
-http://l.cztvcloud.com/channels/lantian/SXxiaoshan1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",西宁新闻综合
-https://liveout.xntv.tv/a65jur/96iln2.m3u8?zqinghd
-#EXTINF:-1 group-title="IPTV",诸暨新闻综合
-https://l.cztvcloud.com/channels/lantian/SXzhuji3/720p.m3u8
-#EXTINF:-1 group-title="IPTV",象山新闻综合
-http://l.cztvcloud.com/channels/lantian/SXxiangshan1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",象山综合
-http://play-sh13.quklive.com/live/1702360350551252.m3u8?auth_key=2037107484-800189c57a5a44d3b823b60cf84f6756-0-a6f6828a62d5c167cff5e68735fa0d39
-#EXTINF:-1 group-title="IPTV",铜梁综合
-http://183.64.174.171:40123/ch1.m3u8?zzhongqd
-#EXTINF:-1 group-title="IPTV",镇江二套社会民生
-http://zjtv-wshls.homecdn.com/live/2aa16.m3u8
-#EXTINF:-1 group-title="IPTV",镇江新闻综合
-http://cm-wshls.homecdn.com/live/2aa50.m3u8
-#EXTINF:-1 group-title="IPTV",雅安新闻综合
-https://play.yunxya.com/channellive/xinwen.m3u8
-#EXTINF:-1 group-title="IPTV",青川综合
-http://qcfile.qcrmt.com/nmip-media/channellive/channel100933/playlist.m3u8
-#EXTINF:-1 group-title="IPTV",黑龙江文体
-https://idclive.hljtv.com:4430/live/hljwy_hd.m3u8
-#EXTINF:-1 group-title="IPTV",黑龙江都市
-https://idclive.hljtv.com:4430/live/dushi_hd.m3u8
-#EXTINF:-1 group-title="IPTV",龙泉新闻综合
-http://l.cztvcloud.com/channels/lantian/SXlongquan1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",龙游新闻综合
-https://l.cztvcloud.com/channels/lantian/SXlongyou1/720p.m3u8
-#EXTINF:-1 group-title="IPTV",龙游生活娱乐
-https://l.cztvcloud.com/channels/lantian/SXlongyou2/720p.m3u8
-#EXTINF:-1 group-title="IPTV",CGTN纪录
-https://english-livebkali.cgtn.com/live/doccgtn_0.m3u8
-#EXTINF:-1 group-title="IPTV",航拍中国第二季
-http://newcntv.qcloudcdn.com/asp/hls/4000/0303000a/3/default/2bdfdad540b342f592f9817cb7f3b79a/4000.m3u8
-#EXTINF:-1 group-title="IPTV",东丰
-http://stream5.jlntv.cn/df/sd/live.m3u8?zjild
-#EXTINF:-1 group-title="IPTV",之江纪录
-http://ali-m-l.cztv.com/channels/lantian/channel012/1080p.m3u8
-#EXTINF:-1 group-title="IPTV",人与自然
-http://newcntv.qcloudcdn.com/asp/hls/1200/0303000a/3/default/1425e1d505654cb48ba82b807b221193/1200.m3u8
-#EXTINF:-1 group-title="IPTV",柳河
-http://stream5.jlntv.cn/lh/sd/live.m3u8?zjild
-#EXTINF:-1 group-title="IPTV",桦甸
-http://stream10.jlntv.cn/huadian/sd/live.m3u8?zjild
-#EXTINF:-1 group-title="IPTV",江津新闻
-http://222.179.155.21:1935/ch1.m3u8?zzhongqd
-#EXTINF:-1 group-title="IPTV",玛纳斯
-http://218.84.127.245:1026/hls/main1/playlist.m3u8?zxinjd
-#EXTINF:-1 group-title="IPTV",珲春新闻
-http://stream8.jlntv.cn/hctv/sd/live.m3u8?zjild
-#EXTINF:-1 group-title="IPTV",磐石
-http://stream5.jlntv.cn/ps/sd/live.m3u8?zjild
-#EXTINF:-1 group-title="IPTV",舒兰新闻
-http://stream8.jlntv.cn/shulan/sd/live.m3u8?zjild
-#EXTINF:-1 group-title="IPTV",飞碟之谜01
-https://hls.cntv.lxdns.com/asp/hls/2000/0303000a/3/default/f0a47e155d32450daa1d36a04fd7d262/2000.m3u8
-#EXTINF:-1 group-title="IPTV",飞碟之谜02
-https://newcntv.qcloudcdn.com/asp/hls/2000/0303000a/3/default/d2454bbb542d4613a9db478dab2addfd/2000.m3u8
-#EXTINF:-1 group-title="IPTV",音乐欣赏
-http://61.221.215.25:8800/hls/49/index.m3u8
-#EXTINF:-1 group-title="IPTV",1987年春晚
-https://txmov2.a.kwimgs.com/bs3/video-hls/5195746663405928031_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",1988年春晚
-https://txmov2.a.kwimgs.com/bs3/video-hls/5216575810935394655_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",1989年春晚
-https://txmov2.a.kwimgs.com/bs3/video-hls/5194620763762726260_hlsb.m3u8
-#EXTINF:-1 group-title="IPTV",2025年春晚
-https://svip.high24-playback.com/20250129/17159_7bca93c4/2000k/hls/mixed.m3u8
-#EXTINF:-1 group-title="IPTV",中央电视塔东
-https://gcalic.v.myalicdn.com/gc/ztd_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",丽江古城万古楼遥望玉龙雪山
-https://gcalic.v.myalicdn.com/gc/ljgcwglytylxs_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",丽江古城大水车
-https://gcalic.v.myalicdn.com/gc/ljgcdsc_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",丽江古城大研花巷观景
-https://gcalic.v.myalicdn.com/gc/ljgcdyhxgjt_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",乌镇蓝印花布
-https://gcalic.v.myalicdn.com/gc/zjwzlyhb_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",乌镇西市河
-https://gcalic.v.myalicdn.com/gc/zjwzbblh_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",乐山大佛全景
-https://gcalic.v.myalicdn.com/gc/lsdfgfl_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南丽江冰川
-https://gcalic.v.myalicdn.com/gc/hkylxs05_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南丽江印象实景
-https://gcalic.v.myalicdn.com/gc/hkylxs01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南丽江玉龙雪山
-https://gcalic.v.myalicdn.com/gc/ylxs11_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南丽江玉龙雪山草甸
-https://gcalic.v.myalicdn.com/gc/hkylxs06_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南丽江蓝月谷
-https://gcalic.v.myalicdn.com/gc/ylxs12_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南大理崇圣寺三塔中景
-https://gcalic.v.myalicdn.com/gc/dlst03_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南大理崇圣寺三塔远景
-https://gcalic.v.myalicdn.com/gc/dlst01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",云南白沙远眺玉龙雪山
-https://gcalic.v.myalicdn.com/gc/hkylxs03_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",八里沟风景区天界山玻璃栈道
-https://gcalic.v.myalicdn.com/gc/blg03_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",八里沟风景区桃花湾瀑布
-https://gcalic.v.myalicdn.com/gc/blg05_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",六盘山红军长征景区
-https://gcalic.v.myalicdn.com/gc/lpsgmjng01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",厦门鼓浪屿
-https://gcalic.v.myalicdn.com/gc/gly01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",四川四姑娘山隆珠措
-https://gcalic.v.myalicdn.com/gc/sgns02_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",四川峨眉山远眺万佛顶
-https://gcalic.v.myalicdn.com/gc/emswfs_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",天涯石
-https://gcalic.v.myalicdn.com/gc/tyhjtys_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",安徽池州九华山风景区九华山
-https://gcalic.v.myalicdn.com/gc/jhs05_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",广西桂林漓江景区
-https://gcalic.v.myalicdn.com/gc/gllj01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",张掖七彩丹霞
-https://gcalic.v.myalicdn.com/gc/zyqcdx01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",恒山悬空寺全景
-https://gcalic.v.myalicdn.com/gc/hsxksqj_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",普陀山
-https://gcalic.v.myalicdn.com/gc/pts01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",月牙泉
-https://gcalic.v.myalicdn.com/gc/dhyyqsm_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",望乡台
-https://gcalic.v.myalicdn.com/gc/hlwxt_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",江苏南京牛首山
-https://gcalic.v.myalicdn.com/gc/nss01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",江苏徐州云龙湖风景区云龙山观景台西
-https://gcalic.v.myalicdn.com/gc/ylh04_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",泰山主峰
-https://gcalic.v.myalicdn.com/gc/taishan01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",泰山十八盘
-https://gcalic.v.myalicdn.com/gc/taishan05_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",泰山太平岭
-https://gcalic.v.myalicdn.com/gc/hkts09_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",泰山望人松
-https://gcalic.v.myalicdn.com/gc/taishan02_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",泰山白云亭悬崖
-https://gcalic.v.myalicdn.com/gc/hkts02_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",泰山碧霞祠
-https://gcalic.v.myalicdn.com/gc/hkts03_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",浙江舟山东极岛
-https://gcalic.v.myalicdn.com/gc/djd01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",湖南张家界宝峰湖
-https://gcalic.v.myalicdn.com/gc/zjjbfh_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",湖南张家界御笔峰
-https://gcalic.v.myalicdn.com/gc/zjjybf_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",湖南张家界水绕四门
-https://gcalic.v.myalicdn.com/gc/zjjsrsm_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",狮子山鸟瞰丽江古城
-https://gcalic.v.myalicdn.com/gc/ljgcszsnkgc_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",直播中国
-https://gcalic.v.myalicdn.com/gc/wgw05_1/index.m3u8?contentid=2820180516001
-#EXTINF:-1 group-title="IPTV",直播中国精编直播
-https://gcalic.v.myalicdn.com/gc/wgw05_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",福建武夷山玉女峰
-https://gcalic.v.myalicdn.com/gc/wysynf_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",福建漳州醉美沙滩翡翠湾
-https://gcalic.v.myalicdn.com/gc/fcw03_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",贵州省兴义市万峰林
-https://gcalic.v.myalicdn.com/gc/xywfl_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",都江堰鱼嘴
-https://gcalic.v.myalicdn.com/gc/djyqyl1_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",陕西洋县国宝朱鹮02
-https://gcalic.v.myalicdn.com/gc/zh02_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",雪乡大石碑
-https://gcalic.v.myalicdn.com/gc/mdjxxdsb_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",雪乡梦幻家园
-https://gcalic.v.myalicdn.com/gc/mdjxxmhjyxj_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",青岛崂山八水河
-https://gcalic.v.myalicdn.com/gc/qdls02_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",黄山
-https://gcalic.v.myalicdn.com/gc/ahhs01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",黄山始信新道
-https://gcalic.v.myalicdn.com/gc/hsyg_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",黄山排云亭
-https://gcalic.v.myalicdn.com/gc/hspyt_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",黄花城水长城01
-https://gcalic.v.myalicdn.com/gc/wgw01_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",黄花城水长城03
-https://gcalic.v.myalicdn.com/gc/wgw03_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",黄龙
-https://gcalic.v.myalicdn.com/gc/hlzycc_1/index.m3u8
-#EXTINF:-1 group-title="IPTV",ABN China (720p)
-https://mediaserver.abnvideos.com/streams/abnchina.m3u8
-#EXTINF:-1 group-title="IPTV",Anhui TV
-https://restream.pdtvhd.com/memfs/c1cd2ed0-3b2b-4c25-af98-a7fb0b1eb130.m3u8
-#EXTINF:-1 group-title="IPTV",Hunan TV (2160p)
-http://hlsal-ldvt.qing.mgtv.com/nn_live/nn_x64/dWlwPTEyNy4wLjAuMSZ1aWQ9cWluZy1jbXMmbm5fdGltZXpvbmU9OCZjZG5leF9pZD1hbF9obHNfbGR2dCZ1dWlkPTliODY4NmU5ZTM2YzYwMmMmZT02OTE0NjA0JnY9MSZpZD1ITldTWkdTVCZzPTcwN2RiYTc2YzJjNmJmMTQ4MmUyZGYzOWU2NWM3YWFi/HNWSZGST.m3u8
-#EXTINF:-1 group-title="IPTV",Bread TV (720p)
-https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
-#EXTINF:-1 group-title="IPTV",Nei Monggol TV (960p)
-https://cdn4.skygo.mn/live/disk1/NeigMGL/HLSv3-FTA/NeigMGL.m3u8
-#EXTINF:-1 group-title="IPTV",Guangzhou TV
-https://tencentplaybusiness.gztv.com/live/zonghes.m3u8
-#EXTINF:-1 group-title="IPTV",Siping TV
-http://stream2.jlntv.cn/sptv/sd/live.m3u8?_upt=f27750421743154598
-#EXTINF:-1 group-title="IPTV",CCTV-9 (576i)
-https://xykt-fix.github.io/Y77.m3u8
-#EXTINF:-1 group-title="IPTV",CGTN英语
-https://english-livebkali.cgtn.com/live/encgtn_0.m3u8
-#EXTINF:-1 group-title="IPTV",春晚2026
-https://v.lzcdn28.com/20260217/8616_1de9f6e5/index.m3u8
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/c1dcfe2d
+#EXTINF:-1 group-title="IPTV",黑水电视台
+https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/58fc9dac
