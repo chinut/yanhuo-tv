@@ -332,12 +332,22 @@ object DebugWebServer {
                         if (!tokenOk(query, body)) {
                             respond(out, 403, """{"ok":false,"error":"token"}""", JSON_UTF8)
                         } else {
+                            // ⚠️ 必须同时读 body 和 **URL 查询串**。
+                            //
+                            // 原来只读 body（`parseForm`），所以
+                            // `GET /api/remote/key?code=20` 这种写法读不到参数 →
+                            // 键码恒为 0 → `{"ok":false,"keyCode":0,"consumed":false}`
+                            // → **什么都没按**（实测：监控窗口所有按键都无效）。
+                            //
+                            // `/volume` 和 `/mute` 早就是两个都读，只有这里漏了。
                             val p = parseForm(body)
+                            val q = parseQuery(query)
+                            fun arg(k: String): String? = p[k] ?: q[k]
                             // 键码可以直接给 keyCode（Android 键码），
-                            // 也可以用 key 传语义名，两者都支持 —— 手机端写哪个都行
-                            val code = p["keyCode"]?.toIntOrNull()
-                                ?: keyNameToCode(p["key"].orEmpty())
-                            val action = if (p["action"] == "up") KeyEvent.ACTION_UP
+                            // 也可以用 code / key 传，语义名也支持 —— 怎么调都行
+                            val code = (arg("keyCode") ?: arg("code"))?.toIntOrNull()
+                                ?: keyNameToCode(arg("key").orEmpty())
+                            val action = if (arg("action") == "up") KeyEvent.ACTION_UP
                             else KeyEvent.ACTION_DOWN
                             val consumed = if (code != 0) RemoteBus.injectKey(code, action) else false
                             respond(
