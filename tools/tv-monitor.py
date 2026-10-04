@@ -18,6 +18,27 @@
   而 `screencap` 是系统级合成结果，连视频画面一起抓得到
 · ADB 本来就连着，不需要额外改 App
 
+## ⚠️ 帧率的硬限制（实测，别再怀疑自己）
+
+    adb 纯往返           0.07 秒   ← 网络没问题
+    电视「拍一张」        2.61 秒   ← **瓶颈在这里**
+      -g 图形层            2.61 秒
+      -a 图形+视频         2.96 秒
+      -p PNG              3.67 秒
+      -v 只视频层          0.68 秒   ← 快 4 倍，但拍不到界面（只有视频画面）
+
+慢在**老电视 GPU 读回整帧 1920x1080 帧缓冲**，和网络、和本程序都无关。
+**上限就是约 0.4 帧/秒。**
+
+想要真正实时（30 帧）请用 `scrcpy` —— 它是把设备屏幕**编码成视频流**，
+走的是完全不同的通道，不受这个限制。本窗口的定位是
+**"能遥控 + 能看到画面"**，不是"实时投屏"。
+
+本程序在这个限制内做了三件事让它尽量跟手：
+1. 按过键之后**取消等待、立刻抓一帧**（这一下最影响手感）
+2. 连续操作时用最快节奏
+3. 状态条显示**实际帧率**（让你知道当前速度，而不是"感觉慢但不知道为什么"）
+
 ## 踩过的两个坑（都写在这里，免得以后重踩）
 
 ### 坑 1：小米电视的 `screencap` 会在 PNG 前面多输出一行
@@ -60,7 +81,8 @@ import urllib.request
 # ---------- 可配置 ----------
 ADB = r'C:\Users\Administrator\AppData\Local\Android\Sdk\platform-tools\adb.exe'
 HTTP_PORT = 8899          # App 调试服务端口（被占时 App 会自动往后换）
-SHOT_INTERVAL_MS = 900    # 截图间隔（一帧约 4.5 秒，这个值是最小间隔）
+SHOT_INTERVAL_MS = 150    # 每帧之间的**额外**等待（抓一帧本身就要 2.6 秒）
+FAST_AFTER_KEY_MS = 4000  # 按过键之后这段时间内用最快节奏
 SHOT_WIDTH = 960          # 显示宽度（缩放省电脑 CPU）
 STATUS_EVERY_MS = 3000    # 状态刷新间隔
 
@@ -71,6 +93,10 @@ KEY = {
     'play': 85, 'prev': 88, 'next': 87,
     'volup': 24, 'voldown': 25, 'mute': 164, 'power': 26,
 }
+
+
+# 抓帧临时文件的轮换序号（避免同名冲突，见 grab_png 注释）
+_SHOT_SEQ = 0
 
 
 def find_serial(explicit=None):
@@ -95,32 +121,43 @@ def grab_png(serial, timeout=25):
 
     两个坑见文件顶部注释：要剥掉 toybox 的前缀、要绕开文本管道。
     """
-    tmp = os.path.join(tempfile.gettempdir(), '_tvmon_shot.png')
-    try:
-        if os.path.exists(tmp):
-            os.remove(tmp)
-    except Exception:
-        pass
+    # ⚠️ 每次用**不同的文件名**。
+    #
+    # 踩过的坑：原来固定用 `_tvmon_shot.png`，于是
+    #   · 抓帧线程正在用这个文件时，下一次抓帧要先删它 →
+    #     Windows 报 PermissionError（文件被占用）→ 抓帧整个失败
+    #   · 两个进程同时跑（比如我在旁边跑测试脚本）也会互相踩
+    # 实测症状：`grab_png` 一直返回 None、监控窗口画面不更新。
+    #
+    # 用序号轮换 + 抓完就删，就没有冲突了。
+    global _SHOT_SEQ
+    _SHOT_SEQ = (_SHOT_SEQ + 1) % 4
+    tmp = os.path.join(tempfile.gettempdir(), '_tvmon_shot_%d.png' % _SHOT_SEQ)
 
     try:
         # 用 cmd 重定向，避免 Python 文本管道做 CRLF 转换
         cmd = '"%s" -s %s exec-out screencap -p > "%s"' % (ADB, serial, tmp)
-        r = subprocess.run(cmd, shell=True, capture_output=True, timeout=timeout)
+        subprocess.run(cmd, shell=True, capture_output=True, timeout=timeout)
         if not os.path.exists(tmp):
             return None
         raw = open(tmp, 'rb').read()
     except Exception:
         return None
+    finally:
+        # 抓完就删，别留垃圾；删不掉也不影响（下次用另一个名字）
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
 
     # 坑 1：剥掉 PNG 之前的前缀（实测是 `argc: 2 \n`）
     i = raw.find(b'\x89PNG')
     if i < 0:
         return None
     png = raw[i:]
-    # 完整性校验：PNG 必须以 IEND 块结束
-    if not png.rstrip(b'\x00').endswith(b'IEND\xaeB`\x82'):
-        if b'IEND' not in png[-32:]:
-            return None
+    # 完整性校验：PNG 必须以 IEND 结束（宽松一点，避免误杀）
+    if b'IEND' not in png[-64:]:
+        return None
     return png
 
 
@@ -165,6 +202,11 @@ class MonitorApp:
         self.running = True
         self._photo = None
         self._last_status = 0
+        # 刚按过键的时间戳 —— 按完立刻抓一帧，最影响"跟手感"
+        self._last_key_at = 0.0
+        # 实际帧率统计
+        self._frame_times = []
+        self._shot_now = threading.Event()
 
         root.title('焰火TV 监控 — %s' % serial)
         root.configure(bg='#0b0d18')
@@ -229,12 +271,24 @@ class MonitorApp:
                         pass
             else:
                 fails = 0
+                # 帧率统计（用最近 6 帧）
+                self._frame_times.append(time.time())
+                if len(self._frame_times) > 6:
+                    self._frame_times.pop(0)
                 try:
                     self.shots.put_nowait(('img', png))
                 except queue.Full:
                     pass
-            cost = (time.time() - t0) * 1000
-            time.sleep(max(0.0, (SHOT_INTERVAL_MS - cost) / 1000.0))
+
+            # 按过键 → 别等，立刻抓下一帧（这是"跟手"的关键）
+            since_key = time.time() - self._last_key_at
+            extra = 0.0
+            if since_key * 1000 > FAST_AFTER_KEY_MS:
+                extra = SHOT_INTERVAL_MS / 1000.0
+
+            # 等 extra；期间如果用户按了键，_shot_now 会被置位，立刻醒
+            self._shot_now.wait(timeout=extra)
+            self._shot_now.clear()
 
     # ---------- 主线程刷新 ----------
     def pump(self):
@@ -252,12 +306,18 @@ class MonitorApp:
             self._last_status = now
             st = self.remote.status()
             if st:
+                fps = 0.0
+                if len(self._frame_times) >= 2:
+                    span = self._frame_times[-1] - self._frame_times[0]
+                    if span > 0:
+                        fps = (len(self._frame_times) - 1) / span
                 self.status.config(
-                    text='界面：%s    音量：%s/%s%s     （键盘方向键可直接遥控）' % (
-                        st.get('screen', '?'), st.get('volume', '?'),
-                        st.get('volumeMax', '?'),
-                        '   静音中' if st.get('muted') else '',
-                    ), fg='#8b95b5')
+                    text='界面：%s    音量：%s/%s%s    %.1f 帧/秒    '
+                         '（键盘方向键可直接遥控）' % (
+                             st.get('screen', '?'), st.get('volume', '?'),
+                             st.get('volumeMax', '?'),
+                             '   静音中' if st.get('muted') else '', fps,
+                         ), fg='#8b95b5')
             else:
                 self.status.config(
                     text='遥控接口连不上 —— 电视上「设置 → 手机网页调试」要开着',
@@ -281,7 +341,16 @@ class MonitorApp:
 
     # ---------- 操作 ----------
     def send(self, name):
-        threading.Thread(target=self.remote.key, args=(name,), daemon=True).start()
+        # 记下按键时间：抓帧循环会据此取消等待、立刻抓一帧
+        self._last_key_at = time.time()
+        self._shot_now.set()
+
+        def do():
+            self.remote.key(name)
+            # 再置一次：等电视把界面画完（约 250ms）后马上取新画面
+            time.sleep(0.25)
+            self._shot_now.set()
+        threading.Thread(target=do, daemon=True).start()
 
     def on_button(self, name):
         if name == 'shot':
