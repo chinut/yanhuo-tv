@@ -69,6 +69,18 @@ object QimaoSource : VideoSource {
     private const val API = "https://xiaoqi.icofun.cn/API/qimao_duanju.php"
 
     private const val FILE_NAME = "qimao_list.tsv"
+
+    /**
+     * 一次拉取的总时长预算。
+     *
+     * 12 个热词**串行**拉，HTTP 是 connect 12s + read 20s —— 不设上限的话，
+     * 电视网络慢时最坏能跑 6 分多钟。用户等不了就切走 →
+     * `LaunchedEffect` 的协程被取消 → 一条都没保存下来 → 下次还是 0 部。
+     *
+     * 25 秒是个折中：够跑完大部分热词，又不至于让用户干等。
+     */
+    private const val TOTAL_BUDGET_MS = 25_000L
+
     private const val SEP = '\u001F'
     private const val LINE_FIELDS = 8
 
@@ -180,14 +192,46 @@ object QimaoSource : VideoSource {
 
         val out = LinkedHashMap<String, UnifiedMovie>()
         var done = 0
+        var okKw = 0
+        var badKw = 0
+
+        // ---------- 总时长预算 ----------
+        //
+        // ⚠️ 这里是"短剧刷不出来"的根因所在（分析见文件顶部注释）：
+        // 12 个热词**串行**拉，HTTP 是 connect 12s + read 20s，
+        // 电视网络稍慢时最坏要 6 分多钟。用户等不了就切走 →
+        // 协程被取消 → saveToDisk 没执行 → 磁盘永远空 → 下次还是 0 部。
+        //
+        // 所以给整体一个预算：超了就停，**拉到多少算多少**。
+        val deadline = System.currentTimeMillis() + TOTAL_BUDGET_MS
+
         for (kw in HOT) {
+            if (System.currentTimeMillis() > deadline) {
+                android.util.Log.w(
+                    TAG,
+                    "拉取超出 ${TOTAL_BUDGET_MS / 1000} 秒预算，停止（已成功 $okKw 个热词）",
+                )
+                break
+            }
             done++
-            val page = runCatching { search(kw, 1) }.getOrDefault(emptyList())
-            page.forEach { m -> out.putIfAbsent(m.id, m) }
+            val page = runCatching { search(kw, 1) }.getOrNull()
+            if (page == null) badKw++
+            if (!page.isNullOrEmpty()) okKw++
+            page.orEmpty().forEach { m -> out.putIfAbsent(m.id, m) }
             onProgress(done, HOT.size, out.size)
+
+            // ⚠️ 拿到一部分就立刻落盘，不等全部拉完。
+            // 这样中途被取消（用户切走）时，下次进来至少有内容。
+            if (out.size > 0 && done % 4 == 0) {
+                runCatching { saveToDisk(out.values.toList()) }
+            }
         }
+
         val list = out.values.toList()
-        android.util.Log.i(TAG, "列表聚合 ${list.size} 部（${HOT.size} 个热词）")
+        android.util.Log.i(
+            TAG,
+            "列表聚合 ${list.size} 部（成功 $okKw / 空 $badKw / 共 ${HOT.size} 个热词）",
+        )
 
         if (list.isNotEmpty()) {
             listCache = list
@@ -257,10 +301,31 @@ object QimaoSource : VideoSource {
     /** 搜索一页。 */
     private suspend fun search(keyword: String, page: Int): List<UnifiedMovie> {
         val url = "$API?name=${enc(keyword)}&page=$page"
-        val text = Net.get(url, ua = Http.UA_MOBILE) ?: return emptyList()
-        val list = runCatching {
+
+        // ---------- 失败原因必须说出来 ----------
+        //
+        // 原来这两行把三种完全不同的失败静默成同一个"空列表"：
+        //   · 网络不通（DNS / 超时 / 被劫持）
+        //   · 返回了非 JSON（运营商插页、错误页）
+        //   · JSON 结构变了（接口改版）
+        // 结果用户在电视上只看到"0 部"，我什么都查不到。
+        val text = Net.get(url, ua = Http.UA_MOBILE)
+        if (text == null) {
+            android.util.Log.w(TAG, "搜索「$keyword」取不到响应（网络/DNS/超时）")
+            return emptyList()
+        }
+        val parsed = runCatching {
             JSONObject(text).getJSONObject("data").getJSONArray("list")
-        }.getOrNull() ?: return emptyList()
+        }
+        if (parsed.isFailure) {
+            android.util.Log.w(
+                TAG,
+                "搜索「$keyword」响应解析失败：${parsed.exceptionOrNull()?.message}" +
+                    " 响应前 200 字=${text.take(200)}",
+            )
+            return emptyList()
+        }
+        val list = parsed.getOrThrow()
 
         val out = ArrayList<UnifiedMovie>(list.length())
         for (i in 0 until list.length()) {
