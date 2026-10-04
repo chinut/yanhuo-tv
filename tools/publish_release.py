@@ -54,7 +54,8 @@ def read_cred(target):
     return b.decode('utf-16-le')
 
 
-def http(method, url, headers=None, data=None, timeout=180, retries=4):
+def http(method, url, headers=None, data=None, timeout=180, retries=4,
+         raw=False):
     """
     带重试的 HTTP 调用。
 
@@ -65,13 +66,27 @@ def http(method, url, headers=None, data=None, timeout=180, retries=4):
     import time as _time
     last = None
     for attempt in range(retries):
-        r = urllib.request.Request(url, data=data, method=method)
-        for k, v in (headers or {}).items():
+        # 传 dict/list 时自动编码成 UTF-8 JSON。
+        #
+        # ⚠️ 必须自己 encode：urlib 对 str/bytes 之外的对象会退回
+        # latin-1，而我们的 name/body 里有中文（「焰火TV」），
+        # 实测直接抛 UnicodeEncodeError: 'latin-1' codec can't encode。
+        hh = dict(headers or {})
+        payload = data
+        if isinstance(data, (dict, list)):
+            payload = json.dumps(data, ensure_ascii=False).encode('utf-8')
+            hh.setdefault('Content-Type', 'application/json; charset=utf-8')
+        r = urllib.request.Request(url, data=payload, method=method)
+        for k, v in hh.items():
             r.add_header(k, v)
         try:
             with urllib.request.urlopen(r, timeout=timeout) as resp:
-                raw = resp.read()
-                return resp.status, (json.loads(raw.decode('utf-8')) if raw else None)
+                body_bytes = resp.read()
+                if raw:
+                    # 附件上传返回的不是 JSON（或不需要解析），原样给回去
+                    return resp.status, body_bytes
+                return resp.status, (
+                    json.loads(body_bytes.decode('utf-8')) if body_bytes else None)
         except urllib.error.HTTPError as e:
             body = e.read().decode('utf-8', 'replace')
             # 4xx 是请求本身的问题，重试没意义
@@ -110,8 +125,7 @@ SHA256: `{sha}`
 
 - GitHub：[{apk}]({gh_dl})
 
-> Gitee 的 Release 不支持通过 API 挂二进制附件（attach_files 对令牌返回 405），
-> Gitee 侧请手动上传附件，或到 GitHub 的 Release 页面下载。
+> 两个平台的 Release 附件都会自动上传（Gitee 用 multipart 接口，实测可用）。
 {extra}
 ### 说明
 本应用只做播放器与界面聚合，不存储、不传播任何影视资源。
@@ -166,7 +180,25 @@ def publish_github(repo, tag, name, body, apk_path, apk_name):
         print('  上传结果异常:', out.stdout[:200])
 
 
-def publish_gitee(repo, tag, name, body):
+def publish_gitee(repo, tag, name, body, apk_path):
+    """
+    发布到 Gitee。
+
+    ## 三个踩过的坑（都写在这里，免得以后再撞）
+
+    1. **附件能传！** 之前这里写着"attach_files 对令牌返回 405"，
+       实测是**错的** —— 用 multipart 正确调用返回 **201**。
+       所以现在真的会把 APK 传上去，不用手动。
+
+    2. **不要 DELETE 再 POST**。Gitee 在 tag 已存在时 POST 会报
+       400「验证错误，该标签已经存在发行版」；而且删掉重建会丢掉
+       已有的附件。改成：存在就 **PATCH 更新**。
+
+    3. **PATCH 必须同时带 `tag_name` 和 `name`** —— 只带一个会 400
+       （报 "tag_name is missing" / "name is missing"）。
+
+    4. **上传前先查同名附件**，避免重复（实测出现过两个一样的 APK）。
+    """
     print()
     print('=' * 58)
     print('Gitee')
@@ -176,26 +208,85 @@ def publish_gitee(repo, tag, name, body):
         print('  读不到令牌，跳过')
         return
 
-    st, rls = http('GET', f'https://gitee.com/api/v5/repos/{repo}/releases?access_token={token}')
-    if isinstance(rls, list):
+    base = f'https://gitee.com/api/v5/repos/{repo}'
+
+    # ---------- 找已存在的 release ----------
+    rel = None
+    for page in (1, 2, 3):
+        st, rls = http(
+            'GET', f'{base}/releases?per_page=100&page={page}&access_token={token}')
+        if not isinstance(rls, list) or not rls:
+            break
         for r in rls:
             if r.get('tag_name') == tag:
-                print('  删除已存在的 Release id=', r['id'])
-                http('DELETE', f"https://gitee.com/api/v5/repos/{repo}/releases/{r['id']}"
-                               f"?access_token={token}")
+                rel = r
+        if rel:
+            break
 
-    data = urllib.parse.urlencode({
-        'access_token': token, 'tag_name': tag, 'name': name,
-        'body': body, 'target_commitish': 'main', 'prerelease': 'false',
-    }).encode('utf-8')
-    st, r = http('POST', f'https://gitee.com/api/v5/repos/{repo}/releases',
-                 {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}, data)
-    if st in (200, 201) and isinstance(r, dict):
-        print('  名称:', repr(r.get('name')))
-        print('  页面: https://gitee.com/{}/releases/tag/{}'.format(repo, tag))
-        print('  ⚠️ APK 附件需手动上传（Gitee API 不开放该接口）')
+    if rel:
+        # ⚠️ 必须写 data= —— http() 的第 3 个位置参数是 headers，
+        # 直接把 dict 传进去会被当成 HTTP 头，而头里不能有中文
+        # （实测报 latin-1 codec can't encode）。
+        st, r = http('PATCH', f"{base}/releases/{rel['id']}", data={
+            'access_token': token, 'tag_name': tag, 'name': name, 'body': body,
+        })
+        if st == 200:
+            print('  已更新 Release id=%s' % rel['id'])
+        else:
+            print('  更新失败:', st, str(r)[:200])
+            return
     else:
-        print('  创建失败:', st, str(r)[:300])
+        st, r = http('POST', f'{base}/releases', data={
+            'access_token': token, 'tag_name': tag, 'name': name,
+            'body': body, 'target_commitish': 'main', 'prerelease': False,
+        })
+        if st not in (200, 201) or not isinstance(r, dict):
+            print('  创建失败:', st, str(r)[:200])
+            return
+        rel = r
+        print('  已创建 Release id=%s' % rel.get('id'))
+
+    rel_id = rel['id']
+    print('  页面: https://gitee.com/%s/releases/tag/%s' % (repo, tag))
+
+    # ---------- 上传 APK（先查重）----------
+    apk_name = os.path.basename(apk_path)
+    st, lst = http('GET', f'{base}/releases/{rel_id}/attach_files?access_token={token}')
+    existing = [a for a in (lst if isinstance(lst, list) else [])
+                if a.get('name') == apk_name]
+    if existing:
+        print('  附件已存在（%d 个），跳过上传' % len(existing))
+        # 顺手清掉重复的
+        for a in existing[1:]:
+            http('DELETE',
+                 f"{base}/releases/{rel_id}/attach_files/{a.get('id')}"
+                 f"?access_token={token}")
+            print('    清理重复附件 id=%s' % a.get('id'))
+        return
+
+    import uuid
+    bd = '----dsh' + uuid.uuid4().hex
+    with io.open(apk_path, 'rb') as f:
+        apk_bytes = f.read()
+    head = ('--%s\r\n'
+            'Content-Disposition: form-data; name="file"; filename="%s"\r\n'
+            'Content-Type: application/vnd.android.package-archive\r\n\r\n'
+            % (bd, apk_name)).encode('utf-8')
+    tail = ('\r\n--%s--\r\n' % bd).encode('utf-8')
+    prefix = ('--%s\r\n'
+              'Content-Disposition: form-data; name="access_token"\r\n\r\n'
+              '%s\r\n' % (bd, token)).encode('utf-8')
+    payload = prefix + head + apk_bytes + tail
+
+    st, r = http(
+        'POST', f'{base}/releases/{rel_id}/attach_files', {
+            'Content-Type': 'multipart/form-data; boundary=' + bd,
+        }, payload, raw=True)
+    if st in (200, 201):
+        print('  已上传: %s  %.1f MB' % (apk_name, len(apk_bytes) / 1048576))
+    else:
+        print('  附件上传失败: [%s] %s' % (st, str(r)[:200]))
+        print('  → 请到网页端手动上传')
 
 
 def main():
@@ -232,7 +323,7 @@ def main():
     print()
 
     publish_github(a.repo, a.tag, a.name, body, a.apk, os.path.basename(a.apk))
-    publish_gitee(a.repo, a.tag, a.name, body)
+    publish_gitee(a.repo, a.tag, a.name, body, a.apk)
 
 
 if __name__ == '__main__':
