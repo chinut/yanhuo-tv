@@ -688,7 +688,7 @@ private fun HomeEntryCard(
         Box(Modifier.matchParentSize().background(fallbackBrush))
 
         if (posters.isNotEmpty()) {
-            // 每 9 秒换一张。
+            // 每 11 秒换一张（淡入本身占 1.1 秒，间隔太短会显得一直在动）。
             //
             // ⚠️ key 里带 posters.size：列表后到时重新起算，
             // 否则 index 可能越界。
@@ -696,33 +696,78 @@ private fun HomeEntryCard(
             LaunchedEffect(posters.size) {
                 if (posters.size <= 1) return@LaunchedEffect
                 while (true) {
-                    kotlinx.coroutines.delay(9_000L)
+                    kotlinx.coroutines.delay(11_000L)
                     idx = (idx + 1) % posters.size
                 }
             }
             val url = posters.getOrNull(idx) ?: posters.first()
 
-            // 交叉淡入：同一时刻只挂两张（旧的 + 新的），
-            // 比一次挂 6 张省内存 —— 老电视上这点很实在。
-            // ⚠️ 不用 Crossfade：它的内容 lambda 里 `matchParentSize()`
-            // 拿不到尺寸，实测**海报完全不显示**（卡片只剩渐变）。
-            // 改成自己叠一个 Box + 动画 alpha，尺寸可靠。
+            // ---------- 交叉淡入 ----------
+            //
+            // ⚠️ 不能用 Crossfade：它内容 lambda 里的 `matchParentSize()`
+            // 拿不到尺寸，实测海报完全不显示（只剩渐变）。
+            // 所以自己搭：两个槽位交替 —— 同一时刻只挂两张图，
+            // 比"每张都挂一遍"省内存，老电视上这点很实在。
+            //
+            // 上一版为了修显示问题把淡入也丢了 → 变成硬切（用户反馈
+            // 「切换过于生硬了吧同志」）。这里补回来。
+            val slotA = remember(posters.size) { mutableStateOf(true) }
+            var layerA by remember(posters.size) { mutableStateOf(url) }
+            var layerB by remember(posters.size) { mutableStateOf("") }
+
+            LaunchedEffect(url) {
+                if (layerA == url) return@LaunchedEffect
+                // 写进"当前不可见"的槽位，再把可见位切过去 → 触发淡入
+                if (slotA.value) layerB = url else layerA = url
+                slotA.value = !slotA.value
+            }
+
+            val aAlpha by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (slotA.value) 1f else 0f,
+                animationSpec = androidx.compose.animation.core.tween(1_100),
+                label = "posterA",
+            )
+            val bAlpha by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (slotA.value) 0f else 1f,
+                animationSpec = androidx.compose.animation.core.tween(1_100),
+                label = "posterB",
+            )
+
             Box(Modifier.matchParentSize()) {
-                AsyncImage(
-                    model = url,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        // 放大并偏置 —— 只露出海报的一部分，
-                        // 看起来像"剧照"而不是缩略图（用户要的那种感觉）
-                        .graphicsLayer {
-                            scaleX = 1.28f
-                            scaleY = 1.28f
-                            translationX = -46f
-                            translationY = 30f
-                        },
-                )
+                // 旧图（正在淡出）
+                if (layerA.isNotBlank() && aAlpha > 0.01f) {
+                    AsyncImage(
+                        model = layerA,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = aAlpha
+                                scaleX = 1.28f
+                                scaleY = 1.28f
+                                translationX = -46f
+                                translationY = 30f
+                            },
+                    )
+                }
+                // 新图（正在淡入）
+                if (layerB.isNotBlank() && bAlpha > 0.01f) {
+                    AsyncImage(
+                        model = layerB,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = bAlpha
+                                scaleX = 1.28f
+                                scaleY = 1.28f
+                                translationX = -46f
+                                translationY = 30f
+                            },
+                    )
+                }
             }
             // 从下往上渐变压暗，保证文字在任何海报上都读得清
             Box(
