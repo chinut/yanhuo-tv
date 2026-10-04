@@ -103,12 +103,54 @@ object OpenSourceCatalog {
     private const val MIRROR =
         "https://cdn.jsdelivr.net/gh/best-fan/iptv-sources@main/"
 
-    /** 用 `_status` 变体（带分辨率标记）。 */
+    /**
+     * best-fan 的 `_status` 变体（带分辨率标记）。
+     *
+     * 只保留这一个来源的 4 个文件 —— best-fan 近 30 天有 30 次提交，
+     * 属于"活跃维护"（判据见 [MAINTAINED] 的说明）。
+     */
     private val FILES = listOf(
         "cn_all_status.m3u8",
         "cn_cctv_status.m3u8",
         "cn_province_status.m3u8",
         "cn_pay_status.m3u8",
+    )
+
+    /**
+     * 其他**活跃维护**的订阅源（按维护强度排序）。
+     *
+     * # 筛选判据
+     *
+     * **近 30 天 GitHub 提交 >= 20 次。** 实测数据（2026-10-04）：
+     *
+     * | 仓库 | 星数 | 近30天提交 | 结论 |
+     * |---|---|---|---|
+     * | iptv-org/iptv | 140242 | 100 | ✅ 留 |
+     * | fanmingming/live | 28497 | 100 | ✅ 留 |
+     * | vbskycn/iptv | 8837 | 86 | ✅ 留 |
+     * | best-fan/iptv-sources | 786 | 30 | ✅ 留（主来源）|
+     * | YanG-1989/m3u | 11452 | 2 | ❌ 删（近停更）|
+     * | yuanzl77/IPTV | 2122 | 2 | ❌ 删（且仓库无 m3u）|
+     * | Kimentanm/aptv | 2864 | 1 | ❌ 删（近停更）|
+     *
+     * 用户要求「不被维护的则删除不留，以防远期无法使用」——
+     * 所以判据卡在"提交频率"，而不是"星数"。
+     * 星数高但停更的（YanG-1989 ★11452）照样删。
+     *
+     * # 已被删掉的两个非 GitHub 来源
+     *
+     * · **iptv-search.com** —— 它的 `/live/fav/{token}/...` 里 token 是**临时的**。
+     *   实测第一次验证时 CCTV15/16/17 能用，几十分钟后**全部解不出帧**。
+     *   这种不能作为长期来源。
+     * · **freeiptv.app** —— 是个目录站，自己没有源（页面里那个 m3u 就是 iptv-org 的）。
+     */
+    private val MAINTAINED = listOf(
+        // ★140242，100 次/30天。最权威，有 EPG、按国家/语言分类
+        "https://iptv-org.github.io/iptv/countries/cn.m3u",
+        // ★28497，100 次/30天。中文源最全的之一，CCTV-1~17 全有
+        "https://live.fanmingming.com/tv/m3u/index.m3u",
+        // ★8837，86 次/30天
+        "https://raw.githubusercontent.com/vbskycn/iptv/master/tv/iptv4.m3u",
     )
 
     /**
@@ -125,6 +167,7 @@ object OpenSourceCatalog {
      * 而且它**CCTV-1~17 全都有**（best-fan 缺 15/16/17）。
      * 这个仓库是 IPTV 圈最老牌、维护最规范的之一（有 EPG、按国家/语言分类）。
      */
+    @Suppress("unused")
     private val IPTV_ORG = "https://iptv-org.github.io/iptv/countries/cn.m3u"
 
     /**
@@ -201,12 +244,20 @@ object OpenSourceCatalog {
             }
             val groups = ArrayList<LiveGroup>()
             var date = ""
-            // iptv-org 的中国列表（实测可用率最高）
-            runCatching { fetchOne(IPTV_ORG) }.getOrNull()?.let { org ->
-                if (org.contains("#EXTINF")) {
-                    date = Regex("#EXTM3U[^\n]*").find(org)
-                        ?.value?.take(60).orEmpty().ifBlank { date }
-                    parseIptvOrg(org)?.let { groups.add(it) }
+            // 活跃维护的其他来源（iptv-org / fanmingming / vbskycn）
+            //
+            // 预算内能拉几个是几个 —— 拉不到的跳过，不影响已有结果。
+            for (src in MAINTAINED) {
+                if (System.currentTimeMillis() > deadline) break
+                val text = runCatching { fetchOne(src) }.getOrNull() ?: continue
+                if (!text.contains("#EXTINF")) continue
+                parseIptvOrg(text)?.let { g ->
+                    if (g.channels.isNotEmpty()) {
+                        groups.add(g)
+                        android.util.Log.i(
+                            TAG, "拉到 " + src.take(46) + "：${g.channels.size} 个",
+                        )
+                    }
                 }
             }
             for (f in FILES) {
