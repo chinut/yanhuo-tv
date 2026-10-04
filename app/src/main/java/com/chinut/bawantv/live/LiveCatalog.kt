@@ -396,6 +396,137 @@ object LiveCatalog {
         }.filter { it.channels.isNotEmpty() }
     }
 
+    /**
+     * 并表用的频道 key。
+     *
+     * 和 [normalizeName] 的区别：**央视台只认频道号**。
+     *
+     * 实测踩的坑：`CCTV1` 和 `CCTV-1 综合` 归一化后是 `cctv1` 和 `cctv1综合`，
+     * 两个 key 不一样 → **同一个 CCTV-1 在换台表里出现两次**，上下键要走过两遍。
+     *
+     *     cctv1 / cctv1综合            → cctv1
+     *     cctv5 / cctv5体育 / cctv5plus → cctv5（"+"归一化时已被去掉）
+     *     cctv4k / cctv8k              → cctv4k / cctv8k（**独立频道，不能并进 cctv4/8**）
+     *
+     * 为什么不直接改 [normalizeName]：那个还被「记住台用哪个源」
+     * （StreamCache / SourceDoctor）用着，改成只认编号会让 4K 台和普通台串味。
+     */
+    fun channelKeyOf(name: String): String {
+        val s = normalizeName(name)
+        if (!s.startsWith("cctv")) return s
+
+        // 1) 真 4K / 8K：`cctv4k…` / `cctv8k…`
+        //
+        // 注意这里必须要求 k 后面**还有内容**：
+        //   `CCTV-8K HD` → cctv8khd   （真 8K）✅
+        //   `CCTV-4 K`   → cctv4k     （这是**监控版**，k 后面没东西）
+        // 两者归一化后都是 cctv4k/cctv8k 开头，只能靠"k 后面还有没有字符"区分。
+        Regex("^cctv([48])k(.)").find(s)?.let {
+            return "cctv" + it.groupValues[1] + "k"
+        }
+        // 2) `CCTV4K` / `CCTV8K` 这种不带后缀的
+        Regex("^cctv([48])k$").find(s)?.let {
+            return "cctv" + it.groupValues[1] + "k"
+        }
+        // 3) 监控版后缀：纯编号后面紧跟一个 k（`CCTV-4 K` / `CCTV-8 K` / `CCTV1 K`）
+        Regex("^cctv(\\d+)k$").find(s)?.let {
+            return "cctv" + it.groupValues[1]
+        }
+        // 4) `CCTV-5+`（"+"在 normalizeName 里被去掉，剩下 plus）
+        Regex("^cctv(\\d+)plus").find(s)?.let {
+            return "cctv" + it.groupValues[1]
+        }
+        // 5) 其余按频道号
+        Regex("^cctv(\\d+)").find(s)?.let { return "cctv" + it.groupValues[1] }
+        return s
+    }
+
+    /**
+     * 央视台的排序权重。
+     *
+     * 返回 null 表示"不是央视台"。
+     *
+     * 为什么要自己算权重：频道名归一化之后是 `CCTV1` / `CCTV10`，
+     * 直接按字符串排会得到 **CCTV1, CCTV10, CCTV11, …, CCTV2, CCTV3** ——
+     * CCTV-1 后面跟着 CCTV-10，完全不符合电视台的顺序。
+     *
+     * 规则：
+     *   · `CCTV-5+` 排在 5 和 6 之间 → 用 5.5 当权重
+     *   · `CCTV-4K` / `CCTV-8K` 排在 CCTV-17 之后
+     *   · CGTN 各语种排在 CCTV 之后
+     */
+    private fun cctvRank(name: String): Double? {
+        // ⚠️ 必须用 channelKeyOf 的结果来判断，不能自己再写一遍正则。
+        //
+        // 踩过的坑：原来这里直接对名字跑 `^CCTV(\d+)`，
+        // 但 `CCTV-14 HD (1080p)` 归一化后是 `cctv14hd1080p`，
+        // 与 `^CCTV` 不匹配 → 落到兜底的 91.0 → **排到 CCTV-17 后面去了**。
+        // 而 channelKeyOf 已经把这类都归成了 cctv14，两者不一致就会出现这种错位。
+        val k = channelKeyOf(name)
+        // 4K / 8K 贴着自己编号排（CCTV-4K 紧跟 CCTV-4），
+        // 而不是丢到最后 —— 用户找 4K 台时不会先翻到列表底部
+        if (k.startsWith("cctv4k")) return 4.5
+        if (k.startsWith("cctv8k")) return 8.5
+        Regex("^cctv(\\d+)").find(k)?.let {
+            return it.groupValues[1].toDouble()
+        }
+        // 非编号台（CCTV 风云剧场 / CGTN / CCTV-Storm Music …）排在编号台之后
+        if (k.startsWith("cctv")) return 91.0
+        if (k.startsWith("cgtn")) return 92.0
+        return null
+    }
+
+    /**
+     * 把分组表拍平成「换台表」：跨组去重 → **央视置顶并按频道号排序**。
+     *
+     * 原来 HomeWarmup 和 ImmersiveHome 各自写了一遍去重逻辑，
+     * 现在统一到这里，免得两边顺序不一致（那样上下键换台会跳来跳去）。
+     *
+     * 用户要求：「将左右中央电视台放在列表最前面 按照中央电视台本身的需要排序」。
+     */
+    fun flattenForZapping(groups: List<LiveGroup>): List<LiveChannel> {
+        val uniq = LinkedHashMap<String, LiveChannel>()
+        groups.flatMap { it.channels }.forEach { c ->
+            // ⚠️ 用 channelKeyOf（央视只认频道号），不能用 normalizeName ——
+            // 后者会让 "CCTV1" 和 "CCTV-1 综合" 变成两个台（同名台重复出现）。
+            val k = channelKeyOf(c.name)
+            val exist = uniq[k]
+            if (exist == null) {
+                uniq[k] = c
+            } else {
+                val alts = (exist.alternates + c.url + c.alternates)
+                    .filter { it != exist.url }.distinct()
+                // 保留**信息更全的名字**：`CCTV-1 综合` 比 `CCTV1` 好，
+                // 用户一眼知道是哪个台。
+                // 注意这一步必须在**并表时**做 —— 排序在并表之后，
+                // 那时名字已经定下来了，光排序改不了保留的是哪个。
+                val better = c.name.length > exist.name.length
+                val keepName = if (better) c.name else exist.name
+                val keepLogo = if (better) c.logo else exist.logo
+                val allUrls = (listOf(exist.url) + alts).distinct()
+                uniq[k] = exist.copy(
+                    name = keepName,
+                    logo = keepLogo,
+                    alternates = allUrls.filter { it != exist.url },
+                )
+            }
+        }
+        // 央视在前（按频道号），其余保持原分组顺序
+        val (cctv, rest) = uniq.values.partition { cctvRank(it.name) != null }
+        // 数字优先；同号的**名字长的在前** —— 因为长名字信息更全
+        // （`CCTV-1 综合` 比 `CCTV1` 好，用户一眼知道是哪个台）。
+        // 并表时保留的是第一条的名字，所以这里排好序等于"挑最好的名字"。
+        // 最后再按名字兜底，保证顺序稳定（不会每次启动都不一样）。
+        val ordered = cctv.sortedWith(
+            compareBy(
+                { cctvRank(it.name) ?: Double.MAX_VALUE },
+                { -it.name.length },
+                { it.name },
+            ),
+        ) + rest
+        return ordered
+    }
+
     /** 频道名归一化，用于同名匹配：CCTV-1 综合 / CCTV1综合 → cctv1。 */
     // ==================== 频道分类 ====================
     //

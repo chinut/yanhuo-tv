@@ -195,20 +195,9 @@ fun ImmersiveHome(
                         oldTvMode = prefs.oldTvMode,
                     )
                 }.getOrDefault(emptyList())
-            // 跨分组去重的整表：点开后上下键能一路换到任何台
-            val uniq = LinkedHashMap<String, LiveChannel>()
-            groups.flatMap { it.channels }.forEach { c ->
-                val k = LiveCatalog.normalizeName(c.name)
-                val exist = uniq[k]
-                if (exist == null) {
-                    uniq[k] = c
-                } else {
-                    val alts = (exist.alternates + c.url + c.alternates)
-                        .filter { it != exist.url }.distinct()
-                    uniq[k] = exist.copy(alternates = alts)
-                }
-            }
-            uniq.values.toList()
+            // 跨分组去重的整表：点开后上下键能一路换到任何台。
+            // 央视置顶 + 按频道号排序，见 LiveCatalog.flattenForZapping。
+            LiveCatalog.flattenForZapping(groups)
         }
 
         // 优先最近播放过的台，其次上次播放的台，最后第一个

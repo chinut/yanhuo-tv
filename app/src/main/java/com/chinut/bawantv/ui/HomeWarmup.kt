@@ -118,20 +118,9 @@ object HomeWarmup {
                     oldTvMode = prefs.oldTvMode,
                 )
                 groupsCache = groups
-                // 跨分组去重：与首页/播放页的换台表保持一致
-                val uniq = LinkedHashMap<String, LiveChannel>()
-                groups.flatMap { it.channels }.forEach { c ->
-                    val k = LiveCatalog.normalizeName(c.name)
-                    val exist = uniq[k]
-                    if (exist == null) {
-                        uniq[k] = c
-                    } else {
-                        val alts = (exist.alternates + c.url + c.alternates)
-                            .filter { it != exist.url }.distinct()
-                        uniq[k] = exist.copy(alternates = alts)
-                    }
-                }
-                allChannelsCache = uniq.values.toList()
+                // 跨分组去重 + 央视置顶排序：交给 LiveCatalog 统一处理，
+                // 免得首页和播放页两边顺序不一致（那样上下键换台会跳来跳去）
+                allChannelsCache = LiveCatalog.flattenForZapping(groups)
             }
 
             // 2) 影视片单：影视只保留低端影视，所以直接用它的本地库
