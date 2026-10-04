@@ -149,6 +149,20 @@ object QimaoSource : VideoSource {
         }
     }
 
+    /**
+     * 已缓存的海报地址（给首页短剧块铺背景用）。
+     *
+     * 同步读内存/磁盘缓存，**不联网** —— 首页第一帧就要用。
+     * 首页本来就在预热短剧列表，所以这里通常已经有数据了。
+     */
+    fun posters(max: Int = 6): List<String> {
+        val l = listCache ?: runCatching { loadFromDisk() }.getOrDefault(emptyList()).also {
+            if (it.isNotEmpty()) listCache = it
+        }
+        return l.asSequence().map { it.poster }.filter { it.isNotBlank() }
+            .take(max).toList()
+    }
+
     override suspend fun cached(): List<UnifiedMovie> = withContext(Dispatchers.IO) {
         listCache?.let { return@withContext it }
         val disk = loadFromDisk()

@@ -94,6 +94,8 @@ import com.chinut.bawantv.unified.UnifiedMovie
  * onDown/onUp 把跳转关系钉死。
  */
 private const val KEY_MOVIE = "home:movie"
+private const val KEY_DRAMA = "home:drama"
+private const val KEY_SETTINGS = "home:settings"
 
 /**
  * 首页（重做版）：**左侧大面积直播 + 右侧两个按钮**。
@@ -521,8 +523,163 @@ private fun LiveMiniPlayer(channel: LiveChannel, modifier: Modifier) {
     }
 }
 
-// ==================== 右上：影视入口（海报仅作视觉） ====================
+// ==================== 首页右侧三块（统一样式） ====================
 
+/**
+ * 首页入口卡的统一骨架。
+ *
+ * ## 为什么抽出来
+ *
+ * 原来影视 / 短剧 / 设置三块的 `Row + frostedGlass + shadow + focusBorder +
+ * tvFocusable` 几乎逐字重复了三遍（约 240 行）。改一次要改三处，
+ * 必然漏。现在合成一份。
+ *
+ * ## 视觉设计（用户要求"看起来像个影视 app"）
+ *
+ * 关键是**用内容填满**，而不是三个图标：
+ *
+ *     ┌──────────────────────────────┐
+ *     │  ▓▓ ▓▓ ▓▓ ▓▓ ▓▓ ▓▓          │  ← 一排内容海报
+ *     │  ░░░░░░░░░░░░░░░░░░░░░░░░░░  │  ← 从下往上渐变压暗
+ *     │  [▣]  影视                   │  ← 图标徽章 + 文字压在下面
+ *     │       影视库 240 部          │
+ *     └──────────────────────────────┘
+ *
+ * 海报取不到时（首次安装 + 断网）自动退回纯渐变，不会露出空白。
+ *
+ * @param posters 铺背景的海报地址；空则用 [fallbackBrush] 兜底
+ * @param accent  这块的主色（边框 / 阴影 / 图标）
+ */
+@Composable
+private fun HomeEntryCard(
+    modifier: Modifier,
+    accent: Color,
+    fallbackBrush: Brush,
+    posters: List<String>,
+    focusKey: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String?,
+    titleSize: androidx.compose.ui.unit.TextUnit,
+    manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
+    onEnter: () -> Unit,
+) {
+    val focus = rememberTvFocusState()
+
+    Box(
+        modifier
+            .clip(RoundedCornerShape(Dim.BigRadius))
+            .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius))
+            .shadow(
+                elevation = if (focus.focused) 28.sdp else 8.sdp,
+                shape = RoundedCornerShape(Dim.BigRadius),
+                spotColor = accent.copy(alpha = if (focus.focused) 0.70f else 0.16f),
+            )
+            .focusBorder(
+                visible = focus.focused,
+                cornerRadius = Dim.BigRadius,
+                color = accent,
+                width = 4.sdp,
+            )
+            .tvFocusable(
+                focusState = focus,
+                focusKey = focusKey,
+                shape = RoundedCornerShape(Dim.BigRadius),
+                focusedScale = 1.0f,
+                glow = false,
+                borderWidth = 0.dp,
+                baseBackground = Color.Transparent,
+                focusedBackground = Color.Transparent,
+                onClick = onEnter,
+            ),
+    ) {
+        // ---------- 背景：海报墙 或 渐变兜底 ----------
+        Box(Modifier.matchParentSize().background(fallbackBrush))
+
+        if (posters.isNotEmpty()) {
+            Row(
+                Modifier.matchParentSize(),
+                horizontalArrangement = Arrangement.spacedBy(3.sdp),
+            ) {
+                posters.forEach { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                    )
+                }
+            }
+            // 从下往上渐变压暗，保证文字在任何海报上都读得清
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        // 只在下半部分压暗（文字在下面），上半部分让海报露出来。
+                        // 原来整块都压到 0.48~0.62，海报基本看不见 = 白铺了。
+                        Brush.verticalGradient(
+                            0.0f to Color.Black.copy(alpha = 0.10f),
+                            0.40f to Color.Black.copy(alpha = 0.30f),
+                            0.72f to Color.Black.copy(alpha = 0.72f),
+                            1.0f to Color.Black.copy(alpha = 0.88f),
+                        )
+                    )
+            )
+        }
+
+        // ---------- 前景：图标 + 文字 ----------
+        Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 20.sdp, vertical = 16.sdp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(42.sdp)
+                    .background(
+                        // 半透明玻璃徽章 —— 比原来实心大色块含蓄，不抢海报
+                        Brush.linearGradient(
+                            listOf(accent.copy(alpha = 0.55f), accent.copy(alpha = 0.22f)),
+                        ),
+                        RoundedCornerShape(13.sdp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.sdp),
+                )
+            }
+            Spacer(Modifier.width(14.sdp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    color = Color.White,
+                    fontSize = titleSize,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        subtitle,
+                        color = Color.White.copy(alpha = 0.78f),
+                        fontSize = Txt.Caption,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 影视入口：用片库海报铺背景。 */
 @Composable
 private fun MovieEntry(
     movies: List<UnifiedMovie>,
@@ -530,218 +687,105 @@ private fun MovieEntry(
     onEnter: () -> Unit,
     manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
 ) {
-    val focus = rememberTvFocusState()
-
-    Row(
-        modifier
-            .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius))
-            .shadow(
-                elevation = if (focus.focused) 26.sdp else 8.sdp,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                spotColor = Ink.Pink.copy(alpha = if (focus.focused) 0.65f else 0.16f),
-            )
-            // 用粉色区分「影视」这块的选中框，和直播的蓝色区分开
-            .focusBorder(
-                visible = focus.focused,
-                cornerRadius = Dim.BigRadius,
-                color = Ink.Pink,
-                width = 4.sdp,
-            )
-            .tvFocusable(
-                focusState = focus,
-                // 给一个稳定的 key，让直播块的 onDown 能精确跳到这里
-                focusKey = KEY_MOVIE,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                focusedScale = 1.0f,
-                glow = false,
-                borderWidth = 0.dp,
-                baseBackground = Color.Transparent,
-                focusedBackground = Color.Transparent,
-                onClick = onEnter,
-                // 这里**不能**写 onLeft = moveTo(FocusKeys.nav("home"))：
-                // 首页的导航栏早就删了，没有任何地方注册 "nav:home" 这个 key，
-                // moveTo 找不到目标会直接返回 —— 按键被消费掉却什么也不发生，
-                // 结果就是「从影视按左键回不到左边的直播」。
-                // 留空即可，几何导航本来就能正确找到左边的直播块。
-            )
-            .padding(horizontal = 24.sdp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(52.sdp)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Ink.Pink.copy(alpha = 0.34f), Ink.Pink.copy(alpha = 0.12f))
-                    ),
-                    RoundedCornerShape(16.sdp),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Default.Movie,
-                contentDescription = null,
-                tint = Ink.Pink,
-                modifier = Modifier.size(26.sdp),
-            )
-        }
-        Spacer(Modifier.width(18.sdp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                "影视",
-                color = Color.White,
-                fontSize = Txt.Section,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                // 原来的副标题写死「聚合全部源的影视库」；现在把片库规模也带上，
-                // 用户一眼知道里面有多少内容（而且这和影视页顶栏的文案一致）
-                if (movies.isNotEmpty()) "影视库 ${movies.size} 部 · 电影 / 剧集 / 综艺"
-                else "电影 · 电视剧 · 综艺",
-                color = Ink.TextFaint,
-                fontSize = Txt.Caption,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    HomeEntryCard(
+        modifier = modifier,
+        accent = Ink.Pink,
+        fallbackBrush = Brush.linearGradient(
+            listOf(Ink.Pink.copy(alpha = 0.34f), Color.Transparent),
+        ),
+        posters = remember(movies) {
+            movies.asSequence().map { it.poster }
+                .filter { it.isNotBlank() }.take(6).toList()
+        },
+        focusKey = KEY_MOVIE,
+        icon = Icons.Default.Movie,
+        title = "影视",
+        subtitle = if (movies.isNotEmpty()) "影视库 ${movies.size} 部"
+        else "电影 · 剧集 · 综艺",
+        titleSize = Txt.Section,
+        manager = manager,
+        onEnter = onEnter,
+    )
 }
 
-// ==================== 右下：设置入口（只要一个按钮） ====================
-
+/** 短剧入口：用短剧海报铺背景。 */
 @Composable
 private fun ShortDramaEntry(
     modifier: Modifier,
     onEnter: () -> Unit,
     manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
 ) {
-    val focus = rememberTvFocusState()
-
-    Row(
-        modifier
-            .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius))
-            .shadow(
-                elevation = if (focus.focused) 26.sdp else 8.sdp,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                spotColor = Ink.Pink.copy(alpha = if (focus.focused) 0.65f else 0.16f),
-            )
-            .focusBorder(
-                visible = focus.focused,
-                cornerRadius = Dim.BigRadius,
-                color = Ink.Pink,
-                width = 4.sdp,
-            )
-            .tvFocusable(
-                focusState = focus,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                focusedScale = 1.0f,
-                glow = false,
-                borderWidth = 0.dp,
-                baseBackground = Color.Transparent,
-                focusedBackground = Color.Transparent,
-                onClick = onEnter,
-            )
-            .padding(horizontal = 24.sdp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(52.sdp)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Ink.Pink.copy(alpha = 0.34f), Ink.Pink.copy(alpha = 0.12f))
-                    ),
-                    RoundedCornerShape(16.sdp),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Default.SmartDisplay,
-                contentDescription = null,
-                tint = Ink.Pink,
-                modifier = Modifier.size(26.sdp),
-            )
+    // 海报来自短剧的本地缓存（QimaoSource 落盘那份），不联网。
+    //
+    // ⚠️ 不能用 `remember { ... }` 只取一次：短剧列表是**开屏预热**
+    // 时异步拉的，首页首次组合时缓存往往还没就绪 → 海报永远空。
+    // 所以用 state + 轮询，拉到海报后自己刷新（最多试 12 次 ≈ 12 秒）。
+    var posters by remember {
+        mutableStateOf(
+            runCatching { com.chinut.bawantv.unified.QimaoSource.posters(6) }
+                .getOrDefault(emptyList()),
+        )
+    }
+    LaunchedEffect(Unit) {
+        // 自己没有就去拉一次（会落盘）—— 不依赖开屏预热那条链路，
+        // 实测那条链路不可靠（没有 BawanWarmup 日志）。
+        if (posters.isEmpty()) {
+            runCatching { com.chinut.bawantv.unified.QimaoSource.refresh() }
+            posters = runCatching { com.chinut.bawantv.unified.QimaoSource.posters(6) }
+                .getOrDefault(emptyList())
         }
-        Spacer(Modifier.width(18.sdp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                "短剧",
-                color = Color.White,
-                fontSize = Txt.Section,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "竖屏短剧 · 一集接一集自动播",
-                color = Ink.TextFaint,
-                fontSize = Txt.Caption,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        // 再兜几秒（拉取慢时）
+        var tries = 0
+        while (posters.isEmpty() && tries < 15) {
+            kotlinx.coroutines.delay(1_000)
+            tries++
+            posters = runCatching { com.chinut.bawantv.unified.QimaoSource.posters(6) }
+                .getOrDefault(emptyList())
         }
     }
+    HomeEntryCard(
+        modifier = modifier,
+        accent = Ink.Pink,
+        fallbackBrush = Brush.linearGradient(
+            listOf(Ink.Pink.copy(alpha = 0.34f), Color.Transparent),
+        ),
+        posters = posters,
+        focusKey = KEY_DRAMA,
+        icon = Icons.Default.SmartDisplay,
+        title = "短剧",
+        subtitle = "竖屏短剧 · 自动连播",
+        titleSize = Txt.Section,
+        manager = manager,
+        onEnter = onEnter,
+    )
 }
 
+/**
+ * 设置入口。
+ *
+ * 配色改成**中性蓝灰** —— 原来用绿色，和旁边两块的粉色并列非常突兀
+ * （用户原话「影视和短剧的图标都是红的，但是设置是绿的 很丑」）。
+ * 设置是"工具"不是"内容"，用不抢戏的中性色最稳。
+ */
 @Composable
 private fun SettingsEntry(
     modifier: Modifier,
     onEnter: () -> Unit,
     manager: com.chinut.bawantv.ui.theme.TvFocusManager?,
 ) {
-    val focus = rememberTvFocusState()
-
-    Row(
-        modifier
-            .frostedGlass(shape = RoundedCornerShape(Dim.BigRadius))
-            .shadow(
-                elevation = if (focus.focused) 26.sdp else 8.sdp,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                spotColor = Ink.Green.copy(alpha = if (focus.focused) 0.65f else 0.16f),
-            )
-            .focusBorder(
-                visible = focus.focused,
-                cornerRadius = Dim.BigRadius,
-                color = Ink.Green,
-                width = 4.sdp,
-            )
-            .tvFocusable(
-                focusState = focus,
-                shape = RoundedCornerShape(Dim.BigRadius),
-                focusedScale = 1.0f,
-                glow = false,
-                borderWidth = 0.dp,
-                baseBackground = Color.Transparent,
-                focusedBackground = Color.Transparent,
-                onClick = onEnter,
-                // 同上：不要指向不存在的 "nav:home"，交给几何导航
-            )
-            .padding(horizontal = 24.sdp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(52.sdp)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Ink.Green.copy(alpha = 0.34f), Ink.Green.copy(alpha = 0.12f))
-                    ),
-                    RoundedCornerShape(16.sdp),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Default.Settings,
-                contentDescription = null,
-                tint = Ink.Green,
-                modifier = Modifier.size(26.sdp),
-            )
-        }
-        Spacer(Modifier.width(16.sdp))
-        // 按用户要求：不要详细描述文字，只留名字
-        Text(
-            "设置",
-            color = Color.White,
-            fontSize = 26.ssp,
-            fontWeight = FontWeight.Bold,
-        )
-    }
+    HomeEntryCard(
+        modifier = modifier,
+        accent = Ink.Accent,
+        fallbackBrush = Brush.linearGradient(
+            listOf(Ink.Accent.copy(alpha = 0.30f), Color.Transparent),
+        ),
+        posters = emptyList(),
+        focusKey = KEY_SETTINGS,
+        icon = Icons.Default.Settings,
+        title = "设置",
+        subtitle = null,
+        titleSize = Txt.Section,
+        manager = manager,
+        onEnter = onEnter,
+    )
 }

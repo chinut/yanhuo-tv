@@ -450,6 +450,7 @@ fun BawanRoot(
                                 .UnifiedVideoScreen(
                                     entryKey = FocusKeys.entry(TopSection.ShortDrama.route),
                                     source = com.chinut.bawantv.unified.QimaoSource,
+                                    isShortDrama = true,
                                     pendingMovie = pendingUnified,
                                     onPendingConsumed = { pendingUnified = null },
                                     onDetailChanged = { inVodDetail = it },

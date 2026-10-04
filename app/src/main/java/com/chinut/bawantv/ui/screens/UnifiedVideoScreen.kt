@@ -118,6 +118,14 @@ fun UnifiedVideoScreen(
      */
     source: com.chinut.bawantv.unified.VideoSource =
         com.chinut.bawantv.unified.DdysSource,
+    /**
+     * 是不是短剧板块。
+     *
+     * 本页是影视和短剧**共用**的（省内存），但文案得分开 ——
+     * 短剧那边没有"分类"可切，也没有"影视库"这个概念，
+     * 照搬影视文案会指向空面板（用户实拍反馈过）。
+     */
+    isShortDrama: Boolean = false,
     /** 首页推荐墙点进来的作品：进来直接开详情 */
     pendingMovie: UnifiedMovie? = null,
     onPendingConsumed: () -> Unit = {},
@@ -333,7 +341,7 @@ fun UnifiedVideoScreen(
     }
 
     if (loading && movies.isEmpty()) {
-        SectionLoading("正在准备影视库…")
+        SectionLoading(if (isShortDrama) "正在加载短剧…" else "正在准备影视库…")
         return
     }
 
@@ -515,11 +523,17 @@ fun UnifiedVideoScreen(
             //
             // 现在影视页**只有瀑布流一个可聚焦区域**，方向键再也不会跑出去。
             // 刷新仍然是自动的（进页面就在后台补货），不需要按钮。
-            Text(
-                "按遥控器「三横键」切换分类",
-                color = Ink.TextFaint,
-                fontSize = Txt.Caption,
-            )
+            // ⚠️ 只在**真的有分类**时才提示三横键。
+            //
+            // 短剧的 typeNames() 返回空 → 三横键面板是空的 →
+            // 这句提示是**指向一个空面板**，纯误导（用户实拍反馈过）。
+            if (typeOptions.isNotEmpty()) {
+                Text(
+                    "按遥控器「三横键」切换分类",
+                    color = Ink.TextFaint,
+                    fontSize = Txt.Caption,
+                )
+            }
         }
 
         Spacer(Modifier.height(8.sdp))
@@ -541,8 +555,14 @@ fun UnifiedVideoScreen(
 
         if (movies.isEmpty()) {
             SectionEmpty(
-                error?.let { "影视库准备失败：$it\n可按「刷新片库」重试" }
-                    ?: "片库还是空的\n按「三横键」换个分类试试"
+                when {
+                    error != null ->
+                        if (isShortDrama) "短剧加载失败：$error"
+                        else "影视库准备失败：$error"
+                    // 短剧没有分类可换，别让用户去按三横键
+                    isShortDrama -> "短剧暂时没有内容\n请检查网络后重试"
+                    else -> "片库还是空的\n按「三横键」换个分类试试"
+                }
             )
             return@Column
         }

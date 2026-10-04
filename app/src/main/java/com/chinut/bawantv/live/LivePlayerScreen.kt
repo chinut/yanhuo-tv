@@ -656,9 +656,45 @@ fun LivePlayerScreen(
     //
     // 每条都带 videoFormat 的宽高码率，能直接看出跑在哪一档。
     LaunchedEffect(index, sourceIndex) {
+        // ---------- 卡顿统计 ----------
+        //
+        // 为什么要它：用户反馈"每隔几秒卡零点几秒"，但光看每 3 秒一条的
+        // 快照**看不出卡了几次**。这里累计，实测一次就能定性：
+        //   · 卡顿时 state=BUFFERING  → 取流不够快（网络/源）
+        //   · 卡顿时 state 一直 READY → 渲染卡（解码/码率）
+        //   · 码率来回跳              → 自适应切档
+        // 三种修法完全不同，所以先测再调。
+        var lastPos = -1L
+        var goneMs = 0L          // 3 秒里 position 没推进的次数
+        var stalls = 0           // 累计"没推进"的次数
+        var rebuf = 0            // 累计进入 BUFFERING 的次数
+        var prevState = -1
+        var ticks = 0
+
         while (true) {
             kotlinx.coroutines.delay(3_000)
             runCatching {
+                // 卡顿判定：位置没推进（播放中却不走 = 卡了）
+                val nowPos = player.currentPosition
+                if (player.isPlaying && nowPos == lastPos) {
+                    goneMs += 1
+                    stalls += 1
+                }
+                lastPos = nowPos
+                val st0 = player.playbackState
+                if (st0 == Player.STATE_BUFFERING && prevState != Player.STATE_BUFFERING) {
+                    rebuf += 1
+                }
+                prevState = st0
+                ticks += 1
+                if (ticks % 10 == 0) {
+                    android.util.Log.i(
+                        "BawanLiveStall",
+                        "汇总：卡${stalls}次 重缓${rebuf}次 / 采样${ticks}次 " +
+                            "码率=${(player.videoFormat?.bitrate ?: 0) / 1000}k " +
+                            "分辨率=${player.videoFormat?.width}x${player.videoFormat?.height}",
+                    )
+                }
                 val st = when (player.playbackState) {
                     Player.STATE_IDLE -> "IDLE"
                     Player.STATE_BUFFERING -> "BUFFERING"

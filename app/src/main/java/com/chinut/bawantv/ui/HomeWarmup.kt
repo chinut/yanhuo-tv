@@ -123,7 +123,17 @@ object HomeWarmup {
                 allChannelsCache = LiveCatalog.flattenForZapping(groups)
             }
 
-            // 2) 影视片单：影视只保留低端影视，所以直接用它的本地库
+            // 2) 短剧海报（给首页短剧块铺背景用）
+            //
+            // ⚠️ 原来没预热短剧 —— 首页短剧块永远拿不到海报
+            // （用户要求"整体按钮用内容海报填一填"）。
+            // 这里顺手把短剧列表也拉到本地（它会自己落盘），
+            // 首页就有海报可用，而且**断网也有**（走磁盘缓存）。
+            runCatching {
+                com.chinut.bawantv.unified.QimaoSource.cached()
+            }
+
+            // 3) 影视片单：影视只保留低端影视，所以直接用它的本地库
             runCatching {
                 val cached = LibraryStore.load()
                 if (cached.isNotEmpty()) {
