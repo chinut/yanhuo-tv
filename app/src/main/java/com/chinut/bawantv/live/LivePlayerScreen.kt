@@ -116,6 +116,8 @@ fun LivePlayerScreen(
     onClose: () -> Unit = {},
     /** 从菜单里直接选台（比按键换台跳得远）。 */
     onChannelChange: (LiveChannel) -> Unit = {},
+    /** 换了主源要重新拉频道表，交回上层做。 */
+    onReloadCatalog: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val prefs = BawanApp.prefs
@@ -1476,6 +1478,18 @@ fun LivePlayerScreen(
                 onChannelChange(ch)
                 qualityPanel = false
             },
+            // ---------- 主源切换（A / B / AB）----------
+            //
+            // 用户要求：「在直播播放页面中点击三横线时用户自己选择主源」。
+            // 切换后要重新加载频道表 —— 因为 A 和 B 是两个完全不同的列表。
+            preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset),
+            onPreset = { p ->
+                prefs.livePreset = p.name
+                // 老电视模式跟着走：选 B 就当作"要轻量"
+                hudTimeoutToken++
+                onReloadCatalog()
+                qualityPanel = false
+            },
         )
     }
     }
@@ -1512,6 +1526,8 @@ private fun QualityPanel(
     onMoveChannel: (Int) -> Unit,
     onLeaveListUp: () -> Unit,
     onPickChannel: (LiveChannel) -> Unit,
+    preset: com.chinut.bawantv.live.LivePreset,
+    onPreset: (com.chinut.bawantv.live.LivePreset) -> Unit,
 ) {
     // 每个频道的源可能有几十个（央视 33 个），面板必须能滚动，
     // 否则超出的项会跑到屏幕外 —— 用户「看得到列表但选不中」就是这么来的。
@@ -1541,6 +1557,49 @@ private fun QualityPanel(
             fontSize = Txt.Section,
             fontWeight = FontWeight.Bold,
         )
+        Spacer(Modifier.height(10.sdp))
+
+        // ---------- 主源切换（A / B / AB）----------
+        //
+        // 用户要求：「在直播播放页面中点击三横线时用户自己选择主源」。
+        // A = 内置引擎（网页 + 直连），B = 开源源（全直连，轻），
+        // AB = 两个都加载。点了会重新拉频道表。
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.sdp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("主源", color = Ink.TextTertiary, fontSize = Txt.Tiny)
+            Spacer(Modifier.width(4.sdp))
+            com.chinut.bawantv.live.LivePreset.entries.forEach { p ->
+                val on = p == preset
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.sdp))
+                        .background(
+                            if (on) Ink.Accent.copy(alpha = 0.45f)
+                            else Color.White.copy(alpha = 0.06f)
+                        )
+                        .border(
+                            width = if (on) 2.sdp else 0.sdp,
+                            color = if (on) Ink.AccentBright else Color.Transparent,
+                            shape = RoundedCornerShape(10.sdp),
+                        )
+                        .clickable { onPreset(p) }
+                        .padding(vertical = 7.sdp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        p.short,
+                        color = if (on) Color.White else Ink.TextTertiary,
+                        fontSize = Txt.Caption,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(10.sdp))
 
         // ---------- 分类行（全部 / 央视 / 地方台 / IPTV）----------

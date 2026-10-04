@@ -1,5 +1,7 @@
 package com.chinut.bawantv.live
 
+import kotlinx.coroutines.async
+
 import android.content.Context
 import com.chinut.bawantv.core.Http
 import com.chinut.bawantv.core.Net
@@ -162,34 +164,45 @@ object LiveCatalog {
     }
 
     /**
-     * 最终频道表：内置频道 + 用户自定义源（如果有）。
-     * 自定义源单独成一类，放在最前面，避免和内置的混在一起。
+     * 最终频道表。
      *
-     * 顺序：**本地导入的文件优先**，其次才是自定义网址。
-     * 两者都给的话，本地文件赢 —— 因为它更可能是用户特意准备的。
+     * # 组装顺序（前面的盖后面的）
+     *
+     *   1. **用户导入的文件** —— 最贴身，永远最优先
+     *   2. 按 [LivePreset] 选出来的引擎
+     *      · [LivePreset.Default]    → 内置频道表（A）
+     *      · [LivePreset.OpenSource] → best-fan 开源源（B）
+     *      · [LivePreset.Both]       → A 和 B 并行，两边都放进去
+     *   3. 自定义网址
+     *
+     * # 为什么要区分 A / B
+     *
+     * A 里很多是**电视台网页**，播放要走 WebView —— 老电视跑不动。
+     * B 全是**直连 m3u8**，ExoPlayer 直接解，负载低得多。
+     * 所以老电视模式开的时候默认走 B（见 [LivePreset] 的说明）。
      */
-    suspend fun load(context: Context, customSourceUrl: String): List<LiveGroup> {
+    suspend fun load(
+        context: Context,
+        customSourceUrl: String,
+        preset: LivePreset = LivePreset.Default,
+        oldTvMode: Boolean = false,
+    ): List<LiveGroup> {
         val builtin = builtin(context)
 
-        // 0) 电视上扫描到的 IPTV 源（优先级最高）
+        // ---------- 先算出"引擎"部分 ----------
         //
-        // 为什么排最前：这些是**用用户自己那条宽带实测通过**的，
-        // 比内置的（在开发者电脑上测的）更可能真的能看。
-        if (IptvScanner.hasResult(context)) {
-            val text = runCatching {
-                IptvScanner.resultFile(context).readText(Charsets.UTF_8)
-            }.getOrNull()
-            if (!text.isNullOrBlank()) {
-                val scanned = parse(text)
-                if (scanned.isNotEmpty()) {
-                    val merged = ArrayList<LiveGroup>(scanned.size + builtin.size)
-                    scanned.forEach { g -> merged.add(g.copy(name = "扫描源 · ${g.name}")) }
-                    merged.addAll(builtin)
-                    android.util.Log.i(
-                        TAG,
-                        "用扫描到的源：${scanned.sumOf { it.channels.size }} 个频道",
-                    )
-                    return mergeAlternates(merged)
+        // AB 时并行拉 —— 串行会让首屏等两倍时间。
+        // 开源源失败就只留内置，**绝不让频道表变空**（那用户就什么都看不了了）。
+        val engine: List<LiveGroup> = when (preset) {
+            LivePreset.Default -> builtin
+            LivePreset.OpenSource -> openSourceGroups(context, oldTvMode) ?: builtin
+            LivePreset.Both -> {
+                kotlinx.coroutines.coroutineScope {
+                    val da = async<List<LiveGroup>> { builtin }
+                    val db = async<List<LiveGroup>?> { openSourceGroups(context, oldTvMode) }
+                    val a = da.await()
+                    val b = db.await()
+                    if (b == null) a else b + a      // B 在前：直连源更省资源
                 }
             }
         }
@@ -202,11 +215,11 @@ object LiveCatalog {
             if (!text.isNullOrBlank()) {
                 val custom = parse(text)
                 if (custom.isNotEmpty()) {
-                    val merged = ArrayList<LiveGroup>(custom.size + builtin.size)
+                    val merged = ArrayList<LiveGroup>(custom.size + engine.size)
                     custom.forEach { g ->
                         merged.add(g.copy(name = "我的源 · ${g.name}"))
                     }
-                    merged.addAll(builtin)
+                    merged.addAll(engine)
                     android.util.Log.i(
                         TAG,
                         "用本地导入的源：${custom.sumOf { it.channels.size }} 个频道",
@@ -219,23 +232,41 @@ object LiveCatalog {
 
         // 2) 自定义网址
         val url = customSourceUrl.trim()
-        if (url.isEmpty()) return builtin
+        if (url.isEmpty()) return engine
 
-        val text = Net.get(url, ua = Http.UA_MOBILE) ?: return builtin
+        val text = Net.get(url, ua = Http.UA_MOBILE) ?: return engine
         val custom = parse(text)
-        if (custom.isEmpty()) return builtin
+        if (custom.isEmpty()) return engine
 
-        val merged = ArrayList<LiveGroup>(custom.size + builtin.size)
+        val merged = ArrayList<LiveGroup>(custom.size + engine.size)
         custom.forEach { g ->
             merged.add(g.copy(name = "自定义 · ${g.name}"))
         }
-        merged.addAll(builtin)
+        merged.addAll(engine)
         return mergeAlternates(merged)
     }
 
     /**
      * 解析 m3u / 纯文本频道表。
      */
+
+    /**
+     * 拉开源源（B）。失败返回 null，调用方退回内置表。
+     *
+     * 把"失败"和"空"分开：失败 → null（退回内置）；
+     * 拉到了但一个台都没有 → 也当失败（不然频道表会空）。
+     */
+    private suspend fun openSourceGroups(
+        context: Context,
+        oldTvMode: Boolean,
+    ): List<LiveGroup>? {
+        val snap = OpenSourceCatalog.load(context, preferLowRes = oldTvMode) ?: return null
+        val groups = snap.groups.filter { it.channels.isNotEmpty() }
+        if (groups.isEmpty()) return null
+        // 分组名上标一下来源，用户看得出现在用的是哪个引擎
+        return groups.map { it.copy(name = "开源源 · ${it.name}") }
+    }
+
     fun parse(text: String): List<LiveGroup> {
         if (text.isBlank()) return emptyList()
         return if (text.contains("#EXTINF", ignoreCase = true)) parseM3u(text) else parsePlain(text)

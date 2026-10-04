@@ -120,6 +120,28 @@ class AppPrefs(context: Context) {
         get() = sp.getBoolean(KEY_HW_DECODE, true)
         set(v) = sp.edit().putBoolean(KEY_HW_DECODE, v).apply().also { touch() }
 
+    /**
+     * 老电视模式。
+     *
+     * 打开后：主源默认切到「开源源」（全是直连 m3u8，不跑 WebView），
+     * 而且开源源里同台多条时优先挑**低分辨率**那条。
+     *
+     * 为什么做成一个开关而不是两个：对用户来说只有一个概念 ——
+     * 这台电视老，就打开它。让它去理解"源预设"和"分辨率偏好"太累了。
+     */
+    var oldTvMode: Boolean
+        get() = sp.getBoolean(KEY_OLD_TV, false)
+        set(v) = sp.edit().putBoolean(KEY_OLD_TV, v).apply().also { touch() }
+
+    /**
+     * 直播主源（存 [com.chinut.bawantv.live.LivePreset] 的 name）。
+     *
+     * 存字符串而不是序号：以后枚举顺序变了，老用户的设置不会串。
+     */
+    var livePreset: String
+        get() = sp.getString(KEY_LIVE_PRESET, "Default") ?: "Default"
+        set(v) = sp.edit().putString(KEY_LIVE_PRESET, v).apply().also { touch() }
+
     /** 换台时是否显示台标浮层 */
     var showChannelHud: Boolean
         get() = sp.getBoolean(KEY_SHOW_HUD, true)
@@ -326,6 +348,8 @@ class AppPrefs(context: Context) {
         private const val KEY_HOME_CACHE = "home_movie_cache"
         private const val KEY_HW_DECODE = "hw_decode"
         private const val KEY_SHOW_HUD = "show_hud"
+    private const val KEY_OLD_TV = "old_tv_mode"
+    private const val KEY_LIVE_PRESET = "live_preset"
 private const val KEY_MEM_HUD = "mem_hud"
 private const val KEY_MEM_LOG = "mem_log"
 private const val KEY_LIVE_QUALITY = "live_quality"

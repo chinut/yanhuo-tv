@@ -117,7 +117,14 @@ fun LiveScreen(
     suspend fun reload() {
         loading = true
         val loaded = withContext(Dispatchers.IO) {
-            runCatching { LiveCatalog.load(context, prefs.liveSourceUrl) }.getOrDefault(emptyList())
+            runCatching {
+                LiveCatalog.load(
+                    context = context,
+                    customSourceUrl = prefs.liveSourceUrl,
+                    preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset),
+                    oldTvMode = prefs.oldTvMode,
+                )
+            }.getOrDefault(emptyList())
         }
         groups = loaded
         if (loaded.isNotEmpty() && selectedGroup >= loaded.size) selectedGroup = 0

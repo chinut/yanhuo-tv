@@ -108,23 +108,7 @@ fun SettingsScreen(
     // "Compose Dialog 吞按键"那个问题。
     var importMsg by remember { mutableStateOf("") }
 
-    // ---------- IPTV 自动扫描 ----------
-    //
-    // 在电视上扫，用的是**用户自己那条宽带** —— 这比在开发者电脑上测准得多。
-    //
-    // ⚠️ 电视上没有 ffmpeg，做不到真正的解码验证（电脑版能识破"花屏加密"，
-    // 这里不能）。所以界面上要如实说明"可能仍有少量看不了的源"。
-    var scanning by remember { mutableStateOf(false) }
-    var scanMsg by remember { mutableStateOf("") }
-    var scanDone by remember { mutableIntStateOf(0) }
-    var scanTotal by remember { mutableIntStateOf(0) }
-    var scanOk by remember { mutableIntStateOf(0) }
-    var scannedCount by remember {
-        mutableIntStateOf(
-            com.chinut.bawantv.live.IptvScanner.resultChannelCount(context)
-        )
-    }
-    val scanScope = rememberCoroutineScope()
+
     var importedCount by remember {
         mutableIntStateOf(
             if (com.chinut.bawantv.live.LiveCatalog.hasImported(context)) 1 else 0
@@ -228,7 +212,7 @@ fun SettingsScreen(
                 // （实测按 15 次下键都落不到）。放最上面就绕开了这个问题。
                 SettingsCard(
                     title = "直播源",
-                    subtitle = "自动扫描（用你家网络实测），或导入运营商给的 m3u 文件",
+                    subtitle = "选主源（默认引擎 / 开源源），或导入运营商给的 m3u 文件",
                     accent = Ink.Green,
                 ) {
                     TvRow(
@@ -255,81 +239,54 @@ fun SettingsScreen(
                             )
                         )
                     }
-                    // ---------- 自动扫描 IPTV 源 ----------
-                    TvRow(
-                        label = if (scanning) {
-                            "正在扫描… $scanDone/$scanTotal（可用 $scanOk）"
-                        } else if (scannedCount > 0) {
-                            "已扫到 $scannedCount 个可用频道"
-                        } else {
-                            "自动扫描 IPTV 源"
-                        },
-                        hint = if (scanning) {
-                            "用的是你家宽带，结果最准。大概几分钟，别关电视"
-                        } else if (scannedCount > 0) {
-                            "扫描源优先于内置频道表。可能仍有看不了的，按 ←→ 换源"
-                        } else {
-                            "从网上找直播源并逐个实测，可用的存到本地"
-                        },
-                        hintColor = when {
-                            scanning -> Ink.Amber
-                            scannedCount > 0 -> Ink.Green
-                            else -> Ink.TextFaint
-                        },
-                        actionText = if (scanning) "扫描中" else "开始扫描",
+                    // ---------- 老电视模式 ----------
+                    //
+                    // 用户要求的一个开关。它同时做两件事：
+                    //   1. 主源默认切到「开源源」（全是直连 m3u8，
+                    //      不跑 WebView，老电视的 CPU/内存压力小得多）
+                    //   2. 开源源里同台多条时优先挑**低分辨率**那条
+                    //
+                    // 做成一个开关而不是两个，是因为对用户来说只有
+                    // 一个概念：这台电视老，就打开它。
+                    TvSwitch(
+                        label = "老电视模式",
+                        hint = "用直连源替代网页播放，减轻老电视负担（推荐老设备打开）",
+                        checked = prefs.oldTvMode,
                     ) {
-                        if (!scanning) {
-                            scanning = true
-                            scanMsg = ""
-                            scanDone = 0; scanTotal = 0; scanOk = 0
-                            scanScope.launch {
-                                val r = runCatching {
-                                    com.chinut.bawantv.live.IptvScanner.scan(
-                                        context = context,
-                                        maxPerChannel = 3,
-                                    ) { stage, done, total, ok, cur ->
-                                        scanDone = done
-                                        scanTotal = total
-                                        scanOk = ok
-                                        scanMsg = if (total > 0) "$stage $done/$total" else stage
-                                    }
-                                }.getOrElse {
-                                    com.chinut.bawantv.live.IptvScanner.Outcome(
-                                        0, 0, 0, false,
-                                        "扫描出错：${it.javaClass.simpleName}",
-                                    )
-                                }
-                                scanning = false
-                                scannedCount =
-                                    com.chinut.bawantv.live.IptvScanner
-                                        .resultChannelCount(context)
-                                scanMsg = if (r.saved) {
-                                    "扫到 ${r.channels} 个频道 / ${r.urls} 个地址，已保存"
-                                } else {
-                                    r.note.ifBlank { "没扫到可用的源" }
-                                }
-                                toast(
-                                    context,
-                                    if (r.saved) "扫到 ${r.channels} 个频道" else "没扫到可用的源",
-                                )
-                            }
-                        }
-                    }
-                    if (scanMsg.isNotBlank()) {
-                        Spacer(Modifier.height(6.sdp))
-                        Text(scanMsg, color = Ink.Amber, fontSize = Txt.Tiny)
-                    }
-                    if (scannedCount > 0 && !scanning) {
-                        TvRow(
-                            label = "清除扫描到的源",
-                            hint = "回到内置频道表",
-                            actionText = "清除",
+                        prefs.oldTvMode = it
+                        // 打开时如果主源还是「默认引擎」，自动切到开源源
+                        if (it && prefs.livePreset ==
+                            com.chinut.bawantv.live.LivePreset.Default.name
                         ) {
-                            com.chinut.bawantv.live.IptvScanner.clearResult(context)
-                            scannedCount = 0
-                            scanMsg = "已清除扫描结果"
-                            toast(context, "已清除")
+                            prefs.livePreset = com.chinut.bawantv.live.LivePreset.OpenSource.name
                         }
+                    }
+
+                    // ---------- 主源（A / B / AB）----------
+                    //
+                    // A = App 内置频道表（央视/省市台网页 + 内置直连源）
+                    // B = best-fan/iptv-sources 开源源（每日自动检测，全直连）
+                    // AB = 两个都加载，播放页里自己挑
+                    TvRow(
+                        label = "直播主源",
+                        hint = when (com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)) {
+                            com.chinut.bawantv.live.LivePreset.Default ->
+                                "A 默认引擎：内置频道表（覆盖面广，央视走网页播放）"
+                            com.chinut.bawantv.live.LivePreset.OpenSource ->
+                                "B 开源源：每日自动检测的直连源（轻，含 CCTV-1~17）"
+                            com.chinut.bawantv.live.LivePreset.Both ->
+                                "AB 两个都用：并行加载，播放中按三横键自己挑"
+                        },
+                        hintColor = Ink.TextTertiary,
+                        actionText = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset).short,
+                    ) {
+                        val all = com.chinut.bawantv.live.LivePreset.entries
+                        val cur = all.indexOf(
+                            com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)
+                        )
+                        prefs.livePreset = all[(cur + 1) % all.size].name
+                        toast(context, "主源已切到 " +
+                            com.chinut.bawantv.live.LivePreset.of(prefs.livePreset).label)
                     }
 
                     if (importedCount > 0) {

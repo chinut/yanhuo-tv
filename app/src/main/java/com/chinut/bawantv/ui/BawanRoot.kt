@@ -95,6 +95,8 @@ fun BawanRoot(
     }
     var livePlaying by remember { mutableStateOf<LiveChannel?>(null) }
     var livePlaylist by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
+    // 换主源后强制直播页重新加载频道表
+    var liveReloadToken by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var focusEpoch by remember { mutableIntStateOf(0) }
 
     /**
@@ -482,7 +484,11 @@ fun BawanRoot(
                                     },
                                 )
 
-                            TopSection.Live -> LiveScreen(
+                            // key(liveReloadToken)：换主源后强制重建 LiveScreen，
+                            // 这样它的 LaunchedEffect(Unit) 会重新跑 → 重新拉频道表。
+                            // 比传一层 reloadToken 参数进去简单，也不容易漏。
+                            TopSection.Live -> androidx.compose.runtime.key(liveReloadToken) {
+                            LiveScreen(
                                 debugAutoPlayFirst = debugLivePlay,
                                 entryKey = FocusKeys.entry(TopSection.Live.route),
                                 onPlayingChanged = { ch, list ->
@@ -495,6 +501,7 @@ fun BawanRoot(
                                     focusEpoch++
                                 },
                             )
+                            }
 
                             TopSection.Vod -> com.chinut.bawantv.ui.screens.UnifiedVideoScreen(
                                 entryKey = FocusKeys.entry(TopSection.Vod.route),
@@ -620,6 +627,13 @@ fun BawanRoot(
                     // 菜单里选台（可能跨分类跳很远，比按上下键快）
                     onChannelChange = { picked ->
                         livePlaying = picked
+                    },
+                    // 菜单里换了主源 → 重新拉频道表，并回到直播列表页
+                    onReloadCatalog = {
+                        livePlaying = null
+                        livePlaylist = emptyList()
+                        liveReloadToken++
+                        focusEpoch++
                     },
                 )
             }
