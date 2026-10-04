@@ -442,14 +442,14 @@ fun BawanRoot(
                             // 短剧和影视在交互上是同一件事（海报墙 → 详情 → 选集 → 播放），
                             // 没必要写两套 UI，也更省内存。
                             //
-                            // 数据源 [HongguoSource] 会把红果的分集包成 UnifiedSource：
+                            // 数据源把短剧的分集包成 UnifiedSource：
                             //   · 保住全部分集数（用户能看到"共 72 集"）
                             //   · 只为**免费集**取播放地址（实测 3 集；
                             //     超出的站点返回 404，是正常的付费墙，不是故障）
                             TopSection.ShortDrama -> com.chinut.bawantv.ui.screens
                                 .UnifiedVideoScreen(
                                     entryKey = FocusKeys.entry(TopSection.ShortDrama.route),
-                                    source = com.chinut.bawantv.unified.HongguoSource,
+                                    source = com.chinut.bawantv.unified.QimaoSource,
                                     pendingMovie = pendingUnified,
                                     onPendingConsumed = { pendingUnified = null },
                                     onDetailChanged = { inVodDetail = it },
@@ -488,7 +488,7 @@ fun BawanRoot(
                                             // 短剧：一集播完自动下一集
                                             autoNext = true,
                                             sourceLabel = source.id.let {
-                                                if (it == "hongguo") "红果短剧" else "低端影视"
+                                                "短剧"
                                             },
                                         )
                                     },

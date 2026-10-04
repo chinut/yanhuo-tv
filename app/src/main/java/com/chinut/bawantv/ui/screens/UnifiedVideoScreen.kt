@@ -110,7 +110,7 @@ fun UnifiedVideoScreen(
     entryKey: Any,
     /**
      * 数据源。默认低端影视（影视板块）；
-     * 短剧板块传 [com.chinut.bawantv.unified.HongguoSource]。
+     * 短剧板块传自己的 [com.chinut.bawantv.unified.VideoSource]。
      *
      * 抽出这一层是为了让短剧**复用本页**（海报墙 / 详情 / 选集 / 播放），
      * 而不是复制一份 1300 多行的界面。电视内存紧，多一套界面等于
@@ -836,7 +836,7 @@ private fun UnifiedCard(
 @Composable
 private fun UnifiedDetailScreen(
     movie: UnifiedMovie,
-    /** 数据源。由 UnifiedVideoScreen 透传 —— 短剧要用红果，影视用低端影视。 */
+    /** 数据源。由 UnifiedVideoScreen 透传 —— 短剧和影视各有各的源。 */
     source: com.chinut.bawantv.unified.VideoSource,
     onBack: () -> Unit,
     onPlay: (UnifiedMovie, UnifiedSource, List<Episode>, Int) -> Unit,
@@ -1032,7 +1032,7 @@ private fun UnifiedDetailScreen(
                     )
                     // ---------- 免费集数说明 ----------
                     //
-                    // 短剧（红果）只免费放前几集，实测 22 部剧**全是 3 集**
+                    // 短剧站点常常只免费放前几集（红果实测每部剧 3 集）
                     // （详情页 `accessible_episode_cnt` = 3，第 4 集起服务端 404）。
                     // 这是站点的商业限制，突破不了。
                     //
@@ -1076,7 +1076,7 @@ private fun UnifiedDetailScreen(
                             EpisodeButton(
                                 name = label,
                                 // 地址为空 = 这一集在付费墙后面。
-                                // 短剧那边只有前几集能取到地址（详见 HongguoSource）。
+                                // 短剧那边可能只有前几集能取到地址。
                                 locked = eps[i].url.isBlank(),
                                 onClick = { if (current != null) onPlay(movie, current, eps, i) },
                             )
