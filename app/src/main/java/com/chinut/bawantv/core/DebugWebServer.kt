@@ -48,6 +48,77 @@ object DebugWebServer {
     private val _log = MutableStateFlow<List<String>>(emptyList())
     val log: StateFlow<List<String>> = _log.asStateFlow()
 
+    /**
+     * 处理 APK 上传：从 multipart 里抠出文件、落到 `filesDir/updates/`、
+     * 然后交给系统的安装界面。
+     *
+     * 为什么要手写 multipart 解析：这个服务是极简 HTTP，没有第三方库，
+     * 而 APK 上传只有一个"文件"字段，抠边界就够。
+     *
+     * @return (是否成功, 给用户看的提示)
+     */
+    private fun handleApkUpload(
+        ctx: Context,
+        body: ByteArray,
+    ): Pair<Boolean, String> {
+        val context = ctx.applicationContext
+        if (body.size < 1024) return false to "上传内容为空或过小"
+        if (body.size > 200L * 1024 * 1024) return false to "文件太大（超过 200MB）"
+
+        // 找 multipart 头里的 filename
+        val head = String(body.copyOfRange(0, minOf(body.size, 4096)), Charsets.ISO_8859_1)
+        val nameMatch = Regex("filename=\"([^\"]+)\"").find(head)
+        val rawName = nameMatch?.groupValues?.get(1).orEmpty().ifBlank { "upload.apk" }
+        if (!rawName.lowercase().endsWith(".apk")) {
+            return false to "只接受 .apk 文件（收到：$rawName）"
+        }
+
+        // 抠出文件正文：空行之后、到结尾的 -- 之前
+        val sep = byteArrayOf(13, 10, 13, 10)   // CRLFCRLF
+
+        var start = -1
+        var i = 0
+        while (i <= body.size - 4) {
+            if (body[i] == sep[0] && body[i + 1] == sep[1] &&
+                body[i + 2] == sep[2] && body[i + 3] == sep[3]
+            ) {
+                start = i + 4
+                break
+            }
+            i++
+        }
+        if (start <= 0) return false to "没找到文件内容（multipart 格式不对）"
+
+        // 结尾的 CRLF + -- 要砍掉
+        var end = body.size
+        var k = body.size - 4
+        while (k > start) {
+            if (body[k] == 13.toByte() && body[k + 1] == 10.toByte() &&
+                body[k + 2] == 45.toByte() && body[k + 3] == 45.toByte()
+            ) {
+                end = k
+                break
+            }
+            k--
+        }
+        if (end <= start) return false to "文件内容为空"
+
+        return runCatching {
+            val dir = java.io.File(context.filesDir, "updates").apply { mkdirs() }
+            // 固定文件名，避免上传目录堆积旧包
+            val apk = java.io.File(dir, "uploaded.apk")
+            apk.writeBytes(body.copyOfRange(start, end))
+            log("收到安装包 ${apk.length() / 1048576} MB，交给系统安装器")
+
+            // 复用更新模块的安装逻辑（它已经处理了各家电视的坑）
+            com.chinut.bawantv.core.Updater.install(context, apk)
+            true to "已收到 ${apk.length() / 1048576} MB，电视上应该弹出安装界面了"
+        }.getOrElse { e ->
+            log("安装包处理失败：${e.message}")
+            false to "处理失败：${e.message?.take(80)}"
+        }
+    }
+
     private fun log(line: String) {
         val now = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINA)
             .format(java.util.Date())
@@ -141,20 +212,49 @@ object DebugWebServer {
     private fun handle(context: Context, socket: Socket) {
         socket.use { s ->
             runCatching {
-                s.soTimeout = 15_000
-                val reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
-                val requestLine = reader.readLine() ?: return
+                // ⚠️ 上传 APK 时要把 soTimeout 调大（20MB 在慢网络上不止 15 秒）
+                s.soTimeout = 60_000
+
+                // ---------- 全程用字节流读请求 ----------
+                //
+                // 原来头部用 BufferedReader、body 再切回原始 InputStream ——
+                // BufferedReader 会预读，头读完后body 的前一截还留在它自己的
+                // 缓冲区里，从原始流读就**少了一截**，于是 multipart 解析失败、
+                // 连接被关（实测上传 20MB 直接 Remote end closed）。
+                //
+                // 现在统一走字节：逐字节读到 CRLFCRLF 拿到头部，
+                // 再按 Content-Length 精确读 body，二进制安全。
+                val ins = s.getInputStream()
+
+                /** 读到 CRLFCRLF 为止，返回头部文本（不含空行）。 */
+                fun readHead(): String {
+                    val sb = StringBuilder()
+                    var last4 = 0
+                    while (sb.length < 64 * 1024) {
+                        val b = ins.read()
+                        if (b < 0) break
+                        sb.append(b.toChar())
+                        // 检测 
+
+
+                        last4 = (last4 shl 8) or b
+                        if (last4 == 0x0D0A0D0A) break
+                    }
+                    return sb.toString()
+                }
+
+                val headText = readHead()
+                if (headText.isEmpty()) return
+                val headLines = headText.split("\r\n")
+                val requestLine = headLines.firstOrNull().orEmpty()
                 val parts = requestLine.split(' ')
                 if (parts.size < 2) return
                 val method = parts[0].uppercase()
                 val rawPath = parts[1]
 
-                // 读取请求头（拿到 Content-Length 和 Cookie）
                 var contentLength = 0
                 var cookieToken = ""
-                while (true) {
-                    val line = reader.readLine() ?: break
-                    if (line.isEmpty()) break
+                headLines.drop(1).forEach { line ->
                     val lower = line.lowercase()
                     when {
                         lower.startsWith("content-length:") ->
@@ -166,16 +266,20 @@ object DebugWebServer {
                 }
 
                 // 读取 body
-                val body = if (contentLength > 0) {
-                    val buf = CharArray(contentLength)
+                // ⚠️ 用**字节**读，不能只读成 String ——
+                // APK 上传是二进制，转成 UTF-8 字符串会损坏内容。
+                val bodyBytes: ByteArray = if (contentLength > 0) {
+                    val buf = ByteArray(contentLength)
                     var read = 0
+                    // ins 已在上面定义（同一个流，没有缓冲错位）
                     while (read < contentLength) {
-                        val r = reader.read(buf, read, contentLength - read)
+                        val r = ins.read(buf, read, contentLength - read)
                         if (r <= 0) break
                         read += r
                     }
-                    String(buf, 0, read)
-                } else ""
+                    if (read == contentLength) buf else buf.copyOf(read)
+                } else ByteArray(0)
+                val body = String(bodyBytes, Charsets.UTF_8)
 
                 val path = rawPath.substringBefore('?')
                 val query = rawPath.substringAfter('?', "")
@@ -305,6 +409,15 @@ object DebugWebServer {
                             """{"ok":true,"now":${System.currentTimeMillis()},"events":[$arr]}""",
                             JSON_UTF8,
                         )
+                    }
+
+                    // ---------- 上传安装包（手机 → 电视 → 系统安装器）----------
+                    //
+                    // 用户嫌 U 盘来回插麻烦，而电视又没开 ADB，
+                    // 所以给手机调试页加这个入口。
+                    path == "/upload" && method == "POST" -> {
+                        val r = handleApkUpload(context, bodyBytes)
+                        respond(out, if (r.first) 200 else 400, r.second)
                     }
 
                     // ---------- 播放诊断 ----------
@@ -628,6 +741,35 @@ document.querySelector('form').addEventListener('submit', function (ev) {
       if (btn) { btn.textContent = '保存失败，重试'; btn.disabled = false; }
     });
 });
+</script>
+
+<div class="card">
+ <h2>上传安装包（不用插 U 盘）</h2>
+ <p class="hint">
+  手机选一个 APK，传到电视并直接调用系统安装界面。<br>
+  电视上会弹出安装确认，按遥控器确定即可。
+ </p>
+ <input type="file" id="apk" accept=".apk,application/vnd.android.package-archive"
+  style="width:100%;background:#0e1222;border:1px solid var(--line);
+  border-radius:11px;color:var(--txt);padding:11px 12px;font-size:14px">
+ <button type="button" onclick="uploadApk()" style="margin-top:10px">上传并安装</button>
+ <pre id="upmsg" style="white-space:pre-wrap;font-size:13px;line-height:1.6;
+  margin:10px 0 0;color:var(--dim)"></pre>
+</div>
+
+<script>
+function uploadApk() {
+  var f = document.getElementById('apk').files[0];
+  var msg = document.getElementById('upmsg');
+  if (!f) { msg.textContent = '先选一个 APK 文件'; return; }
+  msg.textContent = '正在上传 ' + (f.size / 1048576).toFixed(1) + ' MB…（别关页面）';
+  var fd = new FormData();
+  fd.append('file', f);
+  fetch('/upload', { method: 'POST', body: fd })
+    .then(function (r) { return r.text(); })
+    .then(function (t) { msg.textContent = t; })
+    .catch(function (e) { msg.textContent = '上传失败：' + e; });
+}
 </script>
 
 <div class="card">
