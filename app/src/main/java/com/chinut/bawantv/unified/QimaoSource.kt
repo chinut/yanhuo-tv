@@ -175,6 +175,41 @@ object QimaoSource : VideoSource {
             .take(max).toList()
     }
 
+    /**
+     * 连通性自检：直接打一次接口，**把确切的失败原因留下来**。
+     *
+     * 为什么需要：`Net.get` 把 `UnknownHostException`（DNS）、
+     * `SocketTimeoutException`（超时）、TLS 失败、HTTP 4xx/5xx
+     * 全部压成一个 `null`，所以"0 部"这个现象对应四种不同病因，
+     * 修法完全不同。这里绕过 `Net` 直接发请求，把异常原样抛出来看。
+     *
+     * 结论写进 `PlayDiag.probeResult`，手机调试页会显示。
+     */
+    suspend fun probe(): String = withContext(Dispatchers.IO) {
+        val url = "$API?name=%E6%80%BB%E8%A3%81&page=1"
+        val result = runCatching {
+            val req = okhttp3.Request.Builder().url(url)
+                .header("User-Agent", Http.UA_MOBILE)
+                .build()
+            Http.client.newCall(req).execute().use { r ->
+                val body = r.body?.string().orEmpty()
+                // ⚠️ 必须压成一行：响应是多行 JSON，
+                // 直接塞进报告会把手机页那张卡片撑乱（实测踩到）。
+                val oneLine = body.replace(Regex("\\s+"), " ").trim()
+                "HTTP ${r.code}，返回 ${body.length} 字符" +
+                    if (oneLine.isNotEmpty()) "，开头=${oneLine.take(70)}" else ""
+            }
+        }.getOrElse { e ->
+            // 异常类名是关键：UnknownHostException=DNS，
+            // SocketTimeoutException=超时，SSLException=TLS/劫持
+            "${e.javaClass.simpleName}: ${e.message?.take(120)}"
+        }
+        val line = "短剧接口 $result"
+        com.chinut.bawantv.core.PlayDiag.probeResult = line
+        android.util.Log.i(TAG, "接口自检 → $line")
+        line
+    }
+
     override suspend fun cached(): List<UnifiedMovie> = withContext(Dispatchers.IO) {
         listCache?.let { return@withContext it }
         val disk = loadFromDisk()
@@ -188,6 +223,13 @@ object QimaoSource : VideoSource {
     override suspend fun refresh(
         onProgress: (Int, Int, Int) -> Unit,
     ): List<UnifiedMovie> = withContext(Dispatchers.IO) {
+        // ⚠️ 自检放在**早返回之前**，无条件跑一次。
+        //
+        // 原来放在后面，结果首页预热已经把缓存灌进 listCache，
+        // refresh 直接早返回，自检根本没执行（实测踩到）。
+        // 自检本身很轻（一次请求、约 0.5 秒），代价可以接受。
+        runCatching { probe() }
+
         listCache?.takeIf { it.isNotEmpty() }?.let { return@withContext it }
 
         val out = LinkedHashMap<String, UnifiedMovie>()

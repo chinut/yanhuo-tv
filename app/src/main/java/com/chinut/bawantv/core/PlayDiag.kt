@@ -49,6 +49,15 @@ object PlayDiag {
     )
 
     private const val TAG = "BawanDiag"
+
+    /**
+     * 最近一次"接口连通性自检"的结论。
+     *
+     * 用途：用户电视上短剧刷不出来，但代码里 `Net.get` 把
+     * DNS / 超时 / TLS / HTTP 错误全压成一个 null，查不出原因。
+     * 这里存一句人能看懂的话，手机调试页直接显示。
+     */
+    @Volatile var probeResult: String = "（还没测过）"
     private const val MAX_STALLS = 60
 
     // ---------- 当前状态 ----------
@@ -156,6 +165,7 @@ object PlayDiag {
         val upSec = if (startedAt == 0L) 0 else (System.currentTimeMillis() - startedAt) / 1000
         val sb = StringBuilder()
 
+        sb.append("接口自检：").append(probeResult).append('\n')
         sb.append("频道：").append(channelName.ifBlank { "（未播放）" }).append('\n')
         sb.append("来源：第 ").append(sourceIndex + 1).append('/').append(sourceCount)
         sb.append(if (usingWeb) " 条 · 网页播放\n" else " 条 · 直连播放\n")
