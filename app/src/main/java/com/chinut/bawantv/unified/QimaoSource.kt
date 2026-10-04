@@ -91,15 +91,34 @@ object QimaoSource : VideoSource {
      *
      * 返回值同时带"实际用了哪个协议"，便于自检里显示。
      */
+    /**
+     * 用**补过信任锚的客户端**发请求。
+     *
+     * ⚠️ 不能用 `Net.get` —— 它内部固定用 `Http.client`，
+     * 而 Android 6 需要给这个域名补 Let's Encrypt 的根证书
+     * （见 [com.chinut.bawantv.core.TlsHelper]）。
+     */
+    private suspend fun getWithAnchors(url: String): String? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val client = com.chinut.bawantv.core.TlsHelper.clientFor(
+                    com.chinut.bawantv.BawanApp.ctx(), url,
+                )
+                val req = okhttp3.Request.Builder().url(url)
+                    .header("User-Agent", Http.UA_MOBILE)
+                    .build()
+                client.newCall(req).execute().use { r ->
+                    if (r.isSuccessful) r.body?.string() else null
+                }
+            }.getOrNull()
+        }
+
     private suspend fun fetch(api: String, query: String): Pair<String?, String> {
         val q = if (query.isEmpty()) "" else "?$query"
-        // 先试 https
-        runCatching { Net.get(api + q, ua = Http.UA_MOBILE) }
-            .getOrNull()?.let { return it to "https" }
-        // https 失败（含证书验不过）→ 退回 http
-        val plain = runCatching {
-            Net.get(API_PLAIN + q, ua = Http.UA_MOBILE)
-        }.getOrNull()
+        // 先试 https（补过锚）
+        getWithAnchors(api + q)?.let { return it to "https" }
+        // https 失败 → 退回 http（同样补过锚，老设备上 http 也可能有重定向）
+        val plain = getWithAnchors(API_PLAIN + q)
         return plain to (if (plain != null) "http(降级)" else "都失败")
     }
 
@@ -222,11 +241,16 @@ object QimaoSource : VideoSource {
      */
     suspend fun probe(): String = withContext(Dispatchers.IO) {
         // 分两步测，把"https 为什么失败"和"http 能不能救"都说清楚
+        // ⚠️ 必须用补过锚的客户端，不能用 Http.client ——
+        // 否则在 Android 6 上永远报证书错误，自检结果会误导排查方向。
+        val client = com.chinut.bawantv.core.TlsHelper.clientFor(
+            com.chinut.bawantv.BawanApp.ctx(), API,
+        )
         val httpsErr = runCatching {
             val req = okhttp3.Request.Builder().url("$API?name=%E6%80%BB%E8%A3%81&page=1")
                 .header("User-Agent", Http.UA_MOBILE)
                 .build()
-            Http.client.newCall(req).execute().use { r ->
+            client.newCall(req).execute().use { r ->
                 val b = r.body?.string().orEmpty()
                 "HTTP ${r.code}，返回 ${b.length} 字符"
             }
@@ -240,7 +264,9 @@ object QimaoSource : VideoSource {
             val req = okhttp3.Request.Builder().url("$API_PLAIN?name=%E6%80%BB%E8%A3%81&page=1")
                 .header("User-Agent", Http.UA_MOBILE)
                 .build()
-            Http.client.newCall(req).execute().use { r ->
+            com.chinut.bawantv.core.TlsHelper.clientFor(
+                com.chinut.bawantv.BawanApp.ctx(), API_PLAIN,
+            ).newCall(req).execute().use { r ->
                 val b = r.body?.string().orEmpty()
                 "HTTP ${r.code}，${b.length} 字符"
             }
@@ -317,7 +343,12 @@ object QimaoSource : VideoSource {
             val page = runCatching { search(kw, 1) }.getOrNull()
             if (page == null) badKw++
             if (!page.isNullOrEmpty()) okKw++
-            page.orEmpty().forEach { m -> out.putIfAbsent(m.id, m) }
+            // ⚠️ 用 Kotlin 的 getOrPut，**不能用 Map.putIfAbsent** ——
+            // 后者是 Java 8 / API 24 才有的方法，在电视（Android 6.0.1，API 23）
+            // 上会抛 NoSuchMethodError：
+            //   No virtual method putIfAbsent(...) in class java.util.LinkedHashMap
+            // 实测这就是"短剧 0 部、等 20 分钟也没用"的第二个原因。
+            page.orEmpty().forEach { m -> out.getOrPut(m.id) { m } }
             onProgress(done, HOT.size, out.size)
 
             // ⚠️ 拿到一部分就立刻落盘，不等全部拉完。
