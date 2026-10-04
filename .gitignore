@@ -42,6 +42,12 @@ captures/
 __pycache__/
 *.pyc
 
-# IPTV 扫描器的运行产物（每次跑都不同）
+# IPTV 扫描器的运行产物（每次跑都不同，而且很大）
 tools/iptv/iptv_result.json
 tools/iptv/iptv_*.m3u
+tools/iptv/直播源.m3u
+tools/iptv/扫描结果.json
+tools/iptv/*.spec
+tools/iptv/build_pyi/
+tools/iptv/发布/直播源.m3u
+tools/iptv/发布/扫描结果.json
