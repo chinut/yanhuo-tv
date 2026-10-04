@@ -321,6 +321,9 @@ fun VodPlayerScreen(
         when {
             next != null -> {
                 android.util.Log.i(TAG_VOD, "自动连播：第 ${index + 1} 集 → 第 ${next + 1} 集")
+                // 同上：手动复位，别指望 remember(request) 会重置
+                // （实测换集后 index 没更新，那个 key 不会变）。
+                autoNextFired = false
                 onSwitchEpisode(request.copy(index = next))
             }
             index < request.episodes.lastIndex -> {
@@ -478,6 +481,16 @@ fun VodPlayerScreen(
     fun step(delta: Int) {
         val next = index + delta
         if (next !in request.episodes.indices) return
+        // ⚠️ 必须手动重置。
+        //
+        // `autoNextFired` 原来是 `remember(request)`，指望"request 变了就重置"。
+        // 但实测**换集后 index 并没有跟着更新**（日志里切到第 6 集后 index 还是 4），
+        // 于是 autoNextFired 一直是 true → 第二次触发被
+        // `if (autoNextFired) return` 挡掉，表现就是**只有第一次能自动连播**
+        // （用户反馈「一集播放完后不会自动跳转下一集」）。
+        //
+        // 不依赖 remember 的 key，直接在这里清掉，最可靠。
+        autoNextFired = false
         onSwitchEpisode(request.copy(index = next))
     }
 
