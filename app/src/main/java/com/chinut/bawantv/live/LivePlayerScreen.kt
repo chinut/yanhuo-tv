@@ -1516,7 +1516,7 @@ fun LivePlayerScreen(
             .wrapContentHeight()
             .padding(end = Dim.SafeH * 0.8f, top = Dim.SafeV, bottom = Dim.SafeV),
     ) {
-        QualityPanel(
+QualityPanel(
             channel = current,
             sources = candidatesOf(current),
             activeIndex = sourceIndex,
@@ -1527,67 +1527,6 @@ fun LivePlayerScreen(
                     sourceIndex = i
                     retryToken++
                 }
-                qualityPanel = false
-            },
-            // ---------- 切换菜单：分类 + 频道 ----------
-            categories = com.chinut.bawantv.live.LiveCatalog.Category.entries,
-            category = menuCategory,
-            catCursor = menuCatCursor,
-            segment = menuSeg,
-            channels = menuChannels,
-            channelCursor = menuChannelCursor,
-            currentChannelUrl = current.url,
-            onCategory = { cat ->
-                menuCategory = cat
-                menuSeg = 1
-                menuChannelCursor = 0
-                hudTimeoutToken++
-            },
-            onMoveCat = { d ->
-                val n = com.chinut.bawantv.live.LiveCatalog.Category.entries.size
-                menuCatCursor = ((menuCatCursor + d) % n + n) % n
-                menuCategory = com.chinut.bawantv.live.LiveCatalog.Category.entries[menuCatCursor]
-                menuSeg = 1
-                menuChannelCursor = 0
-                hudTimeoutToken++
-            },
-            onMoveChannel = { d ->
-                if (menuChannels.isNotEmpty()) {
-                    if (menuChannelCursor < 0) {
-                        // 第一次移动：从当前频道出发
-                        val at = menuChannels.indexOfFirst { it.url == current.url }
-                        menuChannelCursor = if (at >= 0) at else 0
-                    } else {
-                        val n = menuChannels.size
-                        menuChannelCursor = ((menuChannelCursor + d) % n + n) % n
-                    }
-                    hudTimeoutToken++
-                }
-            },
-            onLeaveListUp = {
-                // 在列表顶上再按「上」→ 跳到分类行
-                menuSeg = 0
-                hudTimeoutToken++
-            },
-            onPickChannel = { ch ->
-                qualityCursor = 0
-                sourceIndex = 0
-                retryToken++
-                onChannelChange(ch)
-                qualityPanel = false
-            },
-            // ---------- 主源切换（A / B / AB）----------
-            //
-            // 用户要求：「在直播播放页面中点击三横线时用户自己选择主源」。
-            // 切换后要重新加载频道表 —— 因为 A 和 B 是两个完全不同的列表。
-            preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset),
-            oldTvMode = prefs.oldTvMode,
-            onPreset = { p ->
-                prefs.livePreset = p.name
-                // HomeWarmup 会自己发现配置变了并重新预热（见它的 warmKey），
-                // 这里只要关掉播放器回首页就行。
-                hudTimeoutToken++
-                onReloadCatalog()
                 qualityPanel = false
             },
         )
@@ -1606,6 +1545,33 @@ fun LivePlayerScreen(
  * 有的就是网页默认档），所以对用户来说它承担的就是"换个更清楚的"这个作用。
  * 但标题必须诚实，不能让用户以为能在 720P/1080P 之间精确选。
  */
+/**
+ * 线路选择面板 —— **只放"这个频道有哪些源"**。
+ *
+ * ## 为什么重做成这么小（用户反馈驱动）
+ *
+ * 原来这里堆了四块：只读的"主源"行、分类行、频道列表、源列表。
+ * 用户指出两个问题：
+ *
+ * 「刚修改的那个界面内 遥控器的上下左右确定是没有用的」
+ * 「如果是属性 就不要给用户框体 让用户误解可以被选中，
+ *   如果你要给用户可以选中和操作的界面那么就给用户控制的权利，
+ *   不要给用户太多信息 容易让用户困惑」
+ *
+ * 查出来的根因：**屏幕上画的东西和按键驱动的东西不是同一套 state**。
+ * 键盘只改 `qualityCursor`（源列表），而"分类/频道列表"用的是
+ * `menuCatCursor` / `menuChannelCursor` —— 它们只被画出来，
+ * **没有任何按键能改**。也就是一半真一半假的界面。
+ *
+ * ## 现在的原则
+ *
+ * 1. **有框体的必须能选、能操作** —— 不留"看着能选其实不能"的东西
+ * 2. **只给一个列表** —— 用不上的东西不要并排摆出来
+ * 3. **少给信息** —— 全局"主源"归设置页，播放页不放它
+ *
+ * 列表第一项标「跟随设置」：它就是这个频道跟着主源走的那个地址，
+ * 其余是它自己的备用源。
+ */
 @Composable
 private fun QualityPanel(
     channel: LiveChannel,
@@ -1613,32 +1579,11 @@ private fun QualityPanel(
     activeIndex: Int,
     cursor: Int,
     onPick: (Int) -> Unit,
-    // ---------- 切换菜单 ----------
-    categories: List<com.chinut.bawantv.live.LiveCatalog.Category>,
-    category: com.chinut.bawantv.live.LiveCatalog.Category,
-    catCursor: Int,
-    segment: Int,
-    channels: List<LiveChannel>,
-    channelCursor: Int,
-    currentChannelUrl: String,
-    onCategory: (com.chinut.bawantv.live.LiveCatalog.Category) -> Unit,
-    onMoveCat: (Int) -> Unit,
-    onMoveChannel: (Int) -> Unit,
-    onLeaveListUp: () -> Unit,
-    onPickChannel: (LiveChannel) -> Unit,
-    preset: com.chinut.bawantv.live.LivePreset,
-    onPreset: (com.chinut.bawantv.live.LivePreset) -> Unit,
-    /** 老电视模式：开了就强制 GitHub 源，面板里不再给主源切换。 */
-    oldTvMode: Boolean,
 ) {
-    // 每个频道的源可能有几十个（央视 33 个），面板必须能滚动，
-    // 否则超出的项会跑到屏幕外 —— 用户「看得到列表但选不中」就是这么来的。
     val listState = rememberLazyListState()
-    // 光标移动时自动把它滚进可见范围（遥控器没法拖动滚动条）
-    LaunchedEffect(cursor, sources.size) {
-        if (cursor >= 0 && cursor < sources.size) {
-            runCatching { listState.animateScrollToItem(cursor) }
-        }
+    // 光标移动时把选中项滚进视野（源多了才看得出效果）
+    LaunchedEffect(cursor) {
+        runCatching { listState.animateScrollToItem(cursor) }
     }
 
     Column(
@@ -1653,233 +1598,96 @@ private fun QualityPanel(
             )
             .padding(20.sdp),
     ) {
+        // 标题用**纯文字、不给框** —— 有框就会被当成可选项，
+        // 这正是用户吐槽的"让用户误解可以被选中"。
         Text(
-            "清晰度 / 线路",
+            channel.name,
             color = Color.White,
             fontSize = Txt.Section,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(10.sdp))
-
-        // ---------- 主源：只读展示，不在这里改 ----------
-        //
-        // ⚠️ 这里原来是一排可点的 A/B/AB 按钮。用户指出问题：
-        //
-        //   「清晰度和线路应该是跟随设置的源 而不应该列出来，
-        //     列出来的应该是这个频道拥有的源和清晰度」
-        //
-        // 确实如此 —— 把"全局主源设置"和"本频道的源"并排成两排按钮，
-        // 用户根本分不清哪个是"我现在用的"。而且老电视模式下这一排
-        // 会被藏掉，面板结构随模式变，更糊涂。
-        //
-        // 现在主源**跟随设置、只显示一行**；列表里专注本频道的源。
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("主源", color = Ink.TextTertiary, fontSize = Txt.Tiny)
-            Spacer(Modifier.width(6.sdp))
-            Text(
-                if (oldTvMode) "老电视模式 · GitHub 源"
-                else preset.label + "（在设置里改）",
-                color = Color.White.copy(alpha = 0.82f),
-                fontSize = Txt.Caption,
-            )
-        }
-
-        Spacer(Modifier.height(10.sdp))
-
-        // ---------- 分类行（全部 / 央视 / 地方台 / IPTV）----------
-        //
-        // 在播放中就能换分类 —— 不用退回列表页。这是用户要的"切换菜单"。
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.sdp),
-        ) {
-            categories.forEachIndexed { i, cat ->
-                val on = cat == category
-                val cursorHere = segment == 0 && i == catCursor
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(10.sdp))
-                        .background(
-                            when {
-                                cursorHere -> Ink.Accent.copy(alpha = 0.45f)
-                                on -> Color.White.copy(alpha = 0.16f)
-                                else -> Color.White.copy(alpha = 0.06f)
-                            }
-                        )
-                        .border(
-                            width = if (cursorHere) 3.sdp else 0.sdp,
-                            color = if (cursorHere) Ink.AccentBright else Color.Transparent,
-                            shape = RoundedCornerShape(10.sdp),
-                        )
-                        .clickable { onCategory(cat) }
-                        .padding(vertical = 8.sdp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        cat.label,
-                        color = if (on || cursorHere) Color.White else Ink.TextTertiary,
-                        fontSize = Txt.Caption,
-                        fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.sdp))
-
-        // ---------- 该分类下的频道列表 ----------
+        Spacer(Modifier.height(4.sdp))
         Text(
-            "频道 · " + channels.size + " 个",
+            "这个频道有 ${sources.size} 个源",
             color = Ink.TextTertiary,
             fontSize = Txt.Tiny,
         )
-        Spacer(Modifier.height(6.sdp))
-        val chListState = rememberLazyListState()
-        LaunchedEffect(channelCursor, channels.size) {
-            if (channelCursor >= 0 && channelCursor < channels.size) {
-                runCatching { chListState.animateScrollToItem(channelCursor) }
-            }
-        }
+
+        Spacer(Modifier.height(12.sdp))
+
+        // ---------- 唯一可操作的列表 ----------
         androidx.compose.foundation.lazy.LazyColumn(
-            state = chListState,
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 190.sdp),
+                .heightIn(max = 320.sdp),
         ) {
-            itemsIndexed(channels) { i, ch ->
-                val isHere = ch.url == currentChannelUrl
-                val isCursor = segment == 1 && i == channelCursor
+            itemsIndexed(sources) { i, url ->
+                val isActive = i == activeIndex
+                val isCursor = i == cursor
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 6.sdp)
-                        .clip(RoundedCornerShape(12.sdp))
+                        .padding(bottom = 8.sdp)
+                        .clip(RoundedCornerShape(14.sdp))
                         .background(
                             when {
                                 isCursor -> Ink.Accent.copy(alpha = 0.30f)
-                                isHere -> Color.White.copy(alpha = 0.10f)
-                                else -> Color.White.copy(alpha = 0.04f)
+                                isActive -> Color.White.copy(alpha = 0.10f)
+                                else -> Color.White.copy(alpha = 0.05f)
                             }
                         )
                         .border(
                             width = if (isCursor) 3.sdp else 0.sdp,
                             color = if (isCursor) Ink.AccentBright else Color.Transparent,
-                            shape = RoundedCornerShape(12.sdp),
+                            shape = RoundedCornerShape(14.sdp),
                         )
-                        .clickable { onPickChannel(ch) }
-                        .padding(horizontal = 12.sdp, vertical = 9.sdp),
+                        .clickable { onPick(i) }
+                        .padding(horizontal = 14.sdp, vertical = 12.sdp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        ch.name,
-                        color = if (isCursor || isHere) Color.White else Ink.TextSecondary,
-                        fontSize = Txt.Caption,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (isHere) {
-                        Text("正在看", color = Ink.AccentBright, fontSize = Txt.Tiny)
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            // 第一项跟着主源设置走，其余是这个频道自己的备用源
+                            (if (i == 0) "源 1 · 跟随设置" else "源 ${i + 1}") +
+                                (if (LiveCatalog.isWebPage(url)) "（网页播放）"
+                                 else "（直连流）"),
+                            color = Color.White,
+                            fontSize = Txt.Label,
+                            fontWeight = if (isCursor || isActive) FontWeight.Bold
+                            else FontWeight.Normal,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            runCatching { java.net.URI(url).host ?: url }.getOrDefault(url),
+                            color = Ink.TextFaint,
+                            fontSize = Txt.Tiny,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (isActive) {
+                        Text(
+                            "正在看",
+                            color = Ink.AccentBright,
+                            fontSize = Txt.Tiny,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(14.sdp))
-
-        // ---------- 本频道的源 ----------
+        Spacer(Modifier.height(12.sdp))
         Text(
-            "线路 · " + sources.size + " 个",
-            color = Ink.TextTertiary,
-            fontSize = Txt.Tiny,
-        )
-        Spacer(Modifier.height(6.sdp))
-        Text(
-            channel.name,
-            color = Ink.TextTertiary,
-            fontSize = Txt.Caption,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(14.dp))
-
-        androidx.compose.foundation.lazy.LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 300.sdp),
-        ) {
-            itemsIndexed(sources) { i, url ->
-            val isActive = i == activeIndex
-            val isCursor = i == cursor
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.sdp)
-                    .clip(RoundedCornerShape(14.sdp))
-                    .background(
-                        when {
-                            isCursor -> Ink.Accent.copy(alpha = 0.30f)
-                            isActive -> Color.White.copy(alpha = 0.10f)
-                            else -> Color.White.copy(alpha = 0.05f)
-                        }
-                    )
-                    .border(
-                        width = if (isCursor) 3.sdp else 0.sdp,
-                        color = if (isCursor) Ink.AccentBright else Color.Transparent,
-                        shape = RoundedCornerShape(14.sdp),
-                    )
-                    .clickable { onPick(i) }
-                    .padding(horizontal = 14.sdp, vertical = 12.sdp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        // 第一个是这个频道的"主地址"，也就是**跟着主源设置走**的那个；
-                        // 其余是它自己的备用源。这么标用户一眼能区分。
-                        //
-                        // 网页源没有码率信息，就按类型如实标注。
-                        (if (i == 0) "源 1 · 跟随设置" else "源 ${i + 1}") +
-                            (if (LiveCatalog.isWebPage(url)) "（网页播放）" else "（直连流）"),
-                        color = Color.White,
-                        fontSize = Txt.Label,
-                        fontWeight = if (isCursor || isActive) FontWeight.Bold else FontWeight.Normal,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        runCatching { java.net.URI(url).host ?: url }.getOrDefault(url),
-                        color = Ink.TextFaint,
-                        fontSize = Txt.Tiny,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (isActive) {
-                    Text(
-                        "使用中",
-                        color = Ink.Green,
-                        fontSize = Txt.Tiny,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-            }
-        }
-
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "↑↓ 选台/选线路 · ←→ 换分类 · 确定键选中 · 三横键关闭",
+            "↑↓ 选源 · 确定切换 · 三横键关闭",
             color = Ink.TextFaint,
             fontSize = Txt.Tiny,
         )
     }
 }
-
-// ==================== 台标卡片 ====================
 
 /**
  * 左下角的台标信息卡。
