@@ -509,7 +509,16 @@ fun VodPlayerScreen(
     //
     // 直播页一直是靠这套拦截器工作的，点播页漏了 —— 现在对齐。
     val focusManager = com.chinut.bawantv.ui.theme.LocalTvFocusManager.current
-    DisposableEffect(focusManager) {
+    // ⚠️ key 必须包含 `index`。
+    //
+    // 踩过的坑（用户反馈「按下只能到第2集，再按就没反应」）：
+    // 原来 key 只有 focusManager，换集后这个 effect 不重启，
+    // 而换集会重建 ExoPlayer（下面的 DisposableEffect(Unit)），
+    // 结果**按键拦截器被顶掉** —— 实测日志里第二次按下之后
+    // 完全没有 KeyInterceptor 输出。
+    //
+    // 把 index 放进 key，换集后重新注册，就正常了。
+    DisposableEffect(focusManager, index) {
         focusManager?.setKeyInterceptor { dir ->
             // 失败弹窗显示时，方向键只在"重试 / 下一集"之间走，不要拿去拖进度。
             // （用户反馈过：弹窗上的按钮遥控器选不中。）
