@@ -688,15 +688,23 @@ private fun HomeEntryCard(
         Box(Modifier.matchParentSize().background(fallbackBrush))
 
         if (posters.isNotEmpty()) {
-            // 每 11 秒换一张（淡入本身占 1.1 秒，间隔太短会显得一直在动）。
+            // 每 3 分钟换一张。
+            //
+            // 用户反馈「海报切换太频繁了 几分钟切一次就行」——
+            // 原来 11 秒一次，看电视时余光一直有东西在动，很吵。
             //
             // ⚠️ key 里带 posters.size：列表后到时重新起算，
             // 否则 index 可能越界。
-            var idx by remember(posters.size) { mutableIntStateOf(0) }
+            //
+            // 起点**随机**：不然每次开机都从同一张开始，
+            // 而 3 分钟才换一张，"每次开机看到的都是这张"会更明显。
+            var idx by remember(posters.size) {
+                mutableIntStateOf(if (posters.isEmpty()) 0 else (0 until posters.size).random())
+            }
             LaunchedEffect(posters.size) {
                 if (posters.size <= 1) return@LaunchedEffect
                 while (true) {
-                    kotlinx.coroutines.delay(11_000L)
+                    kotlinx.coroutines.delay(3 * 60_000L)
                     idx = (idx + 1) % posters.size
                 }
             }
