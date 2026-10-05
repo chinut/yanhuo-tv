@@ -93,10 +93,22 @@ object HomeWarmup {
      */
     suspend fun warmUp(context: Context) {
         // 配置变了 → 之前的预热结果作废
+        //
+        // ⚠️ 这里**必须连磁盘缓存一起清**。
+        //
+        // `LiveCache` 是单文件、只存最后一次的结果（`filesDir/live_cache.tsv`）。
+        // 切源后按新 key 去查，内容对不上 —— 那份旧缓存已经没用了，
+        // 留着只会让下次读盘多花时间。
+        //
+        // 更重要的是下面的 `skipDiskCache`：**不能复用旧源的结果**。
+        // 用户改设置要的就是"换一套"，给他旧的等于没换（用户反馈过"改了没用"）。
         val want = keyOf()
-        if (done && warmKey != want) {
-            android.util.Log.i("BawanWarmup", "主源/老电视模式变了，重新预热频道表")
+        var configChanged = false
+        if (warmKey.isNotEmpty() && warmKey != want) {
+            android.util.Log.i("BawanWarmup", "主源/老电视模式变了，清缓存并强制重新拉取")
             reset()
+            runCatching { com.chinut.bawantv.live.LiveCache.clear(context) }
+            configChanged = true
         }
         if (done) return
         withContext(Dispatchers.IO) {
@@ -119,6 +131,9 @@ object HomeWarmup {
                 //
                 // 注意：**过期也用**。频道表本来就极少变，先让用户看到东西，
                 // 鲜度交给下面第 4 步在后台补刷。
+                //
+                // ⚠️ 但**配置刚变过时不能用缓存**（`configChanged`）——
+                // 缓存里存的是**上一个源**的频道表，用它等于切源没生效。
                 val prefs = prefs
                 val preset = com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)
                 val cachedSnap = LiveCache.load(
@@ -130,7 +145,7 @@ object HomeWarmup {
                         hasImported = LiveCatalog.hasImported(context),
                     ),
                 )
-                if (cachedSnap != null) {
+                if (cachedSnap != null && !configChanged) {
                     groupsCache = cachedSnap.groups
                     allChannelsCache = cachedSnap.channels
                     android.util.Log.i(
@@ -138,6 +153,8 @@ object HomeWarmup {
                         "开屏走频道磁盘缓存：${cachedSnap.channels.size} 个频道" +
                             "（新鲜=${cachedSnap.isFresh()}）",
                     )
+                } else if (configChanged) {
+                    android.util.Log.i("BawanWarmup", "配置刚变，跳过磁盘缓存，按新源重新拉取")
                 }
 
                 // ---------- 再走正常加载（缓存没命中／已过期时是唯一来源）----------

@@ -1,0 +1,2782 @@
+[
+  {
+    "slug": "hs3ep0bm",
+    "url": "https://huangguo.video/series/hs3ep0bm",
+    "title": "示例剧名 001",
+    "cover": "https://huangguo.video/uploads/content/series/217/cover.webp?v=<版本号>",
+    "description": "《示例剧名 001》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 8,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "x8ju5gr2",
+        "title": "示例剧名 001 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "hs3ep0bm",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 417606,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 648003,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 1085123,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "x8ju5gr2d",
+        "title": "示例剧名 001 · 第8集",
+        "episode_no": 8,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "hs3ep0bm"
+      },
+      {
+        "slug": "x8ju5gr2d",
+        "title": "示例剧名 001 · 第?集"
+      },
+      {
+        "slug": "x8ju5gr2d",
+        "title": "示例剧名 001 · 第?集"
+      },
+      {
+        "slug": "x8ju5gr2",
+        "title": "示例剧名 001 · 第?集"
+      },
+      {
+        "slug": "x8ju5gr2",
+        "title": "示例剧名 001 · 第?集"
+      },
+      {
+        "slug": "x8ju5gr2",
+        "title": "示例剧名 001 · 第?集"
+      },
+      {
+        "slug": "x8ju5gr2",
+        "title": "示例剧名 001 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "ozalw7it",
+    "url": "https://huangguo.video/series/ozalw7it",
+    "title": "示例剧名 002",
+    "cover": "https://huangguo.video/uploads/content/series/250/cover.webp?v=<版本号>",
+    "description": "《示例剧名 002》是示例平台的连续剧，由@示例出品，标签示例。",
+    "tags": [],
+    "episode_count_listed": 9,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "4fq1cny9",
+        "title": "示例剧名 002 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ozalw7it",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 473001,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 698686,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 1105265,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 002 · 第9集",
+        "episode_no": 9,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ozalw7it"
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 002 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9",
+        "title": "示例剧名 002 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9",
+        "title": "示例剧名 002 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9",
+        "title": "示例剧名 002 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9",
+        "title": "示例剧名 002 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9",
+        "title": "示例剧名 002 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9",
+        "title": "示例剧名 002 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "v6hs3ep0",
+    "url": "https://huangguo.video/series/v6hs3ep0",
+    "title": "示例剧名 003",
+    "cover": "https://huangguo.video/uploads/content/series/660/cover.webp?v=<版本号>",
+    "description": "《示例剧名 003》是示例平台的连续剧，由@示例出品，标签标签C、标签D。",
+    "tags": [
+      "标签C",
+      "标签D"
+    ],
+    "episode_count_listed": 10,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "v6hs3ep0",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 527487,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 752735,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 1170670,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "v6hs3ep0"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 003 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "2dozalw7",
+    "url": "https://huangguo.video/series/2dozalw7",
+    "title": "示例剧名 004",
+    "cover": "https://huangguo.video/uploads/content/series/579/cover.webp?v=<版本号>",
+    "description": "《示例剧名 004》是示例平台的连续剧，由@示例出品，标签标签A、标签D。",
+    "tags": [
+      "标签A",
+      "标签D"
+    ],
+    "episode_count_listed": 3,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 004 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "2dozalw7",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 642494,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1071902,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "1920x1080",
+            "bandwidth": 1917390,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 004 · 第3集",
+        "episode_no": 3,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "2dozalw7"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 004 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "9kv6hs3e",
+    "url": "https://huangguo.video/series/9kv6hs3e",
+    "title": "示例剧名 005",
+    "cover": "https://huangguo.video/uploads/content/series/659/cover.webp?v=<版本号>",
+    "description": "《示例剧名 005》是示例平台的连续剧，由@示例出品，标签标签A、标签E。",
+    "tags": [
+      "标签A",
+      "标签E"
+    ],
+    "episode_count_listed": 3,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "p0bmx8ju5",
+        "title": "示例剧名 005 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "9kv6hs3e",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "640x480",
+            "bandwidth": 508541,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "960x720",
+            "bandwidth": 766140,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "p0bmx8ju5",
+        "title": "示例剧名 005 · 第3集",
+        "episode_no": 3,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "9kv6hs3e"
+      },
+      {
+        "slug": "p0bmx8ju5",
+        "title": "示例剧名 005 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "gr2dozal",
+    "url": "https://huangguo.video/series/gr2dozal",
+    "title": "示例剧名 006",
+    "cover": "https://huangguo.video/uploads/content/series/658/cover.webp?v=<版本号>",
+    "description": "《示例剧名 006》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 14,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "gr2dozal",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 435806,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 622502,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 977526,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第14集",
+        "episode_no": 14,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "gr2dozal"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      },
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 006 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "ny9kv6hs",
+    "url": "https://huangguo.video/series/ny9kv6hs",
+    "title": "示例剧名 007",
+    "cover": "https://huangguo.video/uploads/content/series/657/cover.webp?v=<版本号>",
+    "description": "《示例剧名 007》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 9,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ny9kv6hs",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 688304,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1146469,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第9集",
+        "episode_no": 9,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ny9kv6hs"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 007 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "u5gr2doz",
+    "url": "https://huangguo.video/series/u5gr2doz",
+    "title": "示例剧名 008",
+    "cover": "https://huangguo.video/uploads/content/series/656/cover.webp?v=<版本号>",
+    "description": "《示例剧名 008》是示例平台的连续剧，由@示例出品，标签示例。（内容略）（内容略）",
+    "tags": [],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "alw7it4fq",
+        "title": "示例剧名 008 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "u5gr2doz",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 406440,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 572304,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 893571,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "1cny9kv6",
+    "url": "https://huangguo.video/series/1cny9kv6",
+    "title": "示例剧名 009",
+    "cover": "https://huangguo.video/uploads/content/series/655/cover.webp?v=<版本号>",
+    "description": "《示例剧名 009》是示例平台的连续剧，由@示例出品，标签标签A、标签D。",
+    "tags": [
+      "标签A",
+      "标签D"
+    ],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "hs3ep0bmx",
+        "title": "示例剧名 009 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "1cny9kv6",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 651090,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1085689,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "8ju5gr2d",
+    "url": "https://huangguo.video/series/8ju5gr2d",
+    "title": "示例剧名 010",
+    "cover": "https://huangguo.video/uploads/content/series/654/cover.webp?v=<版本号>",
+    "description": "《示例剧名 010》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 13,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "8ju5gr2d",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "854x480",
+            "bandwidth": 827016,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第13集",
+        "episode_no": 13,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "8ju5gr2d"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      },
+      {
+        "slug": "ozalw7it4",
+        "title": "示例剧名 010 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "fq1cny9k",
+    "url": "https://huangguo.video/series/fq1cny9k",
+    "title": "示例剧名 011",
+    "cover": "https://huangguo.video/uploads/content/series/649/cover.webp?v=<版本号>",
+    "description": "《示例剧名 011》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 2,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "v6hs3ep0b",
+        "title": "示例剧名 011 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "fq1cny9k",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 420122,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 601288,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "606x1080",
+            "bandwidth": 929626,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "v6hs3ep0b",
+        "title": "示例剧名 011 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "fq1cny9k"
+      }
+    ]
+  },
+  {
+    "slug": "mx8ju5gr",
+    "url": "https://huangguo.video/series/mx8ju5gr",
+    "title": "示例剧名 012",
+    "cover": "https://huangguo.video/uploads/content/series/597/cover.webp?v=<版本号>",
+    "description": "《示例剧名 012》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 2,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "2dozalw7i",
+        "title": "示例剧名 012 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "mx8ju5gr",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 607771,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1035195,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "2dozalw7i",
+        "title": "示例剧名 012 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "mx8ju5gr"
+      }
+    ]
+  },
+  {
+    "slug": "t4fq1cny",
+    "url": "https://huangguo.video/series/t4fq1cny",
+    "title": "示例剧名 013",
+    "cover": "https://huangguo.video/uploads/content/series/648/cover.webp?v=<版本号>",
+    "description": "《示例剧名 013》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 3,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "9kv6hs3ep",
+        "title": "示例剧名 013 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "t4fq1cny",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "276x480",
+            "bandwidth": 404628,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "412x720",
+            "bandwidth": 550495,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "620x1080",
+            "bandwidth": 862052,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "9kv6hs3ep",
+        "title": "示例剧名 013 · 第3集",
+        "episode_no": 3,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "t4fq1cny"
+      },
+      {
+        "slug": "9kv6hs3ep",
+        "title": "示例剧名 013 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "0bmx8ju5",
+    "url": "https://huangguo.video/series/0bmx8ju5",
+    "title": "示例剧名 014",
+    "cover": "https://huangguo.video/uploads/content/series/647/cover.webp?v=<版本号>",
+    "description": "《示例剧名 014》是示例平台的连续剧，由@示例出品，标签示例。（内容略）",
+    "tags": [],
+    "episode_count_listed": 4,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "gr2dozalw",
+        "title": "示例剧名 014 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "0bmx8ju5",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 393958,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 558400,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 880096,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "gr2dozalw",
+        "title": "示例剧名 014 · 第4集",
+        "episode_no": 4,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "0bmx8ju5"
+      },
+      {
+        "slug": "gr2dozalw",
+        "title": "示例剧名 014 · 第?集"
+      },
+      {
+        "slug": "gr2dozalw",
+        "title": "示例剧名 014 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "7it4fq1c",
+    "url": "https://huangguo.video/series/7it4fq1c",
+    "title": "示例剧名 015",
+    "cover": "https://huangguo.video/uploads/content/series/646/cover.webp?v=<版本号>",
+    "description": "《示例剧名 015》是示例平台的连续剧，由@示例出品，标签标签A、标签F。",
+    "tags": [
+      "标签A",
+      "标签F"
+    ],
+    "episode_count_listed": 5,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "ny9kv6hs3",
+        "title": "示例剧名 015 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "7it4fq1c",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "268x480",
+            "bandwidth": 385189,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 570729,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "ny9kv6hs3",
+        "title": "示例剧名 015 · 第5集",
+        "episode_no": 5,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "7it4fq1c"
+      },
+      {
+        "slug": "ny9kv6hs3",
+        "title": "示例剧名 015 · 第?集"
+      },
+      {
+        "slug": "ny9kv6hs3",
+        "title": "示例剧名 015 · 第?集"
+      },
+      {
+        "slug": "ny9kv6hs3",
+        "title": "示例剧名 015 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "ep0bmx8j",
+    "url": "https://huangguo.video/series/ep0bmx8j",
+    "title": "示例剧名 016",
+    "cover": "https://huangguo.video/uploads/content/series/645/cover.webp?v=<版本号>",
+    "description": "《示例剧名 016》是示例平台的连续剧，由@示例出品，标签标签A、标签G。",
+    "tags": [
+      "标签A",
+      "标签G"
+    ],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "u5gr2doza",
+        "title": "示例剧名 016 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ep0bmx8j",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 587073,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 947604,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "1920x1080",
+            "bandwidth": 1707351,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "lw7it4fq",
+    "url": "https://huangguo.video/series/lw7it4fq",
+    "title": "示例剧名 017",
+    "cover": "https://huangguo.video/uploads/content/series/571/cover.webp?v=<版本号>",
+    "description": "《示例剧名 017》是示例平台的连续剧，由@示例出品，标签标签A、标签H。",
+    "tags": [
+      "标签A",
+      "标签H"
+    ],
+    "episode_count_listed": 2,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "1cny9kv6h",
+        "title": "示例剧名 017 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "lw7it4fq",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 381210,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 529744,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 790139,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "1cny9kv6h",
+        "title": "示例剧名 017 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "lw7it4fq"
+      }
+    ]
+  },
+  {
+    "slug": "s3ep0bmx",
+    "url": "https://huangguo.video/series/s3ep0bmx",
+    "title": "示例剧名 018",
+    "cover": "https://huangguo.video/uploads/content/series/644/cover.webp?v=<版本号>",
+    "description": "《示例剧名 018》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "8ju5gr2do",
+        "title": "示例剧名 018 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "s3ep0bmx",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 452128,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 617716,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 954739,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "zalw7it4",
+    "url": "https://huangguo.video/series/zalw7it4",
+    "title": "示例剧名 019",
+    "cover": "https://huangguo.video/uploads/content/series/643/cover.webp?v=<版本号>",
+    "description": "《示例剧名 019》是示例平台的连续剧，由@示例出品，标签标签A、标签C。",
+    "tags": [
+      "标签A",
+      "标签C"
+    ],
+    "episode_count_listed": 7,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "fq1cny9kv",
+        "title": "示例剧名 019 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "zalw7it4",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 460535,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "406x720",
+            "bandwidth": 664650,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "610x1080",
+            "bandwidth": 1051961,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "fq1cny9kv",
+        "title": "示例剧名 019 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "zalw7it4"
+      },
+      {
+        "slug": "fq1cny9kv",
+        "title": "示例剧名 019 · 第?集"
+      },
+      {
+        "slug": "fq1cny9kv",
+        "title": "示例剧名 019 · 第?集"
+      },
+      {
+        "slug": "fq1cny9kv",
+        "title": "示例剧名 019 · 第?集"
+      },
+      {
+        "slug": "fq1cny9kv",
+        "title": "示例剧名 019 · 第?集"
+      },
+      {
+        "slug": "fq1cny9kv",
+        "title": "示例剧名 019 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "6hs3ep0b",
+    "url": "https://huangguo.video/series/6hs3ep0b",
+    "title": "示例剧名 020",
+    "cover": "https://huangguo.video/uploads/content/series/642/cover.webp?v=<版本号>",
+    "description": "《示例剧名 020》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 3,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "mx8ju5gr2",
+        "title": "示例剧名 020 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "6hs3ep0b",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 708712,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1144575,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "1920x1080",
+            "bandwidth": 2238918,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "mx8ju5gr2",
+        "title": "示例剧名 020 · 第3集",
+        "episode_no": 3,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "6hs3ep0b"
+      },
+      {
+        "slug": "mx8ju5gr2",
+        "title": "示例剧名 020 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "dozalw7i",
+    "url": "https://huangguo.video/series/dozalw7i",
+    "title": "示例剧名 021",
+    "cover": "https://huangguo.video/uploads/content/series/641/cover.webp?v=<版本号>",
+    "description": "《示例剧名 021》是示例平台的连续剧，由@示例出品，标签示例。（内容略）",
+    "tags": [],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "t4fq1cny9",
+        "title": "示例剧名 021 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "dozalw7i",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 488582,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 728710,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "kv6hs3ep",
+    "url": "https://huangguo.video/series/kv6hs3ep",
+    "title": "示例剧名 022",
+    "cover": "https://huangguo.video/uploads/content/series/640/cover.webp?v=<版本号>",
+    "description": "《示例剧名 022》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 2,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "0bmx8ju5g",
+        "title": "示例剧名 022 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "kv6hs3ep",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 396299,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 560121,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 878339,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "0bmx8ju5g",
+        "title": "示例剧名 022 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "kv6hs3ep"
+      }
+    ]
+  },
+  {
+    "slug": "r2dozalw",
+    "url": "https://huangguo.video/series/r2dozalw",
+    "title": "示例剧名 023",
+    "cover": "https://huangguo.video/uploads/content/series/639/cover.webp?v=<版本号>",
+    "description": "《示例剧名 023》是示例平台的连续剧，由@示例出品，标签标签A、标签I。",
+    "tags": [
+      "标签A",
+      "标签I"
+    ],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "7it4fq1cn",
+        "title": "示例剧名 023 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "r2dozalw",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 455862,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 661979,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "y9kv6hs3",
+    "url": "https://huangguo.video/series/y9kv6hs3",
+    "title": "示例剧名 024",
+    "cover": "https://huangguo.video/uploads/content/series/638/cover.webp?v=<版本号>",
+    "description": "《示例剧名 024》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 3,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "ep0bmx8ju",
+        "title": "示例剧名 024 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "y9kv6hs3",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "854x480",
+            "bandwidth": 970282,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1282x720",
+            "bandwidth": 1620747,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "ep0bmx8ju",
+        "title": "示例剧名 024 · 第3集",
+        "episode_no": 3,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "y9kv6hs3"
+      },
+      {
+        "slug": "ep0bmx8ju",
+        "title": "示例剧名 024 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "5gr2doza",
+    "url": "https://huangguo.video/series/5gr2doza",
+    "title": "示例剧名 025",
+    "cover": "https://huangguo.video/uploads/content/series/472/cover.webp?v=<版本号>",
+    "description": "《示例剧名 025》是示例平台的连续剧，由@示例出品，标签标签A、标签D。",
+    "tags": [
+      "标签A",
+      "标签D"
+    ],
+    "episode_count_listed": 4,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "lw7it4fq",
+        "title": "示例剧名 025 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "5gr2doza",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 479298,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 700667,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 1086581,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "lw7it4fq1",
+        "title": "示例剧名 025 · 第4集",
+        "episode_no": 4,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "5gr2doza"
+      },
+      {
+        "slug": "lw7it4fq",
+        "title": "示例剧名 025 · 第?集"
+      },
+      {
+        "slug": "lw7it4fq",
+        "title": "示例剧名 025 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "cny9kv6h",
+    "url": "https://huangguo.video/series/cny9kv6h",
+    "title": "示例剧名 026",
+    "cover": "https://huangguo.video/uploads/content/series/637/cover.webp?v=<版本号>",
+    "description": "《示例剧名 026》是示例平台的连续剧，由@示例出品，标签标签A、标签G。",
+    "tags": [
+      "标签A",
+      "标签G"
+    ],
+    "episode_count_listed": 2,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "s3ep0bmx8",
+        "title": "示例剧名 026 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "cny9kv6h",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 391350,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 553782,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "606x1080",
+            "bandwidth": 867194,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "s3ep0bmx8",
+        "title": "示例剧名 026 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "cny9kv6h"
+      }
+    ]
+  },
+  {
+    "slug": "ju5gr2do",
+    "url": "https://huangguo.video/series/ju5gr2do",
+    "title": "示例剧名 027",
+    "cover": "https://huangguo.video/uploads/content/series/501/cover.webp?v=<版本号>",
+    "description": "《示例剧名 027》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 12,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ju5gr2do",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 402141,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 559825,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 850328,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "zalw7it4f",
+        "title": "示例剧名 027 · 第12集",
+        "episode_no": 12,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ju5gr2do"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      },
+      {
+        "slug": "zalw7it4",
+        "title": "示例剧名 027 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "q1cny9kv",
+    "url": "https://huangguo.video/series/q1cny9kv",
+    "title": "示例剧名 028",
+    "cover": "https://huangguo.video/uploads/content/series/220/cover.webp?v=<版本号>",
+    "description": "《示例剧名 028》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 12,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "q1cny9kv",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 337912,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 489515,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 775625,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "6hs3ep0bm",
+        "title": "示例剧名 028 · 第12集",
+        "episode_no": 12,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "q1cny9kv"
+      },
+      {
+        "slug": "6hs3ep0bm",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      },
+      {
+        "slug": "6hs3ep0b",
+        "title": "示例剧名 028 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "x8ju5gr2",
+    "url": "https://huangguo.video/series/x8ju5gr2",
+    "title": "示例剧名 029",
+    "cover": "https://huangguo.video/uploads/content/series/473/cover.webp?v=<版本号>",
+    "description": "《示例剧名 029》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 6,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "dozalw7i",
+        "title": "示例剧名 029 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "x8ju5gr2",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 386066,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 531889,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 805290,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "dozalw7it",
+        "title": "示例剧名 029 · 第6集",
+        "episode_no": 6,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "x8ju5gr2"
+      },
+      {
+        "slug": "dozalw7it",
+        "title": "示例剧名 029 · 第?集"
+      },
+      {
+        "slug": "dozalw7it",
+        "title": "示例剧名 029 · 第?集"
+      },
+      {
+        "slug": "dozalw7i",
+        "title": "示例剧名 029 · 第?集"
+      },
+      {
+        "slug": "dozalw7i",
+        "title": "示例剧名 029 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "4fq1cny9",
+    "url": "https://huangguo.video/series/4fq1cny9",
+    "title": "示例剧名 030",
+    "cover": "https://huangguo.video/uploads/content/series/636/cover.webp?v=<版本号>",
+    "description": "《示例剧名 030》是示例平台的连续剧，由@示例出品，标签示例。（内容略）（内容略）",
+    "tags": [],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "kv6hs3ep0",
+        "title": "示例剧名 030 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "4fq1cny9",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 792601,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1321171,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "1920x1080",
+            "bandwidth": 2395489,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "bmx8ju5g",
+    "url": "https://huangguo.video/series/bmx8ju5g",
+    "title": "示例剧名 031",
+    "cover": "https://huangguo.video/uploads/content/series/600/cover.webp?v=<版本号>",
+    "description": "《示例剧名 031》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 5,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "r2dozalw7",
+        "title": "示例剧名 031 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "bmx8ju5g",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 383210,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 540216,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 821357,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "r2dozalw7",
+        "title": "示例剧名 031 · 第5集",
+        "episode_no": 5,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "bmx8ju5g"
+      },
+      {
+        "slug": "r2dozalw7",
+        "title": "示例剧名 031 · 第?集"
+      },
+      {
+        "slug": "r2dozalw7",
+        "title": "示例剧名 031 · 第?集"
+      },
+      {
+        "slug": "r2dozalw7",
+        "title": "示例剧名 031 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "it4fq1cn",
+    "url": "https://huangguo.video/series/it4fq1cn",
+    "title": "示例剧名 032",
+    "cover": "https://huangguo.video/uploads/content/series/559/cover.webp?v=<版本号>",
+    "description": "《示例剧名 032》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 2,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "y9kv6hs3e",
+        "title": "示例剧名 032 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "it4fq1cn",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 399207,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 567681,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 872154,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "y9kv6hs3e",
+        "title": "示例剧名 032 · 第2集",
+        "episode_no": 2,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "it4fq1cn"
+      }
+    ]
+  },
+  {
+    "slug": "p0bmx8ju",
+    "url": "https://huangguo.video/series/p0bmx8ju",
+    "title": "示例剧名 033",
+    "cover": "https://huangguo.video/uploads/content/series/308/cover.webp?v=<版本号>",
+    "description": "《示例剧名 033》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 14,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "5gr2doza",
+        "title": "示例剧名 033 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "p0bmx8ju",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 320851,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 526989,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 919378,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第14集",
+        "episode_no": 14,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "p0bmx8ju"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2dozal",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2doza",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2doza",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2doza",
+        "title": "示例剧名 033 · 第?集"
+      },
+      {
+        "slug": "5gr2doza",
+        "title": "示例剧名 033 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "w7it4fq1",
+    "url": "https://huangguo.video/series/w7it4fq1",
+    "title": "示例剧名 034",
+    "cover": "https://huangguo.video/uploads/content/series/634/cover.webp?v=<版本号>",
+    "description": "《示例剧名 034》是示例平台的连续剧，由@示例出品，标签示例。（内容略）（内容略）",
+    "tags": [],
+    "episode_count_listed": 3,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "cny9kv6hs",
+        "title": "示例剧名 034 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "w7it4fq1",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "262x480",
+            "bandwidth": 349971,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "394x720",
+            "bandwidth": 458649,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "592x1080",
+            "bandwidth": 680684,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "cny9kv6hs",
+        "title": "示例剧名 034 · 第3集",
+        "episode_no": 3,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "w7it4fq1"
+      },
+      {
+        "slug": "cny9kv6hs",
+        "title": "示例剧名 034 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "3ep0bmx8",
+    "url": "https://huangguo.video/series/3ep0bmx8",
+    "title": "示例剧名 035",
+    "cover": "https://huangguo.video/uploads/content/series/366/cover.webp?v=<版本号>",
+    "description": "《示例剧名 035》是示例平台的连续剧，由@示例出品，标签标签A。",
+    "tags": [
+      "标签A"
+    ],
+    "episode_count_listed": 9,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "ju5gr2do",
+        "title": "示例剧名 035 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "3ep0bmx8",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 795875,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1427331,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "ju5gr2doz",
+        "title": "示例剧名 035 · 第9集",
+        "episode_no": 9,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "3ep0bmx8"
+      },
+      {
+        "slug": "ju5gr2doz",
+        "title": "示例剧名 035 · 第?集"
+      },
+      {
+        "slug": "ju5gr2doz",
+        "title": "示例剧名 035 · 第?集"
+      },
+      {
+        "slug": "ju5gr2doz",
+        "title": "示例剧名 035 · 第?集"
+      },
+      {
+        "slug": "ju5gr2do",
+        "title": "示例剧名 035 · 第?集"
+      },
+      {
+        "slug": "ju5gr2do",
+        "title": "示例剧名 035 · 第?集"
+      },
+      {
+        "slug": "ju5gr2do",
+        "title": "示例剧名 035 · 第?集"
+      },
+      {
+        "slug": "ju5gr2do",
+        "title": "示例剧名 035 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "alw7it4f",
+    "url": "https://huangguo.video/series/alw7it4f",
+    "title": "示例剧名 036",
+    "cover": "https://huangguo.video/uploads/content/series/278/cover.webp?v=<版本号>",
+    "description": "《示例剧名 036》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 23,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "alw7it4f",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "276x480",
+            "bandwidth": 454693,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "414x720",
+            "bandwidth": 676802,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "622x1080",
+            "bandwidth": 1114489,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "q1cny9kv6",
+        "title": "示例剧名 036 · 第23集",
+        "episode_no": 23,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "alw7it4f"
+      },
+      {
+        "slug": "q1cny9kv6",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv6",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv6",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv6",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv6",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      },
+      {
+        "slug": "q1cny9kv",
+        "title": "示例剧名 036 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "hs3ep0bm",
+    "url": "https://huangguo.video/series/hs3ep0bm",
+    "title": "示例剧名 037",
+    "cover": "https://huangguo.video/uploads/content/series/635/cover.webp?v=<版本号>",
+    "description": "《示例剧名 037》是示例平台的连续剧，由@示例出品，标签示例。（内容略）（内容略）（内容略）（内容略）",
+    "tags": [],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "x8ju5gr2d",
+        "title": "示例剧名 037 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "hs3ep0bm",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 445456,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 655947,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "606x1080",
+            "bandwidth": 1045635,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "ozalw7it",
+    "url": "https://huangguo.video/series/ozalw7it",
+    "title": "示例剧名 038",
+    "cover": "https://huangguo.video/uploads/content/series/587/cover.webp?v=<版本号>",
+    "description": "《示例剧名 038》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 8,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ozalw7it",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 411972,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 583836,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "606x1080",
+            "bandwidth": 894883,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第8集",
+        "episode_no": 8,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ozalw7it"
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第?集"
+      },
+      {
+        "slug": "4fq1cny9k",
+        "title": "示例剧名 038 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "v6hs3ep0",
+    "url": "https://huangguo.video/series/v6hs3ep0",
+    "title": "示例剧名 039",
+    "cover": "https://huangguo.video/uploads/content/series/470/cover.webp?v=<版本号>",
+    "description": "《示例剧名 039》是示例平台的连续剧，由@示例出品，标签标签A、标签G。",
+    "tags": [
+      "标签A",
+      "标签G"
+    ],
+    "episode_count_listed": 10,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "bmx8ju5g",
+        "title": "示例剧名 039 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "v6hs3ep0",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 330727,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 445553,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 672269,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 039 · 第10集",
+        "episode_no": 10,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "v6hs3ep0"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 039 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 039 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 039 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 039 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 039 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5gr",
+        "title": "示例剧名 039 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5g",
+        "title": "示例剧名 039 · 第?集"
+      },
+      {
+        "slug": "bmx8ju5g",
+        "title": "示例剧名 039 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "2dozalw7",
+    "url": "https://huangguo.video/series/2dozalw7",
+    "title": "示例剧名 040",
+    "cover": "https://huangguo.video/uploads/content/series/554/cover.webp?v=<版本号>",
+    "description": "《示例剧名 040》是示例平台的连续剧，由@示例出品，标签标签A、标签I。",
+    "tags": [
+      "标签A",
+      "标签I"
+    ],
+    "episode_count_listed": 10,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "2dozalw7",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "268x480",
+            "bandwidth": 481800,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "404x720",
+            "bandwidth": 744053,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第10集",
+        "episode_no": 10,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "2dozalw7"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      },
+      {
+        "slug": "it4fq1cny",
+        "title": "示例剧名 040 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "9kv6hs3e",
+    "url": "https://huangguo.video/series/9kv6hs3e",
+    "title": "示例剧名 041",
+    "cover": "https://huangguo.video/uploads/content/series/384/cover.webp?v=<版本号>",
+    "description": "《示例剧名 041》是示例平台的连续剧，由@示例出品，标签标签A、标签J。",
+    "tags": [
+      "标签A",
+      "标签J"
+    ],
+    "episode_count_listed": 8,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "p0bmx8ju",
+        "title": "示例剧名 041 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "9kv6hs3e",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 777111,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1317549,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "1920x1080",
+            "bandwidth": 2511236,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "p0bmx8ju5",
+        "title": "示例剧名 041 · 第8集",
+        "episode_no": 8,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "9kv6hs3e"
+      },
+      {
+        "slug": "p0bmx8ju5",
+        "title": "示例剧名 041 · 第?集"
+      },
+      {
+        "slug": "p0bmx8ju5",
+        "title": "示例剧名 041 · 第?集"
+      },
+      {
+        "slug": "p0bmx8ju5",
+        "title": "示例剧名 041 · 第?集"
+      },
+      {
+        "slug": "p0bmx8ju",
+        "title": "示例剧名 041 · 第?集"
+      },
+      {
+        "slug": "p0bmx8ju",
+        "title": "示例剧名 041 · 第?集"
+      },
+      {
+        "slug": "p0bmx8ju",
+        "title": "示例剧名 041 · 第?集"
+      }
+    ]
+  },
+  {
+    "slug": "gr2dozal",
+    "url": "https://huangguo.video/series/gr2dozal",
+    "title": "示例剧名 042",
+    "cover": "https://huangguo.video/uploads/content/series/633/cover.webp?v=<版本号>",
+    "description": "《示例剧名 042》是示例平台的连续剧，由@示例出品，标签标签C。",
+    "tags": [
+      "标签C"
+    ],
+    "episode_count_listed": 1,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "w7it4fq1c",
+        "title": "示例剧名 042 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "gr2dozal",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "270x480",
+            "bandwidth": 476883,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "406x720",
+            "bandwidth": 715053,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "608x1080",
+            "bandwidth": 1128752,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "ny9kv6hs",
+    "url": "https://huangguo.video/series/ny9kv6hs",
+    "title": "示例剧名 043",
+    "cover": "https://huangguo.video/uploads/content/series/418/cover.webp?v=<版本号>",
+    "description": "《示例剧名 043》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+    "tags": [
+      "标签A",
+      "标签B"
+    ],
+    "episode_count_listed": 9,
+    "episode_count_declared": null,
+    "episodes": [
+      {
+        "slug": "3ep0bmx8",
+        "title": "示例剧名 043 · 第1集",
+        "episode_no": 1,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ny9kv6hs",
+        "variants": [
+          {
+            "name": "480p",
+            "resolution": "852x480",
+            "bandwidth": 682426,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "720p",
+            "resolution": "1280x720",
+            "bandwidth": 1163836,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+          },
+          {
+            "name": "1080p",
+            "resolution": "1920x1080",
+            "bandwidth": 2322557,
+            "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+          }
+        ]
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 043 · 第9集",
+        "episode_no": 9,
+        "content_id": "<content_id>",
+        "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+        "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+        "series_slug": "ny9kv6hs"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 043 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 043 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 043 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 043 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8j",
+        "title": "示例剧名 043 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8",
+        "title": "示例剧名 043 · 第?集"
+      },
+      {
+        "slug": "3ep0bmx8",
+        "title": "示例剧名 043 · 第?集"
+      }
+    ]
+  }
+]

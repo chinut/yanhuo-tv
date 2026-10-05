@@ -1,0 +1,77 @@
+{
+  "slug": "hs3ep0bm",
+  "url": "https://huangguo.video/series/hs3ep0bm",
+  "title": "示例剧名 001",
+  "cover": "https://huangguo.video/uploads/content/series/217/cover.webp?v=<版本号>",
+  "description": "《示例剧名 001》是示例平台的连续剧，由@示例出品，标签标签A、标签B。",
+  "tags": [
+    "标签A",
+    "标签B"
+  ],
+  "episode_count_listed": 8,
+  "episode_count_declared": null,
+  "episodes": [
+    {
+      "slug": "x8ju5gr2",
+      "title": "示例剧名 001 · 第1集",
+      "episode_no": 1,
+      "content_id": "<content_id>",
+      "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+      "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+      "series_slug": "hs3ep0bm",
+      "variants": [
+        {
+          "name": "480p",
+          "resolution": "270x480",
+          "bandwidth": 417606,
+          "url": "https://huangguo.video/uploads/content/video/<content_id>/480p/index.m3u8?n=<签名>"
+        },
+        {
+          "name": "720p",
+          "resolution": "404x720",
+          "bandwidth": 648003,
+          "url": "https://huangguo.video/uploads/content/video/<content_id>/720p/index.m3u8?n=<签名>"
+        },
+        {
+          "name": "1080p",
+          "resolution": "608x1080",
+          "bandwidth": 1085123,
+          "url": "https://huangguo.video/uploads/content/video/<content_id>/1080p/index.m3u8?n=<签名>"
+        }
+      ]
+    },
+    {
+      "slug": "x8ju5gr2d",
+      "title": "示例剧名 001 · 第8集",
+      "episode_no": 8,
+      "content_id": "<content_id>",
+      "hls": "https://huangguo.video/uploads/content/video/<content_id>/master.m3u8",
+      "poster": "https://huangguo.video/uploads/content/series/<series_id>/cover.webp?v=<版本号>",
+      "series_slug": "hs3ep0bm"
+    },
+    {
+      "slug": "x8ju5gr2d",
+      "title": "示例剧名 001 · 第?集"
+    },
+    {
+      "slug": "x8ju5gr2d",
+      "title": "示例剧名 001 · 第?集"
+    },
+    {
+      "slug": "x8ju5gr2",
+      "title": "示例剧名 001 · 第?集"
+    },
+    {
+      "slug": "x8ju5gr2",
+      "title": "示例剧名 001 · 第?集"
+    },
+    {
+      "slug": "x8ju5gr2",
+      "title": "示例剧名 001 · 第?集"
+    },
+    {
+      "slug": "x8ju5gr2",
+      "title": "示例剧名 001 · 第?集"
+    }
+  ]
+}

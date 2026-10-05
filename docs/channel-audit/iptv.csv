@@ -1,0 +1,57 @@
+﻿name,group,kind,host,http,ok,note,variants,segments,url
+CCTV1,IPTV,m3u8,120.40.39.246,200,是,media，5 分片,0,5,http://120.40.39.246:352/newlive/live/hls/1/live.m3u8
+CCTV3,IPTV,m3u8,183.10.180.81,200,是,media，5 分片,0,5,http://183.10.180.81:9901/tsfile/live/0003_1.m3u8?key=txiptv&playlive=1&authid=0
+CCTV-4 中文国际,IPTV,m3u8,live-play-hls.cctvnews.cctv.com,403,否,HTTP 403,0,0,https://live-play-hls.cctvnews.cctv.com/CCTVChannel/channel_cctv4_mbd.m3u8?auth_key=1791097200-1-b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c-1d69bbcbdea2dd8281d3dc59f42e8f50&yid=b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c
+CCTV4,IPTV,m3u8,58.56.162.102,200,是,media，5 分片,0,5,http://58.56.162.102:4466/newlive/live/hls/4/live.m3u8
+CCTV5体育,IPTV,未知,iptv-search.com,200,是,media，1 分片,0,1,https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/0f32eece
+CCTV-8K HD (1080p),IPTV,m3u8,192.151.150.154,200,是,media，3 分片,0,3,http://192.151.150.154/live/cctv8k.m3u8
+CCTV8,IPTV,m3u8,63.141.230.178,200,是,media，3 分片,0,3,http://63.141.230.178:82/gslb/zbdq5.m3u8?id=cctv8k
+CCTV-9 (576i),IPTV,m3u8,xykt-fix.github.io,200,是,master，5 档,5,0,https://xykt-fix.github.io/Y77.m3u8
+CCTV-9 纪录,IPTV,m3u8,v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com,200,是,media，3 分片,0,3,https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=92574abd34750c4b083d993636811947
+CCTV9,IPTV,m3u8,v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com,200,是,media，3 分片,0,3,https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=04d0734a39c43ac7409c482c75ab83eb
+CCTV13,IPTV,m3u8,101.66.199.13,200,是,media，5 分片,0,5,http://101.66.199.13:9901/tsfile/live/0013_1.m3u8?key=txiptv&playlive=0&authid=0
+CCTV-14 HD (1080p),IPTV,m3u8,74.91.26.218,200,是,media，3 分片,0,3,http://74.91.26.218:82/live/cctv14hd.m3u8
+CCTV-17 HD (1080p),IPTV,m3u8,74.91.26.218,200,是,media，3 分片,0,3,http://74.91.26.218:82/live/cctv17hd.m3u8
+山西卫视,IPTV,m3u8,119.39.9.8,200,是,media，5 分片,0,5,http://119.39.9.8:9901/tsfile/live/0118_1.m3u8
+延边卫视,IPTV,m3u8,srs.iyb983.cn,200,是,media，7 分片,0,7,https://srs.iyb983.cn/video/CYS/index.m3u8
+延边卫视,IPTV,m3u8,srs.iyb983.cn,200,是,media，7 分片,0,7,https://srs.iyb983.cn:443/video/CYS/index.m3u8
+新疆卫视,IPTV,m3u8,38.75.136.137,200,是,media，3 分片,0,3,http://38.75.136.137:98/gslb/dsdqpub/xjws.m3u8?auth=testpub
+江西卫视,IPTV,m3u8,112.27.5.218,200,是,media，5 分片,0,5,http://112.27.5.218:9901/tsfile/live/faacts/0138_1.m3u8?key=txiptv&playlive=1&authid=0
+江西卫视,IPTV,m3u8,63.141.230.178,200,是,media，3 分片,0,3,http://63.141.230.178:82/gslb/zbdq5.m3u8?id=jxwshd
+浙江卫视,IPTV,m3u8,101.66.199.13,200,是,media，5 分片,0,5,http://101.66.199.13:9901/tsfile/live/0124_1.m3u8?key=txiptv&playlive=0&authid=0
+浙江卫视,IPTV,m3u8,ali-xwl.cztv.com,200,是,media，6 分片,0,6,http://ali-xwl.cztv.com/live/channel01720Plxw.m3u8
+西藏卫视,IPTV,m3u8,59.39.89.130,200,是,media，5 分片,0,5,http://59.39.89.130:60901/tsfile/live/0125_4.m3u8?key=txiptv&playlive=1&authid=0
+辽宁卫视,IPTV,m3u8,204.12.221.218,200,是,media，3 分片,0,3,http://204.12.221.218:8181/3m1080p/lnws.m3u8
+陕西卫视,IPTV,m3u8,192.151.150.154,200,是,media，3 分片,0,3,http://192.151.150.154/live/snwshd.m3u8
+ABN China (720p),IPTV,m3u8,mediaserver.abnvideos.com,200,是,media，10 分片,0,10,https://mediaserver.abnvideos.com/streams/abnchina.m3u8
+Ando TV (1080p),IPTV,m3u8,play.kankanlive.com,200,是,master，1 档,1,0,http://play.kankanlive.com/live/1711956137852982.m3u8
+Bread TV (720p),IPTV,m3u8,video.bread-tv.com,,否,URLError,0,0,https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
+CCTV-Storm Music (1080p),IPTV,m3u8,38.75.136.137,200,是,media，3 分片,0,3,http://38.75.136.137:98/gslb/dsdqpub/fyyy.m3u8?auth=testpub
+CCTV-The First Theater (1080p),IPTV,m3u8,38.75.136.137,200,是,media，3 分片,0,3,http://38.75.136.137:98/gslb/dsdqpub/dyjc.m3u8?auth=testpub
+Chuxiong News Channel [Not 24/7],IPTV,m3u8,hwapi.yntv.net,200,是,media，5 分片,0,5,http://hwapi.yntv.net/ew265l/848y54.m3u8
+Dragon TV International,IPTV,m3u8,restream.pdtvhd.com,200,是,master，1 档,1,0,https://restream.pdtvhd.com/memfs/0b1b95c9-3543-4af9-9fdb-cf45f1602f17.m3u8
+Guangzhou TV,IPTV,m3u8,tencentplaybusiness.gztv.com,200,是,media，3 分片,0,3,https://tencentplaybusiness.gztv.com/live/zonghes.m3u8
+Harbin Comprehensive News Channel,IPTV,m3u8,stream.hrbtv.net,200,是,master，1 档,1,0,https://stream.hrbtv.net/xwzh/playlist.m3u8?_upt=ef41dd531755913594
+Harbin Movie Channel,IPTV,m3u8,stream.hrbtv.net,200,是,master，1 档,1,0,https://stream.hrbtv.net/yspd/playlist.m3u8
+Hebei TV (2160p),IPTV,m3u8,event.pull.hebtv.com,200,是,media，3 分片,0,3,https://event.pull.hebtv.com/live/live101.m3u8
+Hunan TV (2160p),IPTV,m3u8,hlsal-ldvt.qing.mgtv.com,200,是,media，3 分片,0,3,http://hlsal-ldvt.qing.mgtv.com/nn_live/nn_x64/dWlwPTEyNy4wLjAuMSZ1aWQ9cWluZy1jbXMmbm5fdGltZXpvbmU9OCZjZG5leF9pZD1hbF9obHNfbGR2dCZ1dWlkPTliODY4NmU5ZTM2YzYwMmMmZT02OTE0NjA0JnY9MSZpZD1ITldTWkdTVCZzPTcwN2RiYTc2YzJjNmJmMTQ4MmUyZGYzOWU2NWM3YWFi/HNWSZGST.m3u8
+Kangba TV,IPTV,m3u8,110.185.237.164,200,是,media，5 分片,0,5,http://110.185.237.164:8888/hls/30/index.m3u8
+Lanzhou Comprehensive News Channel,IPTV,m3u8,liveplus.lzr.com.cn,200,是,media，5 分片,0,5,https://liveplus.lzr.com.cn/xwzh/HD/live.m3u8
+Siping TV,IPTV,m3u8,stream2.jlntv.cn,200,是,media，5 分片,0,5,http://stream2.jlntv.cn/sptv/sd/live.m3u8?_upt=f27750421743154598
+TV BRICS Chinese (1080p),IPTV,m3u8,chibrics.mediacdn.ru,200,是,master，1 档,1,0,https://chibrics.mediacdn.ru/cdn/brics/chinese/playlist.m3u8
+Xinjiang TV 2,IPTV,m3u8,110.153.180.106,200,是,master，1 档,1,0,http://110.153.180.106:55555/out_3/index.m3u8
+Xinjiang TV 3,IPTV,m3u8,110.153.180.106,200,是,master，1 档,1,0,http://110.153.180.106:55555/out_2/index.m3u8
+Xinjiang TV 8,IPTV,m3u8,120.70.60.179,200,是,media，5 分片,0,5,http://120.70.60.179:9901/tsfile/live/1002_1.m3u8?authid=0&key=txiptv&playlive=1
+世界地理,IPTV,m3u8,183.10.180.81,200,是,media，5 分片,0,5,http://183.10.180.81:9901/tsfile/live/1008_1.m3u8?key=txiptv&playlive=1&authid=0
+第一剧场,IPTV,m3u8,183.10.180.81,200,是,media，5 分片,0,5,http://183.10.180.81:9901/tsfile/live/1082_1.m3u8?key=txiptv&playlive=1&authid=0
+CCTV-1 综合,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000021973/1.m3u8
+CCTV-2 财经,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000012442/1.m3u8
+CCTV-3 综艺,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011218/1.m3u8
+CCTV-4 中文国际,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011219/1.m3u8
+CCTV-5 体育,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011220/1.m3u8
+CCTV-5+ 体育赛事,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011221/1.m3u8
+CCTV-6 电影,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011222/1.m3u8
+CCTV-7 国防军事,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011223/1.m3u8
+CCTV-8 电视剧,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011224/1.m3u8
+CCTV-13 新闻,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011229/1.m3u8
+CCTV-14 少儿,IPTV,m3u8,39.135.34.150,502,否,HTTP 502,0,0,http://39.135.34.150:8080/000000001000/1000000001000011230/1.m3u8

@@ -1,0 +1,23 @@
+字段类型（从脱敏样本推断）
+==================================================
+cover                                      str
+description                                str
+episode_count_declared                     NoneType
+episode_count_listed                       int
+episodes                                   array<dict>
+episodes[].content_id                      str
+episodes[].episode_no                      int
+episodes[].hls                             str
+episodes[].poster                          str
+episodes[].series_slug                     str
+episodes[].slug                            str
+episodes[].title                           str
+episodes[].variants                        array<dict>
+episodes[].variants[].bandwidth            int
+episodes[].variants[].name                 str
+episodes[].variants[].resolution           str
+episodes[].variants[].url                  str
+slug                                       str
+tags                                       array<str>
+title                                      str
+url                                        str

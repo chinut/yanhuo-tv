@@ -1,0 +1,57 @@
+﻿source,section,province,name,kind,url,direct
+GitHub源,IPTV,IPTV,CCTV1,直连流,http://120.40.39.246:352/newlive/live/hls/1/live.m3u8,http://120.40.39.246:352/newlive/live/hls/1/live.m3u8
+GitHub源,IPTV,IPTV,CCTV3,直连流,http://183.10.180.81:9901/tsfile/live/0003_1.m3u8?key=txiptv&playlive=1&authid=0,http://183.10.180.81:9901/tsfile/live/0003_1.m3u8?key=txiptv&playlive=1&authid=0
+GitHub源,IPTV,IPTV,CCTV-4 中文国际,直连流,https://live-play-hls.cctvnews.cctv.com/CCTVChannel/channel_cctv4_mbd.m3u8?auth_key=1791097200-1-b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c-1d69bbcbdea2dd8281d3dc59f42e8f50&yid=b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c,https://live-play-hls.cctvnews.cctv.com/CCTVChannel/channel_cctv4_mbd.m3u8?auth_key=1791097200-1-b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c-1d69bbcbdea2dd8281d3dc59f42e8f50&yid=b59134a2ead43d7f783f943c8f535e7bb80c5169575b2e8efcd5b3ddea21b41c
+GitHub源,IPTV,IPTV,CCTV4,直连流,http://58.56.162.102:4466/newlive/live/hls/4/live.m3u8,http://58.56.162.102:4466/newlive/live/hls/4/live.m3u8
+GitHub源,IPTV,IPTV,CCTV5体育,网页,https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/0f32eece,https://iptv-search.com/live/fav/3XxBSyPtdZDOWTHtno1TfKXB5sl2y2Dl/0f32eece
+GitHub源,IPTV,IPTV,CCTV-8K HD (1080p),直连流,http://192.151.150.154/live/cctv8k.m3u8,http://192.151.150.154/live/cctv8k.m3u8
+GitHub源,IPTV,IPTV,CCTV8,直连流,http://63.141.230.178:82/gslb/zbdq5.m3u8?id=cctv8k,http://63.141.230.178:82/gslb/zbdq5.m3u8?id=cctv8k
+GitHub源,IPTV,IPTV,CCTV-9 (576i),直连流,https://xykt-fix.github.io/Y77.m3u8,https://xykt-fix.github.io/Y77.m3u8
+GitHub源,IPTV,IPTV,CCTV-9 纪录,直连流,https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=92574abd34750c4b083d993636811947,https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=92574abd34750c4b083d993636811947
+GitHub源,IPTV,IPTV,CCTV9,直连流,https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=04d0734a39c43ac7409c482c75ab83eb,https://v4-702cae17a28d6e4f0c0002bba021d934.livehwc4.com/play.kankanlive.com/live/1698423397390920.m3u8?sub_m3u8=true&edge_slice=true&user_session_id=04d0734a39c43ac7409c482c75ab83eb
+GitHub源,IPTV,IPTV,CCTV13,直连流,http://101.66.199.13:9901/tsfile/live/0013_1.m3u8?key=txiptv&playlive=0&authid=0,http://101.66.199.13:9901/tsfile/live/0013_1.m3u8?key=txiptv&playlive=0&authid=0
+GitHub源,IPTV,IPTV,CCTV-14 HD (1080p),直连流,http://74.91.26.218:82/live/cctv14hd.m3u8,http://74.91.26.218:82/live/cctv14hd.m3u8
+GitHub源,IPTV,IPTV,CCTV-17 HD (1080p),直连流,http://74.91.26.218:82/live/cctv17hd.m3u8,http://74.91.26.218:82/live/cctv17hd.m3u8
+GitHub源,IPTV,IPTV,山西卫视,直连流,http://119.39.9.8:9901/tsfile/live/0118_1.m3u8,http://119.39.9.8:9901/tsfile/live/0118_1.m3u8
+GitHub源,IPTV,IPTV,延边卫视,直连流,https://srs.iyb983.cn/video/CYS/index.m3u8,https://srs.iyb983.cn/video/CYS/index.m3u8
+GitHub源,IPTV,IPTV,延边卫视,直连流,https://srs.iyb983.cn:443/video/CYS/index.m3u8,https://srs.iyb983.cn:443/video/CYS/index.m3u8
+GitHub源,IPTV,IPTV,新疆卫视,直连流,http://38.75.136.137:98/gslb/dsdqpub/xjws.m3u8?auth=testpub,http://38.75.136.137:98/gslb/dsdqpub/xjws.m3u8?auth=testpub
+GitHub源,IPTV,IPTV,江西卫视,直连流,http://112.27.5.218:9901/tsfile/live/faacts/0138_1.m3u8?key=txiptv&playlive=1&authid=0,http://112.27.5.218:9901/tsfile/live/faacts/0138_1.m3u8?key=txiptv&playlive=1&authid=0
+GitHub源,IPTV,IPTV,江西卫视,直连流,http://63.141.230.178:82/gslb/zbdq5.m3u8?id=jxwshd,http://63.141.230.178:82/gslb/zbdq5.m3u8?id=jxwshd
+GitHub源,IPTV,IPTV,浙江卫视,直连流,http://101.66.199.13:9901/tsfile/live/0124_1.m3u8?key=txiptv&playlive=0&authid=0,http://101.66.199.13:9901/tsfile/live/0124_1.m3u8?key=txiptv&playlive=0&authid=0
+GitHub源,IPTV,IPTV,浙江卫视,直连流,http://ali-xwl.cztv.com/live/channel01720Plxw.m3u8,http://ali-xwl.cztv.com/live/channel01720Plxw.m3u8
+GitHub源,IPTV,IPTV,西藏卫视,直连流,http://59.39.89.130:60901/tsfile/live/0125_4.m3u8?key=txiptv&playlive=1&authid=0,http://59.39.89.130:60901/tsfile/live/0125_4.m3u8?key=txiptv&playlive=1&authid=0
+GitHub源,IPTV,IPTV,辽宁卫视,直连流,http://204.12.221.218:8181/3m1080p/lnws.m3u8,http://204.12.221.218:8181/3m1080p/lnws.m3u8
+GitHub源,IPTV,IPTV,陕西卫视,直连流,http://192.151.150.154/live/snwshd.m3u8,http://192.151.150.154/live/snwshd.m3u8
+GitHub源,IPTV,IPTV,ABN China (720p),直连流,https://mediaserver.abnvideos.com/streams/abnchina.m3u8,https://mediaserver.abnvideos.com/streams/abnchina.m3u8
+GitHub源,IPTV,IPTV,Ando TV (1080p),直连流,http://play.kankanlive.com/live/1711956137852982.m3u8,http://play.kankanlive.com/live/1711956137852982.m3u8
+GitHub源,IPTV,IPTV,Bread TV (720p),直连流,https://video.bread-tv.com:8091/hls-live24/online/index.m3u8,https://video.bread-tv.com:8091/hls-live24/online/index.m3u8
+GitHub源,IPTV,IPTV,CCTV-Storm Music (1080p),直连流,http://38.75.136.137:98/gslb/dsdqpub/fyyy.m3u8?auth=testpub,http://38.75.136.137:98/gslb/dsdqpub/fyyy.m3u8?auth=testpub
+GitHub源,IPTV,IPTV,CCTV-The First Theater (1080p),直连流,http://38.75.136.137:98/gslb/dsdqpub/dyjc.m3u8?auth=testpub,http://38.75.136.137:98/gslb/dsdqpub/dyjc.m3u8?auth=testpub
+GitHub源,IPTV,IPTV,Chuxiong News Channel [Not 24/7],直连流,http://hwapi.yntv.net/ew265l/848y54.m3u8,http://hwapi.yntv.net/ew265l/848y54.m3u8
+GitHub源,IPTV,IPTV,Dragon TV International,直连流,https://restream.pdtvhd.com/memfs/0b1b95c9-3543-4af9-9fdb-cf45f1602f17.m3u8,https://restream.pdtvhd.com/memfs/0b1b95c9-3543-4af9-9fdb-cf45f1602f17.m3u8
+GitHub源,IPTV,IPTV,Guangzhou TV,直连流,https://tencentplaybusiness.gztv.com/live/zonghes.m3u8,https://tencentplaybusiness.gztv.com/live/zonghes.m3u8
+GitHub源,IPTV,IPTV,Harbin Comprehensive News Channel,直连流,https://stream.hrbtv.net/xwzh/playlist.m3u8?_upt=ef41dd531755913594,https://stream.hrbtv.net/xwzh/playlist.m3u8?_upt=ef41dd531755913594
+GitHub源,IPTV,IPTV,Harbin Movie Channel,直连流,https://stream.hrbtv.net/yspd/playlist.m3u8,https://stream.hrbtv.net/yspd/playlist.m3u8
+GitHub源,IPTV,IPTV,Hebei TV (2160p),直连流,https://event.pull.hebtv.com/live/live101.m3u8,https://event.pull.hebtv.com/live/live101.m3u8
+GitHub源,IPTV,IPTV,Hunan TV (2160p),直连流,http://hlsal-ldvt.qing.mgtv.com/nn_live/nn_x64/dWlwPTEyNy4wLjAuMSZ1aWQ9cWluZy1jbXMmbm5fdGltZXpvbmU9OCZjZG5leF9pZD1hbF9obHNfbGR2dCZ1dWlkPTliODY4NmU5ZTM2YzYwMmMmZT02OTE0NjA0JnY9MSZpZD1ITldTWkdTVCZzPTcwN2RiYTc2YzJjNmJmMTQ4MmUyZGYzOWU2NWM3YWFi/HNWSZGST.m3u8,http://hlsal-ldvt.qing.mgtv.com/nn_live/nn_x64/dWlwPTEyNy4wLjAuMSZ1aWQ9cWluZy1jbXMmbm5fdGltZXpvbmU9OCZjZG5leF9pZD1hbF9obHNfbGR2dCZ1dWlkPTliODY4NmU5ZTM2YzYwMmMmZT02OTE0NjA0JnY9MSZpZD1ITldTWkdTVCZzPTcwN2RiYTc2YzJjNmJmMTQ4MmUyZGYzOWU2NWM3YWFi/HNWSZGST.m3u8
+GitHub源,IPTV,IPTV,Kangba TV,直连流,http://110.185.237.164:8888/hls/30/index.m3u8,http://110.185.237.164:8888/hls/30/index.m3u8
+GitHub源,IPTV,IPTV,Lanzhou Comprehensive News Channel,直连流,https://liveplus.lzr.com.cn/xwzh/HD/live.m3u8,https://liveplus.lzr.com.cn/xwzh/HD/live.m3u8
+GitHub源,IPTV,IPTV,Siping TV,直连流,http://stream2.jlntv.cn/sptv/sd/live.m3u8?_upt=f27750421743154598,http://stream2.jlntv.cn/sptv/sd/live.m3u8?_upt=f27750421743154598
+GitHub源,IPTV,IPTV,TV BRICS Chinese (1080p),直连流,https://chibrics.mediacdn.ru/cdn/brics/chinese/playlist.m3u8,https://chibrics.mediacdn.ru/cdn/brics/chinese/playlist.m3u8
+GitHub源,IPTV,IPTV,Xinjiang TV 2,直连流,http://110.153.180.106:55555/out_3/index.m3u8,http://110.153.180.106:55555/out_3/index.m3u8
+GitHub源,IPTV,IPTV,Xinjiang TV 3,直连流,http://110.153.180.106:55555/out_2/index.m3u8,http://110.153.180.106:55555/out_2/index.m3u8
+GitHub源,IPTV,IPTV,Xinjiang TV 8,直连流,http://120.70.60.179:9901/tsfile/live/1002_1.m3u8?authid=0&key=txiptv&playlive=1,http://120.70.60.179:9901/tsfile/live/1002_1.m3u8?authid=0&key=txiptv&playlive=1
+GitHub源,IPTV,IPTV,世界地理,直连流,http://183.10.180.81:9901/tsfile/live/1008_1.m3u8?key=txiptv&playlive=1&authid=0,http://183.10.180.81:9901/tsfile/live/1008_1.m3u8?key=txiptv&playlive=1&authid=0
+GitHub源,IPTV,IPTV,第一剧场,直连流,http://183.10.180.81:9901/tsfile/live/1082_1.m3u8?key=txiptv&playlive=1&authid=0,http://183.10.180.81:9901/tsfile/live/1082_1.m3u8?key=txiptv&playlive=1&authid=0
+GitHub源,IPTV,IPTV,CCTV-1 综合,直连流,http://39.135.34.150:8080/000000001000/1000000001000021973/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000021973/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-2 财经,直连流,http://39.135.34.150:8080/000000001000/1000000001000012442/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000012442/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-3 综艺,直连流,http://39.135.34.150:8080/000000001000/1000000001000011218/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011218/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-4 中文国际,直连流,http://39.135.34.150:8080/000000001000/1000000001000011219/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011219/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-5 体育,直连流,http://39.135.34.150:8080/000000001000/1000000001000011220/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011220/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-5+ 体育赛事,直连流,http://39.135.34.150:8080/000000001000/1000000001000011221/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011221/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-6 电影,直连流,http://39.135.34.150:8080/000000001000/1000000001000011222/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011222/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-7 国防军事,直连流,http://39.135.34.150:8080/000000001000/1000000001000011223/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011223/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-8 电视剧,直连流,http://39.135.34.150:8080/000000001000/1000000001000011224/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011224/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-13 新闻,直连流,http://39.135.34.150:8080/000000001000/1000000001000011229/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011229/1.m3u8
+GitHub源,IPTV,IPTV,CCTV-14 少儿,直连流,http://39.135.34.150:8080/000000001000/1000000001000011230/1.m3u8,http://39.135.34.150:8080/000000001000/1000000001000011230/1.m3u8

@@ -1,0 +1,8 @@
+{
+  "source": "https://huangguo.video",
+  "sample_pages_scraped": 3,
+  "series_in_sample": 43,
+  "episodes_in_sample": 248,
+  "episodes_with_stream": 77,
+  "note": "剧名/简介/标签正文已替换为占位符，slug 已换成假值；URL 形状、content_id、码率参数保留"
+}
