@@ -120,11 +120,30 @@ object DeviceTier {
      *   省流 → LOW（640x360）
      *   标清 → MID（854x480）
      *   高清 → HIGH（1280x720）
+     *   超清 → 1080p
+     *   原画 → **不设上限**
+     *
+     * ## ⚠️「上限」的语义是"**排除超过它的轨**"
+     *
+     * 这点非常关键，也是花屏的根因：
+     * 有些流**只有单档高清**（实测 CCTV-1 那条只有 1920x1080），
+     * 而 LOW 档的上限是 640x360 —— 于是**唯一的视频轨被排除**，
+     * 解码器一帧都不出，屏幕上就是花屏。
+     *
+     * 实测日志（花屏时的状态）：
+     *     state=READY playing=true err=none **sawFrame=false**
+     *     状态 READY、位置在走、不报错，但一帧都没渲染出来。
+     *
+     * 所以除了加「原画」，还在 [com.chinut.bawantv.live.LivePlayerScreen]
+     * 里加了自动放宽：起播后一直不出帧就去掉限制重试一次。
      */
     fun manualLimit(quality: Int): Triple<Int, Int, Int>? = when (quality) {
         1 -> videoLimit(Tier.LOW)
         2 -> videoLimit(Tier.MID)
         3 -> videoLimit(Tier.HIGH)
+        4 -> Triple(1920, 1080, 8_000_000)
+        // 5 = 原画：用 Int.MAX_VALUE 表示"不限"
+        5 -> Triple(Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE)
         else -> null
     }
 

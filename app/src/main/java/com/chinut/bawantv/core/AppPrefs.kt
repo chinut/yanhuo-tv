@@ -334,7 +334,7 @@ class AppPrefs(context: Context) {
         map[KEY_OLD_TV]?.let { e.putBoolean(KEY_OLD_TV, htmlBool(it)) }
         map[KEY_LIVE_PRESET]?.let { e.putString(KEY_LIVE_PRESET, it) }
         map[KEY_LIVE_QUALITY]?.toIntOrNull()?.let {
-            e.putInt(KEY_LIVE_QUALITY, it.coerceIn(0, 4))
+            e.putInt(KEY_LIVE_QUALITY, it.coerceIn(0, QUALITY_MAX))
         }
         map[KEY_MEM_HUD]?.let { e.putBoolean(KEY_MEM_HUD, htmlBool(it)) }
         map[KEY_MEM_LOG]?.let { e.putBoolean(KEY_MEM_LOG, htmlBool(it)) }
@@ -351,7 +351,7 @@ class AppPrefs(context: Context) {
         map["old_tv"]?.let { e.putBoolean(KEY_OLD_TV, htmlBool(it)) }
         map["live_preset"]?.let { e.putString(KEY_LIVE_PRESET, it) }
         map["live_quality"]?.toIntOrNull()?.let {
-            e.putInt(KEY_LIVE_QUALITY, it.coerceIn(0, 4))
+            e.putInt(KEY_LIVE_QUALITY, it.coerceIn(0, QUALITY_MAX))
         }
         map["mem_hud"]?.let { e.putBoolean(KEY_MEM_HUD, htmlBool(it)) }
         map["mem_log"]?.let { e.putBoolean(KEY_MEM_LOG, htmlBool(it)) }
@@ -413,5 +413,18 @@ class AppPrefs(context: Context) {
 private const val KEY_MEM_HUD = "mem_hud"
 private const val KEY_MEM_LOG = "mem_log"
 private const val KEY_LIVE_QUALITY = "live_quality"
+
+    /**
+     * 播放清晰度的最大档位。
+     *
+     * ⚠️ 这个值必须和设置页的档位表、[com.chinut.bawantv.live.DeviceTier.manualLimit]
+     * 的 when 分支**同时**改。
+     *
+     * 踩过的坑：原来这两处写死 coerceIn(0, 4)，我加档位时漏改了它们 ——
+     * 于是手机网页端保存的档位会被**夹回 4**，新加的档位怎么选都存不进去。
+     *
+     * 档位：0 自动 · 1 省流 · 2 标清 · 3 高清 · 4 超清 · 5 原画
+     */
+    const val QUALITY_MAX = 5
     }
 }

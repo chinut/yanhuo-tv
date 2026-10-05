@@ -574,80 +574,39 @@ private fun LiveMiniPlayer(channel: LiveChannel, modifier: Modifier) {
         }
         AndroidView(
             factory = { ctx ->
-                // ⚠️ 首页预览用 **TextureView**，不用 `PlayerView`。
+                // 首页预览用 **PlayerView（SurfaceView）**。
                 //
-                // ## 为什么
+                // # ⚠️ 这里有一个**实测出来的取舍**，别再"优化"回去
                 //
-                // `PlayerView` 内部用 `SurfaceView`，而 `SurfaceView` 是**独立的
-                // 硬件叠加层** —— `adb shell screencap` 抓主帧缓冲时，
-                // 整个首页都会是空白（实测稳定返回 8159 字节的空帧，
-                // 而影视页同样截图是 2.4MB 正常）。
+                // 我曾经为了「首页能远程截图」把它改成 `TextureView`，
+                // 因为 `SurfaceView` 是独立硬件层、`screencap` 抓不到。
+                // 结果用户反馈**花屏**，A/B 实测（大卡区平均色 + 绿偏）：
                 //
-                // 用户需求是「给我一个远程看到的界面」，首页恰恰是**最需要
-                // 远程看**的那一屏（直播预览 + 布局）。所以这里必须让视频
-                // 渲染进普通的 View 层。
+                //     TextureView  [3.9, 55.7, 3.8]   绿偏 +51.8   ← 花屏
+                //     SurfaceView  [3.9,  3.8, 3.8]   绿偏  -0.0   ← 正常
                 //
-                // `TextureView` 和 Compose 的 UI 合成在同一个 buffer 里，
-                // 截图能同时拿到界面和画面。
+                // `TextureView` 在这台 Amlogic 电视上渲染绿屏。截图再方便，
+                // 也不能拿"画面是坏的"去换。
                 //
-                // ## 为什么不用 `PlayerView(ctx)` 再改属性
+                // ## 代价：首页截不到图（已知且接受）
                 //
-                // `PlayerView` 的 `surface_type` **只从 XML 属性读**
-                // （构造器里 `defStyleRes=0`，且没有任何默认 style），
-                // 代码里创建就一定是 SurfaceView，没有 setter 可改。
-                // 与其为一个预览去复制整个 `exo_player_view.xml`，
-                // 不如直接用 TextureView —— 首页预览不需要播放器控件
-                // （`useController=false`），用不上 PlayerView 的任何功能。
+                //    首页（有 SurfaceView 视频）  screencap → 8159 字节空帧（稳定）
+                //    影视页（无视频）            screencap → 2.4 MB 正常
+                //    全屏直播页                  screencap → 正常（它有别的合成路径）
                 //
-                // 全屏直播页**保持原样**：那里更看重硬解性能，
-                // 而且它本身截得到图。
-                // ## 为什么要包一层 FrameLayout
+                // 所以**首页的远程截图能力是没有的**。要在首页看画面，
+                // 用 `adb shell screenrecord`（它能抓到 SurfaceView 层）。
                 //
-                // 裸 `TextureView` 默认 `wrap_content` + 默认背景，
-                // 实测会出现"画面没铺满、圆角外露黑边"，而且纹理在
-                // 尺寸未定时会短暂显示**绿色雪花**。
-                //
-                // 这里显式给 `MATCH_PARENT` 尺寸、黑底、并设
-                // `SurfaceTextureListener` —— 等 SurfaceTexture 就绪后再
-                // 把视频表面交上去，避免在未就绪时绑定导致雪花。
-                // ## 背景色只能给外层，**不能给 TextureView 本身**
-                //
-                // `TextureView.setBackground*` 会抛
-                // `UnsupportedOperationException: TextureView doesn't support
-                // displaying a background drawable`（实测在这台 Android 11 上直接崩）。
-                // 所以黑底给外层 FrameLayout。
-                val tv = android.view.TextureView(ctx).apply {
-                    layoutParams = android.view.ViewGroup.LayoutParams(
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    )
+                // 对电视 App 来说「画面正确」优先级远高于「我能远程截图」，
+                // 所以这个取舍是明确的：**要画面，不要截图**。
+                PlayerView(ctx).apply {
+                    useController = false
+                    resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
+                    this.player = player
+                    keepScreenOn = true
                 }
-                val box = android.widget.FrameLayout(ctx).apply {
-                    setBackgroundColor(android.graphics.Color.BLACK)
-                    addView(tv)
-                }
-                tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
-                    override fun onSurfaceTextureAvailable(
-                        st: android.graphics.SurfaceTexture, w: Int, h: Int,
-                    ) {
-                        // 尺寸就绪了才挂上去
-                        player.setVideoTextureView(tv)
-                    }
-
-                    override fun onSurfaceTextureSizeChanged(
-                        st: android.graphics.SurfaceTexture, w: Int, h: Int,
-                    ) = Unit
-
-                    override fun onSurfaceTextureDestroyed(
-                        st: android.graphics.SurfaceTexture,
-                    ): Boolean {
-                        player.clearVideoSurface()
-                        return true
-                    }
-
-                    override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) = Unit
-                }
-                box
             },
             modifier = modifier,
         )

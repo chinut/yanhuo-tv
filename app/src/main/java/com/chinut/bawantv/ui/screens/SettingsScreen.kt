@@ -536,18 +536,28 @@ fun SettingsScreen(
                             )
                         }
                         Spacer(Modifier.width(14.sdp))
+                        // ⚠️ 档位表必须是**唯一来源**。
+                        //
+                        // 原来这里写了两遍 `listOf("自动","省流 360p","标清 480p","高清 720p")`
+                        // （label 一次、toast 一次），而循环用的是 `% 4` ——
+                        // 以后加档位必然漏改一处。抽成 val 就不会了。
+                        //
+                        // 另外原来那句 hint 说"确定键循环切换"，但档位表只有 4 个，
+                        // 和 DebugWebServer 的 5 个（自动/流畅/标清/高清/**超清**）对不上。
+                        // 现在统一成 5 档 + 「原画」= 6 档。
+                        val qualityLabels = listOf(
+                            "自动", "省流 360p", "标清 480p", "高清 720p", "超清 1080p", "原画",
+                        )
                         SmallButton(
-                            label = listOf("自动", "省流 360p", "标清 480p", "高清 720p")
-                                .getOrElse(prefs.liveQuality) { "自动" },
+                            label = qualityLabels.getOrElse(prefs.liveQuality) { "自动" },
                             focusKey = "set:liveQuality",
                             upKey = "set:hwDecode",
                         ) {
-                            prefs.liveQuality = (prefs.liveQuality + 1) % 4
+                            prefs.liveQuality = (prefs.liveQuality + 1) % qualityLabels.size
                             toast(
                                 context,
                                 "直播清晰度：" +
-                                    listOf("自动", "省流 360p", "标清 480p", "高清 720p")
-                                        .getOrElse(prefs.liveQuality) { "自动" },
+                                    qualityLabels.getOrElse(prefs.liveQuality) { "自动" },
                             )
                         }
                     }

@@ -516,6 +516,7 @@ fun LivePlayerScreen(
                         // 解码跟不上就成了"卡"甚至"黑屏"（实测日志显示硬解
                         // 不报错、只是永远不出画面 —— 就是码率吃不下）。
                         // 手动设置优先；没设（0）才走自动判定
+                        // 手动设置优先；没设（0）才走自动判定
                         val manual = com.chinut.bawantv.live.DeviceTier
                             .manualLimit(prefs.liveQuality)
                         val (w, h, bitrate) = manual
@@ -567,7 +568,7 @@ fun LivePlayerScreen(
         nativeActive = false
     }
 
-    /**
+        /**
      * 捕获到流地址 → 切到 ExoPlayer 硬解。
      *
      * 这是解决真机「直播卡成 PPT」的关键：网页播放器在电视上太吃力
@@ -683,6 +684,7 @@ fun LivePlayerScreen(
 
         while (true) {
             kotlinx.coroutines.delay(3_000)
+
             runCatching {
                 // 卡顿判定：位置没推进（播放中却不走 = 卡了）
                 val nowPos = player.currentPosition
