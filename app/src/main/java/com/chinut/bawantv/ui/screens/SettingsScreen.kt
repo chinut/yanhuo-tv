@@ -100,21 +100,6 @@ fun SettingsScreen(
 
     var showQr by remember { mutableStateOf(false) }
 
-    // ---------- 源体检 ----------
-    //
-    // 在**用户自己的网络**上验证源。开发机测不了国内源
-    // （bupt / 39.135 都是 TCP 超时），只有用户家宽带能验出来。
-    var docRunning by remember { mutableStateOf(false) }
-    var docDone by remember { mutableIntStateOf(0) }
-    var docTotal by remember { mutableIntStateOf(0) }
-    var docOk by remember { mutableIntStateOf(0) }
-    var docMsg by remember { mutableStateOf("") }
-    var docChecked by remember {
-        mutableIntStateOf(
-            com.chinut.bawantv.live.SourceDoctor.loadChecked(context).size
-        )
-    }
-    val docScope = rememberCoroutineScope()
     var resolvedDomain by remember { mutableStateOf(Ddys.activeBase) }
 
     // ---------- 未成年人保护的状态 ----------
@@ -203,80 +188,6 @@ fun SettingsScreen(
                     subtitle = "老电视模式：开 = 只用 GitHub 源（轻）｜关 = 央视/央视频 + GitHub 源",
                     accent = Ink.Green,
                 ) {
-                    // ---------- 源体检 ----------
-                    //
-                    // 说明写得直白：它测的是"你家网络能不能连上"，
-                    // 而且**测不出画面静止**（那要解码多帧，电视上代价太大）。
-                    TvRow(
-                        label = if (docRunning) {
-                            "正在体检… $docDone/$docTotal"
-                        } else if (docChecked > 0) {
-                            "已体检 $docChecked 个源"
-                        } else {
-                            "源体检（在你家网络上验证）"
-                        },
-                        hint = if (docRunning) {
-                            "串行执行，别关电视；大概几分钟"
-                        } else if (docChecked > 0) {
-                            docMsg.ifBlank { "可用 $docOk 个。测不出画面静止，仍可能有个别看不了" }
-                        } else {
-                            "用自己的网络逐个验证，能连上的才留下（约几分钟）"
-                        },
-                        hintColor = when {
-                            docRunning -> Ink.Amber
-                            docChecked > 0 -> Ink.Green
-                            else -> Ink.TextFaint
-                        },
-                        actionText = if (docRunning) "体检中" else "开始体检",
-                    ) {
-                        if (!docRunning) {
-                            docRunning = true
-                            docDone = 0; docTotal = 0; docOk = 0
-                            docMsg = ""
-                            docScope.launch {
-                                // 体检对象：内置已验证源 + 开源源
-                                val targets = runCatching {
-                                    val builtin = com.chinut.bawantv.live.LiveCatalog.builtin(context)
-                                    val open = com.chinut.bawantv.live.OpenSourceCatalog.cachedOrNull()
-                                        ?.groups.orEmpty()
-                                    (builtin + open)
-                                        .flatMap { g: com.chinut.bawantv.live.LiveGroup ->
-                                            g.channels.flatMap { ch: com.chinut.bawantv.live.LiveChannel ->
-                                                listOf(ch.url) + ch.alternates
-                                            }
-                                        }
-                                        .filter { (it as String).startsWith("http") }
-                                        .distinct()
-                                }.getOrDefault(emptyList())
-
-                                com.chinut.bawantv.live.SourceDoctor.clear(context)
-                                val r = runCatching {
-                                    com.chinut.bawantv.live.SourceDoctor.run(context, targets) { d, t, ok, _ ->
-                                        docDone = d; docTotal = t; docOk = ok
-                                    }
-                                }.getOrElse {
-                                    com.chinut.bawantv.live.SourceDoctor.Outcome(0, 0)
-                                }
-                                docRunning = false
-                                docChecked = com.chinut.bawantv.live.SourceDoctor.loadChecked(context).size
-                                docMsg = "体检完成：测了 ${r.tested} 个，能连上 ${r.ok} 个"
-                                toast(context, docMsg)
-                            }
-                        }
-                    }
-                    if (docChecked > 0 && !docRunning) {
-                        TvRow(
-                            label = "清除体检结果",
-                            hint = "下次重新体检",
-                            actionText = "清除",
-                        ) {
-                            com.chinut.bawantv.live.SourceDoctor.clear(context)
-                            docChecked = 0
-                            docMsg = "已清除"
-                            toast(context, "已清除")
-                        }
-                    }
-
                     // ---------- 老电视模式 ----------
                     //
                     // 用户要求的一个开关。它同时做两件事：
