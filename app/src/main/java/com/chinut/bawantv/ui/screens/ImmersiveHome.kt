@@ -432,20 +432,41 @@ private fun LiveHero(
             Box(Modifier.fillMaxSize().background(Color.Black))
         }
 
-        // 底部渐变 + 台标：让文字永远压得住画面
+        // ---------- 底部遮罩：保证台标文字压得住画面 ----------
+        //
+        // ## 为什么原来会"露字"
+        //
+        // 原来是 210dp 高、`[全透 → 30% → 82%]` 三段渐变，
+        // **到卡片最底部也只有 82% 不透明** —— 而直播流自己带的字幕
+        // 正好在画面下缘，于是从遮罩下面透出来，和我们的
+        // 「正在直播 / 频道名 / 提示」叠在一起（用户反馈）。
+        //
+        // ## 改法：让渐变在**文字区上方**就到达全不透明
+        //
+        //     y=0%    全透（和上面的画面无缝接）
+        //     y=18%   已很暗
+        //     y=55%   全黑 ─┐
+        //     y=100%  全黑 ─┘ 这一段整个盖住文字块
+        //
+        // 文字块（`.padding(26.sdp)`）的顶端大约在横幅的 12% 处，
+        // 所以 55% 才开始全黑**足够** —— 而且留了余量：
+        // 即使卡片再矮一点、文字相对位置再靠上，也还在全黑区里。
+        //
+        // 为什么不干脆做成"上方透明、下方纯色"两块：
+        // 那样交界处会有一条**硬边**，在电视上很显眼。
+        // 渐变到全黑既盖得严实，又没有硬边。
         Box(
             Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .height(210.sdp)
+                .height(240.sdp)
                 .background(
                     Brush.verticalGradient(
-                        // 官方 scrim：顶部全透、底部接近不透明，保证白字可读
-                        listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.30f),
-                            Color.Black.copy(alpha = 0.82f),
-                        )
+                        0.00f to Color.Transparent,
+                        0.18f to Color.Black.copy(alpha = 0.45f),
+                        0.40f to Color.Black.copy(alpha = 0.85f),
+                        0.55f to Color.Black,
+                        1.00f to Color.Black,
                     )
                 )
         )
