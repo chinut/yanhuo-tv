@@ -47,8 +47,53 @@ object TlsHelper {
 
     private const val TAG = "BawanTls"
 
-    /** 需要补锚的域名。只对它们生效，别的一律走系统默认。 */
-    private val HOSTS = setOf("xiaoqi.icofun.cn", "icofun.cn")
+    /**
+     * 需要补锚的域名。只对它们生效，别的一律走系统默认。
+     *
+     * # 为什么把 GitHub 相关域名也加进来
+     *
+     * 用户两台电视，同一份 App、同一个网络：
+     *
+     * | 电视 | 系统 | GitHub 订阅源 |
+     * |---|---|---|
+     * | 192.168.31.101 | Android 11 | ✅ 正常（141 个频道）|
+     * | 192.168.31.233 | **Android 6.0.1** | ❌ 全部失败 |
+     *
+     * 用户一句话点破了方向：「一个电视好着呢，一个不行说明不是网的问题」。
+     *
+     * 打开异常日志后拿到真实原因（之前 `getOrNull()` 把异常吞了）：
+     *
+     *     SSLHandshakeException: java.security.cert.CertPathValidatorException:
+     *       Trust anchor for certification path not found.
+     *
+     * 实测这几个源**全是 Let's Encrypt 签的**：
+     *
+     *     iptv-org.github.io         → Let's Encrypt
+     *     raw.githubusercontent.com  → Let's Encrypt
+     *
+     * 而 **Android 6 的系统证书库里没有 ISRG Root X1** ——
+     * Let's Encrypt 的根原先靠 DST Root CA X3 交叉签名，2021-09 那张过期后，
+     * 老系统（Android < 7.1.1）就再也验不过 Let's Encrypt 的新证书了。
+     *
+     * 这个项目**早就为同一个问题写过解法**（短剧接口 xiaoqi.icofun.cn 也是
+     * Let's Encrypt），内置了 `isrg_root_x1.pem` / `isrg_root_x2.pem`。
+     * 当时只对短剧域名生效 —— 现在把订阅源域名也纳入，复用同一套补锚。
+     *
+     * ⚠️ 注意 `live.fanmingming.com` 也要加：它同样是 HTTPS 源，
+     * 在老系统上会遇到一样的问题。
+     */
+    private val HOSTS = setOf(
+        // 短剧接口（原本就有的）
+        "xiaoqi.icofun.cn",
+        "icofun.cn",
+        // GitHub 订阅源：best-fan / iptv-org / vbskycn
+        "raw.githubusercontent.com",
+        "githubusercontent.com",
+        "github.io",
+        "github.com",
+        // 其他 HTTPS 订阅源
+        "live.fanmingming.com",
+    )
 
     @Volatile
     private var cached: OkHttpClient? = null
@@ -125,6 +170,12 @@ object TlsHelper {
      *
      * 域名在 [HOSTS] 里 → 用补过锚的；否则用全局默认的。
      * 补锚失败就退回默认客户端，**不影响其它功能**。
+     *
+     * ⚠️ `cached` 只缓存**补锚过的那个客户端**。
+     * 原来这里写的是 `cached?.let { return it }` —— 但 cached 里存的
+     * 可能是"默认客户端"（当第一个调用的域名不在 [HOSTS] 里时），
+     * 于是后面所有域名都会拿到默认客户端，**补锚永远不生效**。
+     * 改成只缓存补锚结果，默认分支直接返回 [Http.client]。
      */
     fun clientFor(context: Context, url: String): OkHttpClient {
         if (!needsExtraAnchors(url)) return Http.client

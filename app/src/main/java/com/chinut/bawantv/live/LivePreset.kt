@@ -266,7 +266,7 @@ object OpenSourceCatalog {
             // 预算内能拉几个是几个 —— 拉不到的跳过，不影响已有结果。
             for (src in MAINTAINED) {
                 if (System.currentTimeMillis() > deadline) break
-                val text = runCatching { fetchOne(src) }.getOrNull() ?: continue
+                val text = runCatching { fetchOne(context, src) }.getOrNull() ?: continue
                 if (!text.contains("#EXTINF")) continue
                 parseIptvOrg(text)?.let { g ->
                     if (g.channels.isNotEmpty()) {
@@ -279,7 +279,7 @@ object OpenSourceCatalog {
             }
             for (f in FILES) {
                 if (System.currentTimeMillis() > deadline) break
-                val text = fetchOne(base + f) ?: continue
+                val text = fetchOne(context, base + f) ?: continue
                 if (date.isEmpty()) {
                     date = Regex("#DATE:\\s*(.+)").find(text)
                         ?.let { it.groupValues[1].trim() }.orEmpty()
@@ -314,10 +314,22 @@ object OpenSourceCatalog {
      * 默认的 Http.client 是 connect 12s / read 20s —— 对"拉个小文本列表"
      * 来说太长了。这里单独建一个短超时的 client（复用连接池/拦截器）。
      */
-    private suspend fun fetchOne(url: String): String? =
+    private suspend fun fetchOne(context: android.content.Context, url: String): String? =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching {
-                val cli = com.chinut.bawantv.core.Http.client.newBuilder()
+                // ⚠️ 必须过 TlsHelper（给 Let‘s Encrypt 补信任锚）。
+                //
+                // 实测原因（打开异常日志后拿到的）：
+                //   SSLHandshakeException:
+                //     Trust anchor for certification path not found.
+                //
+                // 这些订阅源全是 Let’s Encrypt 签的，而 Android 6 的系统
+                // 证书库里没有 ISRG Root X1（2021-09 DST Root CA X3 过期后
+                // 老系统就验不过了）。TlsHelper 内置了这两个根，补上即可。
+                //
+                // 用户两台电视一台行一台不行（Android 11 / Android 6）
+                // 就是这个原因 —— 不是网络问题。
+                val cli = com.chinut.bawantv.core.TlsHelper.clientFor(context, url).newBuilder()
                     .connectTimeout(ONE_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
                     .readTimeout(ONE_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
                     .build()
