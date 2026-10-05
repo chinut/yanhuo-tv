@@ -39,7 +39,7 @@ import java.io.File
  *
  * # 文件格式
  *
- *     #v1 <TAB> 配置指纹 <TAB> 写入时间戳
+ *     #v2 <TAB> 配置指纹 <TAB> 写入时间戳
  *     G <US> 分组名
  *     C <US> name <US> url <US> logo <US> alternates(RS 分隔)
  *     ...
@@ -134,7 +134,17 @@ object LiveCache {
         if (channels.isEmpty()) return
         runCatching {
             val sb = StringBuilder(channels.size * 64)
-            sb.append("#v1").append('\t').append(key).append('\t')
+            // ⚠️ 版本号 → v2。
+            //
+            // 原因：v2.2.0 之前，**兜底数据也会落盘** —— 用户在电视上
+            // GitHub 连不通时，App 退回内置表并把那份结果存进缓存，
+            // 而且用的是"老电视模式"的 key。于是下次启动直接读这份假数据：
+            // **老电视模式开着，列表却是主源的频道**（用户实测反馈）。
+            //
+            // 现在兜底数据已经不落盘了（见 LiveCatalog 里的 `usedFallback`），
+            // 但**老版本写下的 v1 缓存还在用户设备上**。升版本号让它们作废，
+            // 用户升级后第一次启动就能拿到正确的源。
+            sb.append("#v2").append('\t').append(key).append('\t')
                 .append(System.currentTimeMillis()).append('\n')
 
             groups.forEach { g ->
@@ -174,7 +184,11 @@ object LiveCache {
         if (lines.isEmpty()) return null
 
         val head = lines[0].split('\t')
-        if (head.size < 3 || head[0] != "#v1") return null
+        // 版本号必须是 v2（见 save() 里的说明：v1 可能存着"兜底数据"）
+        if (head.size < 3 || head[0] != "#v2") {
+            android.util.Log.i(TAG, "缓存版本不是 v2（${head.getOrNull(0)}），作废")
+            return null
+        }
         val cachedKey = head[1]
         val at = head[2].toLongOrNull() ?: return null
         // 配置变了（用户换了主源 / 开关了老电视模式）→ 缓存作废

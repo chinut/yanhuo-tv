@@ -224,11 +224,24 @@ object LiveCatalog {
         //
         // load() 里有 5 个返回点，一个个改必然漏，
         // 所以全部走这个局部函数。
-        fun done(groups: List<LiveGroup>): Pair<List<LiveGroup>, List<LiveChannel>> {
+        //
+        // @param cache 是否允许落盘。**退回兜底源时必须为 false**（见下）。
+        fun done(
+            groups: List<LiveGroup>,
+            cache: Boolean = true,
+        ): Pair<List<LiveGroup>, List<LiveChannel>> {
             val flat = flattenForZapping(groups)
-            // 落盘放后台：这是 IO，用户没必要等它（订阅里报错也不影响这次返回）
-            CoroutineScope(Dispatchers.IO).launch {
-                runCatching { LiveCache.save(context, groups, flat, cacheKey) }
+            if (cache) {
+                // 落盘放后台：这是 IO，用户没必要等它（订阅里报错也不影响这次返回）
+                CoroutineScope(Dispatchers.IO).launch {
+                    runCatching { LiveCache.save(context, groups, flat, cacheKey) }
+                }
+            } else {
+                android.util.Log.w(
+                    TAG,
+                    "本次结果是**兜底数据**（不是目标源），不落盘 —— " +
+                        "否则下次启动会直接读这份假数据",
+                )
             }
             return groups to flat
         }
@@ -319,9 +332,37 @@ object LiveCatalog {
         // 用户要求「主源频道放入源列表且**置顶**」。
         // 原来 Both 分支是 `b + a`（直连源在前），理由是"直连更省资源"——
         // 那是旧取舍，现在按用户要求把主源放最上面。
+        // 这次用的是**兜底数据**吗？
+        //
+        // ## 为什么必须区分（这是个实测出来的真 bug）
+        //
+        // 用户电视（192.168.31.233，小米电视4 / Android 6）上
+        // **GitHub 连不通**（DNS 能解析但 TCP 被拦），于是
+        // `openSourceGroups` 返回 null，代码退回内置表。
+        //
+        // 但退回的结果**被当成正常结果落盘了**，而且 key 是老电视模式的 key：
+        //
+        //     BawanOpenSrc: 开源源全部拉取失败（GitHub 和镜像都不通）
+        //     BawanLiveCache: 频道表已落盘：24 组 / 55 个频道   ← 内置表！
+        //
+        // 下一次启动直接命中这份缓存 —— **老电视模式开着，列表却是主源的频道**。
+        // 用户看到的就是"设置对了但列表不对"。
+        //
+        // 修法：兜底数据**不落盘**。这样每次启动都会重新尝试拉 GitHub 源
+        // （万一网络恢复了就拿到真数据），而不是被一份假缓存永久顶住。
+        var usedFallback = false
+
         val engine: List<LiveGroup> = if (oldTvMode) {
             // 老电视：只要 GitHub 源
-            openSourceGroups(context, oldTvMode) ?: builtin
+            val open = openSourceGroups(context, oldTvMode)
+            if (open == null) {
+                usedFallback = true
+                android.util.Log.w(
+                    TAG,
+                    "老电视模式：GitHub 源拉取失败，本次退回内置表（**不落盘**）",
+                )
+            }
+            open ?: builtin
         } else {
             // 普通：主源在前，GitHub 源在后
             kotlinx.coroutines.coroutineScope {
@@ -358,11 +399,11 @@ object LiveCatalog {
 
         // 2) 自定义网址
         val url = customSourceUrl.trim()
-        if (url.isEmpty()) return done(engine)
+        if (url.isEmpty()) return done(engine, cache = !usedFallback)
 
-        val text = Net.get(url, ua = Http.UA_MOBILE) ?: return done(engine)
+        val text = Net.get(url, ua = Http.UA_MOBILE) ?: return done(engine, cache = !usedFallback)
         val custom = parse(text)
-        if (custom.isEmpty()) return done(engine)
+        if (custom.isEmpty()) return done(engine, cache = !usedFallback)
 
         val merged = ArrayList<LiveGroup>(custom.size + engine.size)
         custom.forEach { g ->
