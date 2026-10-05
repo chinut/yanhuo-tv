@@ -205,11 +205,16 @@ object LiveCatalog {
     ): Pair<List<LiveGroup>, List<LiveChannel>> {
         // ---------- 缓存指纹 ----------
         //
-        // 必须把影响结果的**每个**输入都算进去：换主源、开关老电视模式、
-        // 改自定义网址。少算一个就会出现"设置改了但列表没变"
+        // 必须把影响结果的**每个**输入都算进去：开关老电视模式、
+        // 改自定义网址、有没有导入本地源。少算一个就会出现"设置改了但列表没变"
         // （这个 bug 用户反馈过 —— 见 HomeWarmup 里那段注释）。
+        //
+        // ⚠️ `preset` 已经**不再**参与引擎选择了（规则由 oldTvMode 唯一决定，
+        // 见下面那段长注释）。但它仍然要进缓存键吗？**不要** ——
+        // 它既然不影响输出，放进去只会让同一份数据在缓存里存多份
+        // （老用户 prefs 里可能还残留 "Both"/"OpenSource"）。
+        // 唯一的作用是让缓存失效得更频繁，没有好处。
         val cacheKey = LiveCache.keyOf(
-            presetName = preset.name,
             oldTvMode = oldTvMode,
             customSourceUrl = customSourceUrl,
             hasImported = hasImported(context),
@@ -290,19 +295,41 @@ object LiveCatalog {
         // 关掉开关自然恢复。
         //
         // 用户原话：「开启老电视模式了就只用 iptv 源就好了啊」。
-        val effective = if (oldTvMode) LivePreset.OpenSource else preset
-
-        val engine: List<LiveGroup> = when (effective) {
-            LivePreset.Default -> builtin
-            LivePreset.OpenSource -> openSourceGroups(context, oldTvMode) ?: builtin
-            LivePreset.Both -> {
-                kotlinx.coroutines.coroutineScope {
-                    val da = async<List<LiveGroup>> { builtin }
-                    val db = async<List<LiveGroup>?> { openSourceGroups(context, oldTvMode) }
-                    val a = da.await()
-                    val b = db.await()
-                    if (b == null) a else b + a      // B 在前：直连源更省资源
-                }
+        // ---------- 引擎选择：由「老电视模式」唯一决定 ----------
+        //
+        // ## 用户定义的规则（原话，带例子）
+        //
+        //     「比如主源有4个频道，github有4个频道
+        //       老电视模式开启时  直播列表里应该有4个频道都是来自于github，顺序为1234
+        //       关闭老电视模式后  直播列表里应该有8个频道，顺序为 主源频道1234 github频道1234」
+        //
+        // 也就是：
+        //   · 老电视模式 **开** → 只加载 GitHub 源（直连、轻，不用 WebView）
+        //   · 老电视模式 **关** → 两个都加载，**主源（央视网/央视频网页）在前**
+        //
+        // ## 为什么不再看 `preset`
+        //
+        // 原来这里是 `if (oldTvMode) OpenSource else preset`，而 `preset` 是设置里
+        // 那个「主源」切换项。用户已要求**移除那个切换项** —— 既然只有一个可选行为，
+        // 就不该再读一个可能残留旧值的设置（老用户 prefs 里可能还存着
+        // "Both"/"OpenSource"，会和新规则打架）。
+        //
+        // ## 顺序为什么改成「主源在前」
+        //
+        // 用户要求「主源频道放入源列表且**置顶**」。
+        // 原来 Both 分支是 `b + a`（直连源在前），理由是"直连更省资源"——
+        // 那是旧取舍，现在按用户要求把主源放最上面。
+        val engine: List<LiveGroup> = if (oldTvMode) {
+            // 老电视：只要 GitHub 源
+            openSourceGroups(context, oldTvMode) ?: builtin
+        } else {
+            // 普通：主源在前，GitHub 源在后
+            kotlinx.coroutines.coroutineScope {
+                val dMain = async<List<LiveGroup>> { builtin }
+                val dOpen = async<List<LiveGroup>?> { openSourceGroups(context, oldTvMode) }
+                val main = dMain.await()
+                val open = dOpen.await()
+                if (open == null) main else main + open
             }
         }
 

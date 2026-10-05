@@ -97,14 +97,30 @@ object LiveCache {
      * 就会出现"写进去了但读不出来"（表现为缓存永远不命中、
      * 或者设置改了但列表没变）。之前 HomeWarmup 想自己拼一个 key，
      * 就是这种隐患 —— 所以这里对外开放，谁需要谁来调。
+     *
+     * ## 为什么**没有** `presetName` 参数了
+     *
+     * 原来有个 `presetName`，代表「内置频道 / GitHub 源 / 双源」三选一。
+     * 用户后来把那个设置项**整个移除了** —— 现在引擎由「老电视模式」
+     * 唯一决定（见 [LiveCatalog.loadWithChannels] 里的长注释）：
+     *
+     *     老电视模式 开 → 只有 GitHub 源
+     *     老电视模式 关 → 主源在前 + GitHub 源在后
+     *
+     * 于是 `presetName` **不再影响输出**。我一开始只是把它在
+     * `LiveCatalog` 里写死成常量，结果 `HomeWarmup` 那边还在用
+     * `preset.name` —— 两边 key 对不上，**磁盘缓存永远读不中**，
+     * 每次开屏都要重新联网。
+     *
+     * 所以干脆把这个参数**删掉**：参数不存在，就没法漂移。
+     * 这也让"哪些输入真的影响结果"变得一目了然。
      */
     fun keyOf(
-        presetName: String,
         oldTvMode: Boolean,
         customSourceUrl: String,
         hasImported: Boolean,
     ): String = listOf(
-        presetName, oldTvMode.toString(), customSourceUrl.trim(), hasImported.toString(),
+        oldTvMode.toString(), customSourceUrl.trim(), hasImported.toString(),
     ).joinToString("|")
 
     // ---------- 写 ----------

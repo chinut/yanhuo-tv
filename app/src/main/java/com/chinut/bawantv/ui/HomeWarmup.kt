@@ -139,7 +139,6 @@ object HomeWarmup {
                 val cachedSnap = LiveCache.load(
                     context,
                     LiveCache.keyOf(
-                        presetName = preset.name,
                         oldTvMode = prefs.oldTvMode,
                         customSourceUrl = prefs.liveSourceUrl,
                         hasImported = LiveCatalog.hasImported(context),
