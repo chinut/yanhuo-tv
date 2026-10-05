@@ -17,6 +17,38 @@ class AppPrefs(context: Context) {
     private val sp: SharedPreferences =
         context.applicationContext.getSharedPreferences("bawan_prefs", Context.MODE_PRIVATE)
 
+    /**
+     * 是不是**从来没跑过**的全新安装。
+     *
+     * ## 为什么需要它
+     *
+     * 用户要求「软件安装后默认开启老电视模式」。但直接把默认值从
+     * `false` 改成 `true` 是错的 —— 那会让**已装 App 的老用户**
+     * （prefs 里没有这个键）在升级后被强制切源，看起来像"东西丢了"。
+     *
+     * 所以在**构造函数里**打一个标记：
+     *   · 构造函数运行的那一刻，如果标记还不存在 → 这是全新安装
+     *   · 打完标记之后，后续读到的 `isFreshInstall` 就是"曾经新装过"
+     *
+     * ⚠️ 这段必须放在构造函数里、且早于任何属性被读 —— 属性是懒加载的，
+     * 但 `isFreshInstall` 本身也是属性，所以这里用 `by lazy` 之外的方式：
+     * 直接在 init 块里算好存下来。
+     */
+    private val freshInstall: Boolean
+
+    init {
+        val seen = sp.getBoolean(KEY_INSTALL_SEEN, false)
+        freshInstall = !seen
+        if (!seen) {
+            // 首次运行：打标记。以后升级就不会再被当成新装了
+            sp.edit().putBoolean(KEY_INSTALL_SEEN, true).apply()
+            android.util.Log.i("BawanPrefs", "全新安装：老电视模式默认开启")
+        }
+    }
+
+    /** 见 [freshInstall] 的说明。 */
+    val isFreshInstall: Boolean get() = freshInstall
+
     /** 设置变更通知（任意字段变化都 +1） */
     private val _revision = MutableStateFlow(0)
     val revision: StateFlow<Int> = _revision.asStateFlow()
@@ -123,14 +155,25 @@ class AppPrefs(context: Context) {
     /**
      * 老电视模式。
      *
-     * 打开后：主源默认切到「开源源」（全是直连 m3u8，不跑 WebView），
+     * 打开后：主源默认切到「GitHub 源」（全是直连 m3u8，不跑 WebView），
      * 而且开源源里同台多条时优先挑**低分辨率**那条。
      *
      * 为什么做成一个开关而不是两个：对用户来说只有一个概念 ——
      * 这台电视老，就打开它。让它去理解"源预设"和"分辨率偏好"太累了。
+     *
+     * ## 默认值：**新装默认开**，升级用户保持原样
+     *
+     * 用户要求「软件安装后默认开启老电视模式」。
+     *
+     * ⚠️ 这里有个坑：不能简单写成 `getBoolean(KEY_OLD_TV, true)` ——
+     * 那样**已经装了 App 的老用户**（prefs 里根本没有这个键）也会被强制打开，
+     * 等于替他改了设置。而且如果他现在用的是内置源（央视网页），
+     * 一升级就被切走，会觉得"升级后东西不见了"。
+     *
+     * 所以用 [isFreshInstall] 区分：只有"从来没跑过"的安装才默认开。
      */
     var oldTvMode: Boolean
-        get() = sp.getBoolean(KEY_OLD_TV, false)
+        get() = sp.getBoolean(KEY_OLD_TV, isFreshInstall)
         set(v) = sp.edit().putBoolean(KEY_OLD_TV, v).apply().also { touch() }
 
     /**
@@ -409,6 +452,13 @@ class AppPrefs(context: Context) {
         private const val KEY_HW_DECODE = "hw_decode"
         private const val KEY_SHOW_HUD = "show_hud"
     private const val KEY_OLD_TV = "old_tv_mode"
+
+    /**
+     * 「装过一次」的标记 —— 用来区分全新安装和升级（见 [isFreshInstall]）。
+     *
+     * 只关心"这个键存不存在"，值本身没意义。
+     */
+    private const val KEY_INSTALL_SEEN = "install_seen"
     private const val KEY_LIVE_PRESET = "live_preset"
 private const val KEY_MEM_HUD = "mem_hud"
 private const val KEY_MEM_LOG = "mem_log"

@@ -42,17 +42,6 @@ object LiveCatalog {
 
     private const val BUILTIN_ASSET = "live/cctv.m3u"
 
-    /** 扫描得来的 IPTV 直连源（内置默认配置）。 */
-    private const val IPTV_ASSET = "live/iptv.m3u"
-
-    /**
-     * 实测能播的 IPTV 源。
-     *
-     * best-fan 那个列表实测 182 个地址只有 22 个真能播（12%），
-     * 所以把这 22 个单独存一份、**排在最前面** —— 用户至少立刻有 19 个台能看。
-     */
-    private const val IPTV_VERIFIED_ASSET = "live/iptv_verified.m3u"
-
     @Volatile
     private var cachedBuiltin: List<LiveGroup>? = null
 
@@ -67,39 +56,20 @@ object LiveCatalog {
         cachedBuiltin?.let { return it }
         return synchronized(this) {
             cachedBuiltin ?: run {
+                // 只读 cctv.m3u —— 它现在**只含「央视网 + 央视频」两类网页频道**。
+                //
+                // ⚠️ 这里原来还会并入 `iptv.m3u` / `iptv_verified.m3u` 两个直连源文件。
+                // 用户要求「主源里只保留央视网和央视频使用网页进入的台，剩下全部抛弃」
+                // 之后，那两个文件就**不该再混进主源**了：
+                //   · 直连源属于「GitHub 源」那一侧（而且那边是运行时实时拉的，更新得多）
+                //   · 混在一起会让「主源」这个名字名不副实 —— 用户选主源时
+                //     以为自己选的是"央视网页"，结果列表里一堆直连台
                 val text = runCatching {
                     context.assets.open(BUILTIN_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() }
                 }.getOrDefault("")
                 val groups = parse(text).ifEmpty { fallbackCctv() }
-
-                // 内置的 IPTV 直连源（扫描得来的，见 assets/live/iptv.m3u）。
-                //
-                // 放在**前面**，这样：
-                //   · 「全部」里 IPTV 台排在央视/地方台网页源之前（直连更省资源，
-                //     老电视优先用直连，不用起 WebView）
-                //   · 「IPTV」分类直接就是这个文件的内容
-                //
-                // 用户自己扫描或导入的源优先级更高（见 load），会盖过这一份。
-                val iptv = runCatching {
-                    context.assets.open(IPTV_ASSET)
-                        .bufferedReader(Charsets.UTF_8).use { it.readText() }
-                }.getOrNull()?.let { parse(it) }.orEmpty()
-
-                // 已验证源排最前：它们是**真解码验证过**的，
-                // 比"列表说有"可靠得多（实测 182 个只有 22 个能播）。
-                val verified = runCatching {
-                    context.assets.open(IPTV_VERIFIED_ASSET)
-                        .bufferedReader(Charsets.UTF_8).use { it.readText() }
-                }.getOrNull()?.let { parse(it) }.orEmpty()
-
-                val merged = when {
-                    verified.isEmpty() && iptv.isEmpty() -> groups
-                    verified.isEmpty() -> iptv + groups
-                    iptv.isEmpty() -> verified + groups
-                    else -> verified + iptv + groups
-                }
-                cachedBuiltin = merged
-                merged
+                cachedBuiltin = groups
+                groups
             }
         }
     }
@@ -262,11 +232,44 @@ object LiveCatalog {
         if (!forceRefresh) {
             val snap = LiveCache.load(context, cacheKey)
             if (snap != null) {
+                val fresh = snap.isFresh()
                 android.util.Log.i(
                     TAG,
                     "频道表走磁盘缓存：${snap.groups.size} 组 / ${snap.channels.size} 个频道" +
-                        "（新鲜=${snap.isFresh()}）",
+                        "（新鲜=$fresh）",
                 )
+                // ---------- 过期就**后台补刷**（stale-while-revalidate）----------
+                //
+                // ⚠️ 原来这里过期了也直接把旧数据返回，**什么都不做** ——
+                // 结果 GitHub 订阅源最多 6 小时（`LiveCache.TTL_MS`）才更新一次，
+                // 而且过期后也不会自己刷，非得等用户清缓存。
+                //
+                // 用户明确要求：「确保 github 源的电视节目会自动更新订阅，
+                // 不用升级软件就能自动更新」。
+                //
+                // 做法：这次先用旧数据（保证秒开，不卡首屏），
+                // 同时在后台按新配置重新拉一遍并落盘 —— 下次进 App 就是新的。
+                //
+                // 为什么不"过期就阻塞等新数据"：老电视上拉 4 个列表最坏 12 秒，
+                // 用户对着转圈等 12 秒是更糟的体验（这个坑踩过）。
+                if (!fresh) {
+                    android.util.Log.i(TAG, "缓存已过期 → 后台补刷（不阻塞本次）")
+                    CoroutineScope(Dispatchers.IO).launch {
+                        runCatching {
+                            // forceRefresh=true 才会跳过缓存真的去拉
+                            loadWithChannels(
+                                context = context,
+                                customSourceUrl = customSourceUrl,
+                                preset = preset,
+                                oldTvMode = oldTvMode,
+                                forceRefresh = true,
+                            )
+                            android.util.Log.i(TAG, "后台补刷完成")
+                        }.onFailure {
+                            android.util.Log.w(TAG, "后台补刷失败（保留旧数据）：${it.message}")
+                        }
+                    }
+                }
                 return snap.groups to snap.channels
             }
         } else {

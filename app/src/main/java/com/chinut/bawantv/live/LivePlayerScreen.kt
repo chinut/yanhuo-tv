@@ -2001,9 +2001,65 @@ private const val WEB_SLOW_HINT_MS = 10_000L
  *
  * 代价是多一次 GPU 拷贝，换来画面正常 —— 对老电视完全值得。
  */
+/**
+ * 是不是 Amlogic 芯片的设备。
+ *
+ * **为什么需要这个判断**：Amlogic 上 `TextureView` 渲染绿屏（实测见
+ * [applySurfaceWorkaround] 的注释）。所以那个 workaround 必须对它跳过。
+ *
+ * ## 判据为什么用「解码器名字」而不是 `Build.*`
+ *
+ * `Build.HARDWARE` 在实测机上确实是 `amlogic`，但**不是所有厂商都填** ——
+ * 小米/TCL/创维都可能用 Amlogic 方案却把 HARDWARE 填成别的。
+ * `ro.board.platform`（实测 `t5d`）更准，但它是系统属性，
+ * 从 Java 读要反射 `SystemProperties`，在新系统上会被限制。
+ *
+ * 而 `MediaCodecList` 里 Amlogic 的解码器名字**一定带 "amlogic"**
+ * （实测：`OMX.amlogic.avc.decoder.awesome2`、`OMX.amlogic.mpeg4.decoder.awesome2`）。
+ * 这比任何字符串属性都可靠 —— 它就是驱动本身。
+ *
+ * 结果缓存：这个查询有点重，没必要每次渲染都做。
+ */
+private fun isAmlogicDevice(): Boolean = runCatching {
+    val hw = android.os.Build.HARDWARE.lowercase()
+    if (hw.contains("amlogic") || hw.contains("meson")) return true
+    // 查解码器名字（最可靠）
+    val list = android.media.MediaCodecList(android.media.MediaCodecList.ALL_CODECS)
+    list.codecInfos.any { it.name.lowercase().contains("amlogic") }
+}.getOrDefault(false)
+
 private fun androidx.media3.ui.PlayerView.applySurfaceWorkaround() {
     runCatching { setEnableComposeSurfaceSyncWorkaround(true) }
         .onFailure { android.util.Log.w(TAG_LIVE, "Compose 合成修正开关不可用：$it") }
+
+    // ============ ⚠️ Amlogic 上**绝对不要**切 TextureView ============
+    //
+    // ## 为什么（实测，别再"优化"回来）
+    //
+    // 这个 workaround 是为了修「SurfaceView 在 Compose 里合成出错」
+    // （撕裂 / 残影），代价是换成 TextureView 走普通 View 绘制。
+    //
+    // 但 **Amlogic 芯片上 TextureView 渲染出来是纯绿的**：
+    //
+    //     机器指纹：ro.hardware = amlogic   ro.board.platform = t5d
+    //     日志：    BawanLive: 视频渲染已切到 TextureView
+    //     实测：    全屏画面 平均RGB [0.0, 76.0, 0.0]  绿偏 +76.0
+    //              首页预览 [3.9, 55.7, 3.8]           绿偏 +51.8
+    //     换回 SurfaceView：[77.4, 74.3, 73.9]        绿偏  -1.4  ✅
+    //
+    // 也就是说：**这个 workaround 在这类机器上制造的问题，比它修的问题严重得多。**
+    // 相比之下"撕裂 / 残影"只是观感瑕疵，绿屏是"根本没法看"。
+    //
+    // 所以这里做硬件判断：Amlogic 直接跳过，保持 SurfaceView。
+    // 宁可接受偶发的合成瑕疵，也不能整屏绿。
+    if (isAmlogicDevice()) {
+        android.util.Log.i(
+            TAG_LIVE,
+            "Amlogic 设备（${android.os.Build.HARDWARE}）—— 跳过 TextureView 切换，" +
+                "保持 SurfaceView（TextureView 在这类芯片上渲染绿屏）",
+        )
+        return
+    }
 
     // 只在真正需要时切一次，避免 AndroidView 多次 update 时重复替换
     if (getVideoSurfaceView() is android.view.TextureView) {

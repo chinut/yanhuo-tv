@@ -52,8 +52,23 @@ object LiveCache {
     private const val TAG = "BawanLiveCache"
     private const val FILE = "live_cache.tsv"
 
-    /** 频道表的新鲜期。这段时间内直接用缓存，不去联网。 */
-    const val TTL_MS = 6 * 60 * 60 * 1000L      // 6 小时
+    /**
+     * 频道表的新鲜期。这段时间内直接用缓存，不去联网。
+     *
+     * ## 为什么是 1 小时（原来是 6 小时）
+     *
+     * 用户要求：「确保 github 源的电视节目会**自动更新订阅**，
+     * 不用升级软件就能自动更新」。
+     *
+     * 直播源失效很快（尤其是社区转发的直连地址），6 小时太长 ——
+     * 用户在下午打开 App，看到的可能还是早上那批已经挂掉的源。
+     *
+     * 配合 [com.chinut.bawantv.live.LiveCatalog.loadWithChannels] 里的
+     * **过期后台补刷**（stale-while-revalidate）：这次先用旧数据保证秒开，
+     * 后台悄悄拉新的落盘，下次进 App 就是新的。
+     * 所以缩短 TTL **不会**让用户等 —— 它只决定"多快开始后台刷新"。
+     */
+    const val TTL_MS = 60 * 60 * 1000L          // 1 小时
 
     private const val US = '\u001F'      // 字段分隔
     private const val RS = '\u001E'      // 数组内分隔

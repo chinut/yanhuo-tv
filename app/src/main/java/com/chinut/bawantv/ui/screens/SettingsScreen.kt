@@ -312,30 +312,19 @@ fun SettingsScreen(
                     // 老电视模式下的强制逻辑在 LiveCatalog.load 里（运行时覆盖），
                     // 所以这里只是不给入口，设置值保持不变 ——
                     // 用户关掉开关后就恢复他原来选的主源。
-                    if (!prefs.oldTvMode) {
-                        // ---------- 主源（A / B / AB）----------
-                        //
-                        // A = App 内置频道表（央视/省市台网页 + 内置直连源）
-                        // B = best-fan/iptv-sources 开源源（每日自动检测，全直连）
-                        // AB = 两个都加载，播放页里自己挑
-                        TvRow(
-                            label = "主源",
-                            hint = com.chinut.bawantv.live.LivePreset
-                                .of(prefs.livePreset).hint,
-                            hintColor = Ink.TextTertiary,
-                            actionText = com.chinut.bawantv.live.LivePreset
-                                .of(prefs.livePreset).label,
-                        ) {
-                            val all = com.chinut.bawantv.live.LivePreset.entries
-                            val cur = all.indexOf(
-                                com.chinut.bawantv.live.LivePreset.of(prefs.livePreset)
-                            )
-                            prefs.livePreset = all[(cur + 1) % all.size].name
-                            toast(context, "主源已切到 " +
-                                com.chinut.bawantv.live.LivePreset.of(prefs.livePreset).label)
-                        }
-                    }
-
+                    // 原来这里有个「主源」切换项（内置频道 / GitHub 源 / 双源），
+                    // 只在老电视模式关闭时显示。
+                    //
+                    // **已按用户要求移除**：
+                    //   「移除关闭老电视模式后的源切换」
+                    //
+                    // 为什么移除是合理的：老电视模式关掉之后，本来就是
+                    // "GitHub 源 + 把主源（央视网/央视频网页）置顶"这一种组合，
+                    // 没有第二种可选 —— 留一个只有一个选项的"切换"是假选项，
+                    // 和之前三横面板那个"看着能选其实不能"的毛病是同一类。
+                    //
+                    // 主源与老电视模式的配合逻辑在
+                    // [com.chinut.bawantv.live.LiveCatalog.loadWithChannels] 里。
                 }
 
                 SettingsCard(
