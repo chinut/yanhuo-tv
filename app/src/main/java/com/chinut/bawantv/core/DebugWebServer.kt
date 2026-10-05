@@ -318,12 +318,41 @@ object DebugWebServer {
                     //
                     // 鉴权：与网页调试共用同一个口令（prefs.debugToken）。
                     // 口令为空时**不校验**（家庭局域网，默认无口令，方便直接用）。
-                    path == "/api/remote/ping" && method == "GET" ->
+                    path == "/api/remote/ping" && method == "GET" -> {
+                        // ---------- 遥控协议 v2 ----------
+                        //
+                        // 相对 v1 只**新增**字段，不改已有语义（见交接包 README 第三节）：
+                        //
+                        //   name    电视名。用户设过就用用户的，否则用机型名，
+                        //           保证手机端永远不会显示空白
+                        //   port    **实际**监听端口。8899 被占用时会退让到
+                        //           8900/8901…，手机端靠这个字段免去全端口扫描
+                        //           （原来它要扫 253 个地址 × 20 个端口 ≈ 28 秒）
+                        //   protocol  1 → 2
+                        //
+                        // ⚠️ `app` 字段**必须保留**：老版本手机 App 只读它，
+                        // 删掉会让老用户找不到电视。
+                        val rawName = BawanApp.prefs.deviceName.trim()
+                        val name = rawName.ifBlank {
+                            (android.os.Build.MODEL ?: "").trim().ifBlank { "焰火TV" }
+                        }
+                        //
+                        // ⚠️ 必须用 JSONObject 拼，不要手写字符串模板：
+                        // 用户起的中文名或带引号（"）的名字会把手写 JSON 弄坏，
+                        // 手机端解析失败会当成"没找到电视"。
                         respond(
                             out, 200,
-                            """{"ok":true,"app":"焰火TV","protocol":1,"screen":"${RemoteBus.screen()}"}""",
+                            org.json.JSONObject().apply {
+                                put("ok", true)
+                                put("app", "焰火TV")        // 保留：老手机端只读这个
+                                put("name", name)            // 新增：手机端优先读这个
+                                put("protocol", 2)           // 1 → 2
+                                put("port", _port.value)     // 新增：实际监听端口
+                                put("screen", RemoteBus.screen())
+                            }.toString(),
                             "application/json; charset=utf-8",
                         )
+                    }
 
                     path == "/api/remote/status" && method == "GET" ->
                         respond(out, 200, remoteStatus(context), "application/json; charset=utf-8")

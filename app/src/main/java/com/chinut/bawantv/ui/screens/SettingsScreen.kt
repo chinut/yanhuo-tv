@@ -289,6 +289,14 @@ fun SettingsScreen(
                     ) { prefs.debugEnabled = it }
 
                     Spacer(Modifier.height(4.sdp))
+                    // 电视名称（遥控协议 v2）：
+                    // 手机遥控列表里显示它，用来区分家里多台电视
+                    // （原来 ping 里写死"焰火TV"，两台电视名字一样，分不清）。
+                    KeyValueRow(
+                        label = "电视名称",
+                        value = prefs.deviceName.ifBlank { "（未设置，显示机型名）" },
+                        onEdit = { editing = EditTarget.DeviceName },
+                    )
                     KeyValueRow(
                         label = "调试端口",
                         value = prefs.debugPort.toString(),
@@ -895,12 +903,14 @@ fun SettingsScreen(
 private enum class EditTarget(val title: String) {
     Domain("低端影视域名"),
     LiveSource("直播源地址"),
+    DeviceName("电视名称"),
     Port("调试端口"),
     Token("手机调试口令");
 
     fun current(prefs: com.chinut.bawantv.core.AppPrefs): String = when (this) {
         Domain -> prefs.domain
         LiveSource -> prefs.liveSourceUrl
+        DeviceName -> prefs.deviceName
         Port -> prefs.debugPort.toString()
         Token -> prefs.debugToken
     }
@@ -909,6 +919,8 @@ private enum class EditTarget(val title: String) {
         when (this) {
             Domain -> prefs.domain = value
             LiveSource -> prefs.liveSourceUrl = value
+            // take(24) 是防御：手机遥控列表一行放不下太长的名字
+            DeviceName -> prefs.deviceName = value.trim().take(24)
             Port -> value.toIntOrNull()?.let { prefs.debugPort = it.coerceIn(1024, 65535) }
             Token -> prefs.debugToken = value
         }

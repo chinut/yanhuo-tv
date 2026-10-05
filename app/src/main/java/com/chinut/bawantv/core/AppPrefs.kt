@@ -116,6 +116,17 @@ class AppPrefs(context: Context) {
 
     // ==================== 手机网页调试 ====================
 
+    /**
+     * 电视名称。
+     *
+     * 手机遥控列表里显示这个名字，用来区分家里多台电视
+     * （原来 `ping` 里写死 "焰火TV"，两台电视名字完全一样，用户分不清）。
+     * 留空时手机端会退回显示机型名。
+     */
+    var deviceName: String
+        get() = sp.getString(KEY_DEVICE_NAME, "") ?: ""
+        set(v) = sp.edit().putString(KEY_DEVICE_NAME, v).apply().also { touch() }
+
     /** 局域网调试服务端口 */
     var debugPort: Int
         get() = sp.getInt(KEY_PORT, 8899)
@@ -340,6 +351,7 @@ class AppPrefs(context: Context) {
         KEY_MEM_LOG to logMemory.toString(),
         KEY_DEBUG_ON to debugEnabled.toString(),
         KEY_PORT to debugPort.toString(),
+        KEY_DEVICE_NAME to deviceName,
         KEY_PARENTAL_ON to parentalEnabled.toString(),
         KEY_PARENTAL_PIN to parentalPin,
         KEY_PARENTAL_BLOCK to parentalBlockedWords,
@@ -385,6 +397,10 @@ class AppPrefs(context: Context) {
         map[KEY_PORT]?.toIntOrNull()?.let {
             e.putInt(KEY_PORT, it.coerceIn(1024, 65535))
         }
+        // 电视名称（遥控协议 v2）。`take(24)` 是防御：手机列表一行放不下太长。
+        map[KEY_DEVICE_NAME]?.let { e.putString(KEY_DEVICE_NAME, it.trim().take(24)) }
+        // 兼容网页表单用短名
+        map["device_name"]?.let { e.putString(KEY_DEVICE_NAME, it.trim().take(24)) }
         map[KEY_PARENTAL_ON]?.let { e.putBoolean(KEY_PARENTAL_ON, htmlBool(it)) }
         map[KEY_PARENTAL_PIN]?.let { e.putString(KEY_PARENTAL_PIN, it) }
         map[KEY_PARENTAL_BLOCK]?.let { e.putString(KEY_PARENTAL_BLOCK, it) }
@@ -437,6 +453,9 @@ class AppPrefs(context: Context) {
         private const val KEY_FAV_CH = "fav_channels"
         private const val KEY_PORT = "debug_port"
         private const val KEY_DEBUG_ON = "debug_enabled"
+
+    /** 电视名称（遥控协议 v2）。见 [deviceName]。 */
+    private const val KEY_DEVICE_NAME = "device_name"
         private const val KEY_TOKEN = "debug_token"
         private const val KEY_AUTO_UPDATE = "auto_update"
         private const val KEY_SKIP_VERSION = "skip_version"
